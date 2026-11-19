@@ -78,7 +78,7 @@ os.makedirs(DEST + '/img', exist_ok=True)
 for c in cards:
     shutil.copy('/home/claude/src/out/img/' + c['img'], DEST + '/img/' + c['img'])
 with open(DEST + '/data.js', 'w') as f:
-    f.write('// Automatisch erzeugt aus dem Analysis-Skript (Kapitel 1–9). Nicht von Hand ändern.\n')
+    f.write('// Automatisch erzeugt aus dem Skript (Kapitel 1–9). Nicht von Hand ändern.\n')
     f.write('window.CARDS = ' + json.dumps(cards, ensure_ascii=False, separators=(',', ':')) + ';\n')
     f.write('window.CHAPTERS = ' + json.dumps({k: v for k, v in chap_titles.items() if k <= 9}, ensure_ascii=False) + ';\n')
 from collections import Counter

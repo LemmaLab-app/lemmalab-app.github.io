@@ -1,19 +1,19 @@
 <p align="center"><img src="icons/icon-512.png" width="140" alt="LemmaLab"></p>
 
-# LemmaLab – Analysis I: Definitionen & Sätze lernen
+# LemmaLab – Definitionen & Sätze lernen
 
 Private Lernhilfe, nur für den Eigengebrauch, ohne Gewähr.
 
 Lern-Website (Anki + Quizlet in einem) für **alle 228 Definitionen, Sätze, Theoreme, Lemmata,
-Propositionen und Korollare aus Kapitel 1–9** des Skripts «Analysis I und II».
+Propositionen und Korollare aus Kapitel 1–9** des Vorlesungsskripts.
 Die Aussagen sind exakt aus dem Skript ausgeschnitten (keine Abtippfehler).
 
 ## Funktionen
 - **Lernen (Spaced Repetition, FSRS-5):** Titel → Aussage selbst formulieren → aufdecken → Nochmal/Schwer/Gut/Einfach.
   Der Algorithmus plant jede Karte kurz vor dem Vergessen; Fortschritt wird gespeichert, es geht jeden Tag dort weiter, wo du warst.
 - **Prüfungs-Priorisierung:** 5 Stufen (Kern, Wichtig, Solide, Ergänzung, Rand). Neue Karten kommen in dieser Reihenfolge,
-  Kernstoff wird auf 95 % Abrufsicherheit gehalten, Randstoff auf 85 %. Beweis-Wahrscheinlichkeiten aus dem Repo
-  *Prozentuale-Wichtigkeit-der-Beweise-Analysis-1* werden angezeigt.
+  Kernstoff wird auf 95 % Abrufsicherheit gehalten, Randstoff auf 85 %. Beweis-Wahrscheinlichkeiten aus der
+  Auswertung alter Prüfungen werden angezeigt.
 - **Prüfungsdatum:** Tempo der neuen Karten wird automatisch berechnet (alles spätestens 3 Wochen vor der Prüfung eingeführt);
   keine Wiederholung wird über die Prüfung hinaus geplant – alles kommt in den letzten Tagen noch einmal.
 - **Quiz (Zuordnen):** Aussage ohne Titel, richtigen Namen wählen. Fehler kommen am selben Tag im Lernmodus zurück.

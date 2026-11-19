@@ -1,7 +1,7 @@
 {
-  "name": "LemmaLab – Analysis I",
+  "name": "LemmaLab",
   "short_name": "LemmaLab",
-  "description": "Definitionen, Sätze und Korollare aus Analysis I mit Spaced Repetition lernen.",
+  "description": "Definitionen, Sätze und Korollare mit Spaced Repetition lernen.",
   "lang": "de-CH",
   "start_url": "./",
   "scope": "./",

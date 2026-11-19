@@ -1,9 +1,9 @@
-/* Analysis I – Definitionen & Sätze lernen
+/* LemmaLab – Definitionen, Sätze & Korollare lernen
  * Spaced Repetition mit FSRS-5, Prüfungs-Priorisierung, Quiz, Test, Statistik.
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-19.12';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-19.13';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -12,7 +12,14 @@ const CARDS = window.CARDS || [];
 const BY_ID = Object.fromEntries(CARDS.map(c => [c.id, c]));
 const MIN = 60e3, HOUR = 3600e3, DAY = 86400e3;
 const DAY_START_HOUR = 4;                     // neuer Lerntag beginnt um 04:00
-const LS_KEY = 'ana1-lernen-v1';
+const LS_KEY = 'lemmalab-v1';
+// Frühere Speicher-Namen einmalig übernehmen (Fortschritt geht nicht verloren)
+(() => { try {
+  for (const [o, n] of [['ana1-lernen-v1', 'lemmalab-v1'], ['ana1-zoom', 'lemmalab-zoom'], ['ana1-gist-v1', 'lemmalab-gist-v1']]) {
+    const v = localStorage.getItem(o);
+    if (v != null) { if (localStorage.getItem(n) == null) localStorage.setItem(n, v); localStorage.removeItem(o); }
+  }
+} catch (e) { } })();
 
 const PRIO = {
   5: { name: 'Kern',      color: 'var(--p5)', ret: 0.95, w: 5 },
@@ -1277,7 +1284,7 @@ function viewSettings() {
   </div>
   <h2>Zurücksetzen</h2>
   <div class="card"><button class="btn" style="color:var(--again)" data-act="resetall">Gesamten Fortschritt löschen</button></div>
-  <div class="muted small" style="margin:18px 4px">Version ${APP_VERSION} · <a href="#mehr" data-act="update">Nach Update suchen</a> · <a href="datenschutz.html">Datenschutz</a><br>LemmaLab – inoffizielle Lernhilfe, ohne Gewähr. Inhalte: Ausschnitte aus dem Skript «Analysis I und II» (Kapitel 1–9). Prioritäten & Beweis-Wahrscheinlichkeiten: eigene Schätzung aus alten Prüfungen. Algorithmus: FSRS-5.</div>`;
+  <div class="muted small" style="margin:18px 4px">Version ${APP_VERSION} · <a href="#mehr" data-act="update">Nach Update suchen</a> · <a href="datenschutz.html">Datenschutz</a><br>LemmaLab – inoffizielle Lernhilfe, ohne Gewähr. Inhalte: Ausschnitte aus dem Vorlesungsskript (Kapitel 1–9). Prioritäten & Beweis-Wahrscheinlichkeiten: eigene Schätzung aus alten Prüfungen. Algorithmus: FSRS-5.</div>`;
 }
 
 /* ============================================================
@@ -1292,7 +1299,7 @@ function modal(html) {
   document.body.appendChild(m);
 }
 function closeModal() { const m = $('#modal'); if (m) m.remove(); }
-let zoomW = (() => { try { return +localStorage.getItem('ana1-zoom') || Math.max(780, Math.round(window.innerWidth * 1.9)); } catch (e) { return 780; } })();
+let zoomW = (() => { try { return +localStorage.getItem('lemmalab-zoom') || Math.max(780, Math.round(window.innerWidth * 1.9)); } catch (e) { return 780; } })();
 let toastT;
 function toast(s) { const t = $('#toast'); t.textContent = s; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2200); }
 function applyTheme() {
@@ -1367,7 +1374,7 @@ document.addEventListener('click', e => {
     case 'learnwrong': { const ids = quiz.answers.filter(a => !a.ok).map(a => a.id); quiz = null; tab = 'heute'; startSession(ids); break; }
     case 'learnfiltered': { const ids = filteredCatalog().slice(0, 50).map(c => c.id); tab = 'heute'; startSession(ids); break; }
     case 'close': closeModal(); break;
-    case 'zin': case 'zout': { zoomW = clamp(Math.round(zoomW * (act === 'zin' ? 1.25 : 0.8)), 300, 2400); const im = $('#zimg'); if (im) im.style.width = zoomW + 'px'; try { localStorage.setItem('ana1-zoom', zoomW); } catch (e) { } break; }
+    case 'zin': case 'zout': { zoomW = clamp(Math.round(zoomW * (act === 'zin' ? 1.25 : 0.8)), 300, 2400); const im = $('#zimg'); if (im) im.style.width = zoomW + 'px'; try { localStorage.setItem('lemmalab-zoom', zoomW); } catch (e) { } break; }
     case 'export': exportJSON(); break;
     case 'csv': exportCSV(); break;
     case 'gistconnect': { const v = ($('#gistTok') || {}).value || ''; if (v.trim().length < 20) { toast('Bitte gültigen Token einfügen'); break; } Gist.connect(v); break; }
@@ -1414,7 +1421,7 @@ document.addEventListener('keydown', e => {
 });
 
 /* ---------- Export / Import ---------- */
-function exportString() { return JSON.stringify({ app: 'ana1-lernen', exported: new Date().toISOString(), ...S }); }
+function exportString() { return JSON.stringify({ app: 'lemmalab', exported: new Date().toISOString(), ...S }); }
 function exportJSON() {
   const s = exportString();
   const done = () => toast('Fortschritt in die Zwischenablage kopiert');
@@ -1425,7 +1432,7 @@ function showText(s) { modal(`<h3>Export</h3><p class="small muted">Diesen Text 
 function exportFile() {
   try {
     const blob = new Blob([exportString()], { type: 'application/json' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `analysis1-fortschritt-${dayKey()}.json`;
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `lemmalab-fortschritt-${dayKey()}.json`;
     document.body.appendChild(a); a.click(); a.remove();
     toast('Datei gespeichert');
   } catch (e) { showText(exportString()); }
@@ -1440,7 +1447,7 @@ function exportCSV() {
   const csv = logCSV();
   try {
     const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `analysis1-lerndaten-${dayKey()}.csv`;
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `lemmalab-lerndaten-${dayKey()}.csv`;
     document.body.appendChild(a); a.click(); a.remove(); toast('CSV gespeichert');
   } catch (e) { showText(csv); }
 }
@@ -1551,7 +1558,7 @@ window.addEventListener('visibilitychange', () => {
  * Geräte-Abgleich über ein privates GitHub-Gist
  * Token + Gist-ID liegen nur lokal (eigener Schlüssel), nie im Export.
  * ============================================================ */
-const GIST_KEY = 'ana1-gist-v1', GIST_FILE = 'analysis1-fortschritt.json';
+const GIST_KEY = 'lemmalab-gist-v1', GIST_FILE = 'lemmalab-fortschritt.json', OLD_GIST_FILE = 'analysis1-fortschritt.json';
 const Gist = {
   cfg: (() => { try { return JSON.parse(localStorage.getItem(GIST_KEY) || '{}'); } catch (e) { return {}; } })(),
   dirty: false, timer: null, busy: false, status: '', lastSync: 0,
@@ -1576,12 +1583,12 @@ const Gist = {
       let id = null;
       for (let page = 1; page <= 5 && !id; page++) {
         const list = await this.api(`/gists?per_page=100&page=${page}`);
-        const g = list.find(g => g.files && g.files[GIST_FILE]);
+        const g = list.find(g => g.files && (g.files[GIST_FILE] || g.files[OLD_GIST_FILE]));
         if (g) id = g.id;
         if (list.length < 100) break;
       }
       if (!id) {
-        const g = await this.api('/gists', { method: 'POST', body: JSON.stringify({ description: 'Analysis I – Lernfortschritt (automatisch)', public: false, files: { [GIST_FILE]: { content: exportString() } } }) });
+        const g = await this.api('/gists', { method: 'POST', body: JSON.stringify({ description: 'LemmaLab – Lernfortschritt (automatisch)', public: false, files: { [GIST_FILE]: { content: exportString() } } }) });
         id = g.id;
       }
       this.cfg.gistId = id; this.saveCfg();
@@ -1599,7 +1606,8 @@ const Gist = {
     if (!quiet) this.setStatus('Lade …');
     try {
       const g = await this.api('/gists/' + this.cfg.gistId);
-      const f = g.files && g.files[GIST_FILE];
+      this.oldFile = !!(g.files && g.files[OLD_GIST_FILE]);
+      const f = g.files && (g.files[GIST_FILE] || g.files[OLD_GIST_FILE]);
       if (f) {
         let txt = f.content;
         if (f.truncated && f.raw_url) txt = await (await fetch(f.raw_url, { cache: 'no-store' })).text();
@@ -1628,7 +1636,8 @@ const Gist = {
     if (this.busy) { this.timer = setTimeout(() => this.push(), 1500); return; }
     this.busy = true; this.dirty = false;
     try {
-      await this.api('/gists/' + this.cfg.gistId, { method: 'PATCH', body: JSON.stringify({ files: { [GIST_FILE]: { content: exportString() } } }) });
+      await this.api('/gists/' + this.cfg.gistId, { method: 'PATCH', body: JSON.stringify({ description: 'LemmaLab – Lernfortschritt (automatisch)', files: { [GIST_FILE]: { content: exportString() }, ...(this.oldFile ? { [OLD_GIST_FILE]: null } : {}) } }) });
+      this.oldFile = false;
       this.lastSync = now();
       this.setStatus('✓ abgeglichen ' + new Date().toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' }));
     } catch (e) { this.dirty = true; this.setStatus('⚠︎ ' + e.message); this.timer = setTimeout(() => this.push(), 30000); }
@@ -1643,7 +1652,7 @@ function gistSettingsHTML() {
   return `
     <div class="small">Damit iPhone und Mac denselben Stand haben: einmal pro Gerät einen GitHub-Token eintragen. Der Fortschritt landet dann in einem privaten Gist (nur für dich sichtbar).</div>
     <ol class="small" style="margin:10px 0 10px 18px;padding:0">
-      <li>Token erstellen: <a href="https://github.com/settings/tokens/new?scopes=gist&description=Analysis-1-Lernen" target="_blank" rel="noopener">github.com/settings/tokens/new</a> – nur das Häkchen <b>gist</b>, Ablauf z. B. „No expiration“ oder nach der Prüfung.</li>
+      <li>Token erstellen: <a href="https://github.com/settings/tokens/new?scopes=gist&description=LemmaLab" target="_blank" rel="noopener">github.com/settings/tokens/new</a> – nur das Häkchen <b>gist</b>, Ablauf z. B. „No expiration“ oder nach der Prüfung.</li>
       <li>Token (beginnt mit <code>ghp_</code>) kopieren und hier einfügen.</li>
       <li>Auf dem zweiten Gerät denselben Token eintragen – das Gist wird automatisch gefunden.</li>
     </ol>
