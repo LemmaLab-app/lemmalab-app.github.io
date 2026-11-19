@@ -1,6 +1,6 @@
 /* Service Worker: macht die Lern-App offline nutzbar.
  * Automatisch erzeugt aus tools/sw.template.js (tools/build_sw.py) – nicht von Hand ändern. */
-const CACHE = 'lemmalab-5bc20540ec';
+const CACHE = 'lemmalab-c9cb622a90';
 const FILES = [
  "./",
  "index.html",

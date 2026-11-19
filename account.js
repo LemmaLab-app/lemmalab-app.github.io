@@ -208,16 +208,13 @@ function accountSettingsHTML() {
     const av = m.avatar_url ? `<img class="av" src="${esc(m.avatar_url)}" alt="" referrerpolicy="no-referrer">` : `<span class="av accav">${esc((Cloud.user.email || '?')[0].toUpperCase())}</span>`;
     return UI.group([
       `<div class="ir iprof">${av}<span class="ir-l"><b>${esc(m.full_name || m.name || 'Angemeldet')}</b><small>${esc(Cloud.user.email || '')}</small></span></div>`,
-      UI.action('Jetzt abgleichen', 'cloudsync'),
-      isAdmin() ? UI.action('Admin-Bereich', 'tab:admin', { chev: true }) : '',
+      isAdmin() ? UI.action('Admin', 'tab:admin', { chev: true }) : '',
       UI.action('Abmelden', 'logout', { danger: true }),
-    ], { footer: `<span id="cloudStatus">${esc(Cloud.status || '')}</span>${Cloud.status ? ' · ' : ''}Dein Lernstand wird nach jeder Bewertung im Konto gespeichert und auf allen Geräten abgeglichen.` })
-    + UI.group([UI.action('Konto-Daten löschen', 'clouddelete', { danger: true })]);
+    ], { footer: `<span id="cloudStatus">${esc(Cloud.status || '')}</span>` });
   }
   return UI.group([
-    `<div class="ir iprof"><span class="av accav"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="9" r="3.5"/><path d="M5.5 19c1.2-3 3.7-4.5 6.5-4.5s5.3 1.5 6.5 4.5"/></svg></span><span class="ir-l"><b>Anmelden</b><small>Fortschritt auf allen Geräten</small></span></div>`,
-    UI.action('Mit Konto anmelden', 'login', { chev: true }),
-  ], { footer: 'Ohne Konto bleibt der Fortschritt nur auf diesem Gerät.' });
+    UI.action('Anmelden', 'login', { chev: true }),
+  ], { footer: 'Damit dein Fortschritt auf allen Geräten gleich ist.' });
 }
 
 document.addEventListener('click', e => {

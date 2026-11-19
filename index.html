@@ -900,6 +900,7 @@ header.top{margin-bottom:14px}
 
 /* Kapitel-Zeilen mit Balken rechts */
 .chr .ir-l{flex:1 1 auto}
+.chr .ir-l b{font-weight:400}
 .chb{width:34%;max-width:200px}
 .chb .bar{width:100%;height:6px}
 
@@ -941,6 +942,27 @@ details.more[open]>summary{margin-bottom:6px}
 /* Startseite */
 .home .ig{margin-top:12px}
 .hero ul.todo{margin-top:16px}
+
+/* =====================================================================
+ * Minimal: eine Sache pro Bildschirm
+ * ===================================================================== */
+.solo{min-height:calc(100vh - 220px);min-height:calc(100dvh - 220px);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px 0 20px}
+.solo svg[aria-label^="Tagesfortschritt"]{margin-bottom:22px}
+.solo-n{font-family:var(--sfd);font-weight:700;font-size:34px;letter-spacing:-.03em;line-height:1.1}
+.solo-s{color:var(--muted);font-size:15px;margin-top:6px}
+.solo-btn{width:min(320px,100%)!important;margin-top:28px}
+.solo-actions{margin-top:18px}
+.solo .donehero{padding:0}
+.solo .donehero .dt{font-size:30px}
+.solo .bigcheck{width:120px;height:120px;margin-bottom:14px}
+@media (min-width:768px) and (min-height:560px){
+  .solo{min-height:calc(100vh - 180px)}
+  .solo-n{font-size:40px}
+}
+details.adv2{margin-top:0}
+details.adv2[open]>summary{margin-bottom:22px}
+.fc .meta{margin-bottom:2px}
+.study-head .progress{margin-right:4px}
 </style>
 </head>
 <body>
@@ -960,10 +982,10 @@ details.more[open]>summary{margin-bottom:6px}
 <div id="navbar" aria-hidden="true"><span id="navTitle"></span></div>
 <div class="toast" id="toast"></div>
 <script src="vendor/katex/katex.min.js"></script>
-<script src="data.js?v=2026-11-19.29"></script>
-<script src="logic.js?v=2026-11-19.29"></script>
-<script src="app.js?v=2026-11-19.29"></script>
+<script src="data.js?v=2026-11-19.30"></script>
+<script src="logic.js?v=2026-11-19.30"></script>
+<script src="app.js?v=2026-11-19.30"></script>
 <script src="vendor/supabase/supabase.js"></script>
-<script src="account.js?v=2026-11-19.29"></script>
+<script src="account.js?v=2026-11-19.30"></script>
 </body>
 </html>

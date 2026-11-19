@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-19.29';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-19.30';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -643,7 +643,7 @@ const ICONS = {
   statistik: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
   mehr: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
 };
-const TABS = [['heute', 'Lernen'], ['quiz', 'Quiz & Test'], ['katalog', 'Katalog'], ['statistik', 'Statistik'], ['mehr', 'Einstellungen']];
+const TABS = [['heute', 'Lernen'], ['quiz', 'Quiz'], ['katalog', 'Karten'], ['statistik', 'Fortschritt'], ['mehr', 'Einstellungen']];
 let tab = (location.hash || '#heute').slice(1);
 if (!TABS.some(t => t[0] === tab)) tab = 'heute';
 
@@ -685,7 +685,7 @@ window.addEventListener('hashchange', () => { const t = location.hash.slice(1); 
 function render() {
   applyTheme();
   Model.sync();
-  { const h = $('#hdrTitle'); if (h) h.textContent = ({ heute: 'Lernen', quiz: 'Quiz & Test', katalog: 'Katalog', statistik: 'Statistik', mehr: 'Einstellungen', admin: 'Admin' })[tab] || 'LemmaLab'; }
+  { const h = $('#hdrTitle'); if (h) h.textContent = ({ heute: 'Lernen', quiz: 'Quiz', katalog: 'Karten', statistik: 'Fortschritt', mehr: 'Einstellungen', admin: 'Admin' })[tab] || 'LemmaLab'; }
   const focusMode = (tab === 'heute' && session && session.cur) || (tab === 'quiz' && quiz && quiz.i < quiz.items.length);
   document.body.classList.toggle('focus', !!focusMode);
   renderTabs();
@@ -815,54 +815,35 @@ function todoHTML(ts) {
 }
 function doneHeroHTML(ts) {
   const tomorrow = CARDS.filter(c => { const x = S.cards[c.id]; return x && x.st && !x.susp && x.due < dayStart() + 2 * DAY; }).length;
-  const L = S.log.filter(l => l[0] >= dayStart());
-  const mins = Math.max(1, Math.round(L.reduce((a, l) => a + l[4], 0) / 600));
-  const st = streakDays();
   return `<div class="donehero">
     <svg class="bigcheck" viewBox="0 0 120 120"><circle class="c" cx="60" cy="60" r="52"/><path class="k" d="M36 62l16 16 33-35"/></svg>
-    <div class="dt">Für heute geschafft!</div>
-    <div class="ds">${L.length ? `${L.length} Bewertungen in ${mins} Min` : 'Heute war nichts fällig'}${st ? ` · ${st} Tag${st === 1 ? '' : 'e'} in Folge` : ''}</div>
-    <div class="dn">Morgen fällig: <b>${tomorrow}</b> Karte${tomorrow === 1 ? '' : 'n'}</div>
+    <div class="dt">Für heute erledigt</div>
+    <div class="ds">Morgen ${tomorrow} Karte${tomorrow === 1 ? '' : 'n'}</div>
   </div>`;
 }
 function viewHome() {
   const q = buildQueue();
-  const dte = daysToExam();
-  const learning = q.queue.length - q.nRev - q.nNew;
-  const rd = readiness();
-  const introduced = CARDS.filter(c => S.cards[c.id] && S.cards[c.id].st).length;
   const todayLog = S.log.filter(l => l[0] >= dayStart());
-  const minToday = Math.round(todayLog.reduce((a, l) => a + l[4], 0) / 600);
   const pt = personalTimes();
-  const estMin = Math.round((q.nRev * pt.review + q.nNew * pt.newCost + Math.max(0, learning) * pt.learn) / 60);
-  const focus = nextFocus();
+  const learning = q.queue.length - q.nRev - q.nNew;
+  const estMin = Math.max(1, Math.round((q.nRev * pt.review + q.nNew * pt.newCost + Math.max(0, learning) * pt.learn) / 60));
   const ts = todayStatus();
-  const chap = groupStats(c => c.chap, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
-  return `<div class="home"><div class="col">
-  <div class="card hero">
-    <div class="row" style="gap:14px;align-items:center;flex-wrap:nowrap">${ringSVG(todayLog.length, todayLog.length + q.queue.length, 64)}<div style="min-width:0"><div class="htitle">Heute</div><div class="muted small">${ts.allDone ? 'Alles erledigt' : `${todayLog.length} von ${todayLog.length + q.queue.length} Karten`}</div></div></div>
-    ${ts.allDone ? doneHeroHTML(ts) : todoHTML(ts)}
-    <div style="margin-top:14px">
-      ${q.queue.length
-        ? `<button class="btn primary big" data-act="start">${ts.startedToday ? 'Weiterlernen' : 'Lernen starten'} · ca. ${Math.max(1, estMin)} Min</button>`
-        : `${ts.allDone ? '' : `<div class="muted small center" style="margin-bottom:10px">${q.later.length} Karte${q.later.length === 1 ? '' : 'n'} in Lernschritten – kommen in wenigen Minuten wieder.</div>`}
-           <div class="muted small center" style="margin-bottom:8px">Freiwillig weiterüben:</div>
-           <div class="row" style="gap:8px"><button class="btn big" style="flex:1" data-act="extra">10 neue Karten</button>${aheadIds().length ? `<button class="btn big" style="flex:1" data-act="ahead">Vorausüben (${Math.min(20, aheadIds().length)})</button>` : ''}</div>`}
-    </div>
-  </div>
-
-  ${UI.group([
-    UI.row('Prüfungsbereit', `<span class="v">${Math.round(rd.exam * 100)} %</span>`),
-    UI.row('Eingeführt', `<span class="v">${introduced} von ${CARDS.length}</span>`),
-    UI.row('Prüfung', `<span class="v">${dte > 0 ? `in ${dte} Tagen` : dte === 0 ? 'heute' : 'vorbei'}</span>`),
-  ], { cls: 'tight' })}
-  </div><div class="col">
-  ${focus ? `<h2>Als Nächstes</h2>${focus}` : ''}
-  </div></div>`;
+  const dte = daysToExam();
+  if (ts.allDone || !q.queue.length) {
+    return `<div class="solo">${ts.allDone ? doneHeroHTML(ts) : `<div class="donehero"><div class="dt">Gleich geht's weiter</div><div class="ds">${q.later.length} Karte${q.later.length === 1 ? '' : 'n'} kommen in wenigen Minuten wieder.</div></div>`}
+      <div class="solo-actions"><button class="linkbtn2" data-act="extra">10 neue Karten lernen</button></div></div>`;
+  }
+  const total = todayLog.length + q.queue.length;
+  return `<div class="solo">
+    ${ringSVG(todayLog.length, total, 168)}
+    <div class="solo-n">${q.queue.length} Karte${q.queue.length === 1 ? '' : 'n'}</div>
+    <div class="solo-s">etwa ${estMin} Minute${estMin === 1 ? '' : 'n'}${dte > 0 ? ` · Prüfung in ${dte} Tagen` : ''}</div>
+    <button class="btn primary big solo-btn" data-act="start">${ts.startedToday ? 'Weiterlernen' : 'Lernen'}</button>
+  </div>`;
 }
 function ringSVG(done, total, size = 38) {
-  const f = total ? Math.min(1, done / total) : 1, sw = size > 50 ? 7 : 4, r = (size - sw) / 2 - 1, C = 2 * Math.PI * r, c = size / 2;
-  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="flex:none" aria-label="Tagesfortschritt ${Math.round(f * 100)} Prozent"><circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="color-mix(in srgb,var(--accent) 16%,transparent)" stroke-width="${sw}"/><circle cx="${c}" cy="${c}" r="${r}" fill="none" class="ringp" stroke="var(--accent)" stroke-width="${sw}" stroke-linecap="round" stroke-dasharray="${(f * C).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 ${c} ${c})" style="transition:stroke-dasharray .6s ease"/><text x="${c}" y="${c + (size > 50 ? 5 : 3.5)}" text-anchor="middle" font-size="${size > 50 ? 15 : 10.5}" font-weight="700" fill="var(--ink)" style="font-family:var(--sfd)">${Math.round(f * 100)}%</text></svg>`;
+  const f = total ? Math.min(1, done / total) : 1, sw = size > 100 ? 14 : size > 50 ? 7 : 4, r = (size - sw) / 2 - 1, C = 2 * Math.PI * r, c = size / 2;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="flex:none" aria-label="Tagesfortschritt ${Math.round(f * 100)} Prozent"><circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="color-mix(in srgb,var(--accent) 16%,transparent)" stroke-width="${sw}"/><circle cx="${c}" cy="${c}" r="${r}" fill="none" class="ringp" stroke="var(--accent)" stroke-width="${sw}" stroke-linecap="round" stroke-dasharray="${(f * C).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 ${c} ${c})" style="transition:stroke-dasharray .6s ease"/>${size > 100 ? '' : `<text x="${c}" y="${c + (size > 50 ? 5 : 3.5)}" text-anchor="middle" font-size="${size > 50 ? 15 : 10.5}" font-weight="700" fill="var(--ink)" style="font-family:var(--sfd)">${Math.round(f * 100)}%</text>`}</svg>`;
 }
 /* Konfetti-Animation (abgeschaltet bei „Bewegung reduzieren“) */
 function celebrate() {
@@ -959,18 +940,8 @@ function viewStudy() {
     const lapsed = [...new Set(rev.filter(l => l[2] === 1).map(l => l[1]))].map(id => BY_ID[id]);
     const ts = todayStatus();
     if (ts.allDone && !s.celebrated) { s.celebrated = true; setTimeout(() => celebrate(), 60); }
-    return `<div class="card">${ts.allDone ? doneHeroHTML(ts) : `<div class="center"><h3>Sitzung abgeschlossen</h3><div class="muted small">Für heute ist noch etwas offen – siehe Übersicht.</div></div>`}
-      <div class="grid g4" style="margin-top:12px">
-        <div class="kpi center"><div class="v">${L.length}</div><div class="l">Bewertungen</div></div>
-        <div class="kpi center"><div class="v">${fresh.length}</div><div class="l">neu gelernt</div></div>
-        <div class="kpi center"><div class="v">${acc == null ? '–' : acc + '%'}</div><div class="l">Wiederholungen gewusst</div></div>
-        <div class="kpi center"><div class="v">${Math.max(1, Math.round(secs / 60))}</div><div class="l">Minuten</div></div>
-      </div>
-      <div class="muted small center" style="margin-top:10px">${ts.allDone ? '' : `Morgen fällig: ${tomorrow} Karten · `}Ø ${L.length ? fmtSec(secs / L.length) : '–'} pro Bewertung</div>
-      ${lapsed.length ? `<h3 style="margin-top:18px">Kurz nachlesen</h3>${UI.group(lapsed.map(liHTML))}` : ''}
-      <div class="row" style="justify-content:center;margin-top:16px">
-        <button class="btn" data-act="home">Zur Übersicht</button>
-        <button class="btn primary" data-act="tab:statistik">Statistik ansehen</button></div></div>`;
+    return `<div class="solo">${ts.allDone ? doneHeroHTML(ts) : `<div class="donehero"><div class="dt">Pause</div><div class="ds">${L.length} Karten erledigt.</div></div>`}
+      <button class="btn primary big solo-btn" data-act="home">Fertig</button></div>`;
   }
   const c = BY_ID[s.cur], x = cs(c.id);
   const isNew = !x.st;
@@ -981,7 +952,7 @@ function viewStudy() {
   <div class="study-head">
     <button class="btn ghost" data-act="home" title="Beenden">✕</button>
     <div class="progress"><div style="width:${pct}%"></div></div>
-    <span class="small muted">${left} übrig</span>
+
     ${s.undo.length ? '<button class="btn ghost small" data-act="undo" title="Rückgängig (U)">↶</button>' : ''}
   </div>
   <div class="card fc${s.revealed && swipeMode() ? ' swipeable' : ''}">
@@ -991,9 +962,8 @@ function viewStudy() {
       ${isNew ? '<span class="muted small">· neu</span>' : ''}
     </div>
     <div class="ttl">${esc(c.title) || esc(c.kind + ' ' + c.nr)}</div>
-    <div class="meta">Kapitel ${c.chap} · S. ${c.page}${c.proofP && c.proofP >= 0.2 ? ` · Beweis oft geprüft` : ''}</div>
+    <div class="meta">Kapitel ${c.chap}</div>
     ${!s.revealed ? `
-      <div class="prompt">${promptFor(c)}</div>
       ${S.settings.typeAnswer ? `<textarea class="note" id="answer" placeholder="Hier aufschreiben (wird nicht gespeichert) …"></textarea>` : ''}
       <div class="spacer"></div>
       <div class="actionbar"><button class="btn primary big" data-act="reveal">Aufdecken</button></div>
@@ -1191,22 +1161,10 @@ function viewQuiz() {
   }
   const chOpts = Object.entries(window.CHAPTERS || {}).map(([k, v]) => `<option value="k${k}">Kapitel ${k}: ${esc(v)}</option>`).join('');
   return `<div class="quizgrid">
-  <div class="mode">
-    ${UI.group([
-      UI.item('match', '#0a84ff', 'Zuordnen', 'Aussage sehen, richtigen Namen wählen.'),
-      UI.row('Karten', `<span class="isel"><select id="qScope"><option value="intro">Eingeführte</option><option value="kern">Kern & Wichtig</option><option value="all">Alle</option>${chOpts}</select><svg viewBox="0 0 10 16" aria-hidden="true"><path d="M2 6l3-3 3 3M2 10l3 3 3-3"/></svg></span>`),
-      UI.row('Anzahl', UI.select('qN', [['10', '10'], ['15', '15'], ['25', '25'], ['40', '40']], '15')),
-    ])}
-    <button class="btn primary big" data-act="quizstart">Zuordnen starten</button>
-  </div>
-  <div class="mode">
-    ${UI.group([
-      UI.item('test', '#ff375f', 'Prüfungstest', 'Wie an der Prüfung: aufschreiben, aufdecken, bewerten.'),
-      UI.row('Karten', `<span class="isel"><select id="tScope"><option value="kern">Kern & Wichtig</option><option value="intro">Eingeführte</option><option value="all">Alle</option>${chOpts}</select><svg viewBox="0 0 10 16" aria-hidden="true"><path d="M2 6l3-3 3 3M2 10l3 3 3-3"/></svg></span>`),
-      UI.row('Anzahl', UI.select('tN', [['8', '8'], ['12', '12'], ['20', '20']], '12')),
-    ])}
-    <button class="btn primary big" data-act="teststart">Test starten</button>
-  </div>
+  ${UI.group([
+    UI.item('match', '#0a84ff', 'Zuordnen', 'Aussage sehen, Namen wählen', '', { act: 'quizstart' }),
+    UI.item('test', '#ff375f', 'Prüfungstest', 'Wie an der Prüfung', '', { act: 'teststart' }),
+  ])}
   </div>
   ${quizHistory()}`;
 }
@@ -1225,7 +1183,7 @@ let cat = { q: '', chap: '', kind: '', prio: '', status: '' };
 function liHTML(c) {
   const st = statusOf(c), x = S.cards[c.id];
   const right = x && x.st ? (st.k === 'lernend' ? 'lernt' : Math.round(retrievability(x) * 100) + ' %') : '';
-  return `<div class="ir li2" data-card="${c.id}"><span class="ir-l"><b>${esc(c.title) || '—'}${(x || {}).flag ? ' ★' : ''}</b><small>${esc(KIND_SHORT[c.kind] + ' ' + c.nr)} · S. ${c.page}</small></span><span class="ir-r">${right ? `<span class="v${st.k === 'schwach' || st.l === 'Wackelig' ? ' warn' : ''}">${right}</span>` : ''}<svg class="chev" viewBox="0 0 8 14" aria-hidden="true"><path d="M1.5 1.5L6.5 7l-5 5.5"/></svg></span></div>`;
+  return `<div class="ir li2" data-card="${c.id}"><span class="ir-l"><b>${esc(c.title) || '—'}${(x || {}).flag ? ' ★' : ''}</b><small>${esc(KIND_SHORT[c.kind] + ' ' + c.nr)}</small></span><span class="ir-r"><svg class="chev" viewBox="0 0 8 14" aria-hidden="true"><path d="M1.5 1.5L6.5 7l-5 5.5"/></svg></span></div>`;
 }
 function filteredCatalog() {
   const q = cat.q.trim().toLowerCase();
@@ -1250,13 +1208,11 @@ function viewCatalog() {
   if (cat.prio) extra.push(['prio', PRIO[cat.prio].name]);
   if (cat.kind) extra.push(['kind', cat.kind === 'Satz' ? 'Sätze' : cat.kind]);
   if (cat.chap) extra.push(['chap', 'Kapitel ' + cat.chap]);
-  if (cat.status && !segs.some(x => x[0] === cat.status)) extra.push(['status', { wackelig: 'Wackelig', jung: 'Jung', flag: 'Markiert', pause: 'Pausiert' }[cat.status] || cat.status]);
+  if (cat.status) extra.push(['status', { wackelig: 'Wackelig', jung: 'Jung', flag: 'Markiert', pause: 'Pausiert' }[cat.status] || cat.status]);
   const by = {}; for (const c of list) (by[c.chap] = by[c.chap] || []).push(c);
   return `
   <div class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></svg><input id="cq" type="search" placeholder="Suchen" value="${esc(cat.q)}" autocomplete="off"></div>
-  <div class="seg" role="tablist">${segs.map(([v, l]) => `<button role="tab" data-seg="${v}" class="${cat.status === v ? 'on' : ''}">${l}</button>`).join('')}</div>
   ${extra.length ? `<div class="chips">${extra.map(([k, l]) => `<button class="chip" data-unfilter="${k}">${esc(l)} <span aria-hidden="true">×</span></button>`).join('')}</div>` : ''}
-  <div class="cathead"><span>${list.length} Karten</span>${list.length ? `<button class="linkbtn2" data-act="learnfiltered">${Math.min(list.length, 50) === list.length ? 'Alle' : 'Erste ' + Math.min(list.length, 50)} üben</button>` : ''}</div>
   ${list.length ? Object.keys(by).sort((a, b) => a - b).map(k => UI.group(by[k].map(liHTML), { header: `${k}. ${esc((window.CHAPTERS || {})[k] || '')}` })).join('') : '<div class="empty muted">Keine Treffer</div>'}`;
 }
 
@@ -1376,16 +1332,14 @@ function viewStats() {
   <div class="grid g2">
     <div class="card kpi"><div class="l">Prüfungsbereit</div><div class="v">${Math.round(rd.exam * 100)}%</div></div>
     <div class="card kpi"><div class="l">Sitzt sicher</div><div class="v">${sitzt}<span class="of"> / ${CARDS.length}</span></div></div>
-    <div class="card kpi"><div class="l">Gewusst</div><div class="v">${retention == null ? '–' : Math.round(retention * 100) + '%'}</div></div>
-    <div class="card kpi"><div class="l">Serie</div><div class="v">${streak}<span class="of"> Tage</span></div></div>
   </div>
-  <h2>Plan</h2>${plan}
   <h2>Kapitel</h2>
-  ${UI.group(byChap.map(g => `<div class="ir chr"><span class="ir-l"><b>${esc((window.CHAPTERS || {})[g.k] || '')}</b><small>Kapitel ${g.k} · ${g.n - g.neu} von ${g.n}</small></span><span class="ir-r chb">${stackBar(g)}</span></div>`))}
-  <h2>Nächste 14 Tage</h2>
-  <div class="card">${barChart(fc, i => i === 0 ? 'heute' : fmtDate(dayStart() + i * DAY).replace('.', ''))}</div>
-  ${problem.length ? `<h2>Schwierige Karten</h2>${UI.group(problem.map(o => liHTML(o.c)))}` : ''}
-  <details class="more"><summary>Weitere Statistiken</summary>
+  ${UI.group(byChap.map(g => `<div class="ir chr"><span class="ir-l"><b>${esc((window.CHAPTERS || {})[g.k] || '')}</b></span><span class="ir-r chb"><div class="bar"><span style="width:${g.n ? (g.n - g.neu) / g.n * 100 : 0}%;background:var(--accent)"></span></div></span></div>`))}
+  <details class="more"><summary>Details</summary>
+    <h2>Plan</h2>${plan}
+    <h2>Nächste 14 Tage</h2>
+    <div class="card">${barChart(fc, i => i === 0 ? 'heute' : fmtDate(dayStart() + i * DAY).replace('.', ''))}</div>
+    ${problem.length ? `<h2>Schwierige Karten</h2>${UI.group(problem.map(o => liHTML(o.c)))}` : ''}
     <h2>Nach Priorität</h2>${UI.group(byPrio.map(g => `<div class="ir chr"><span class="ir-l"><b>${PRIO[g.k].name}</b><small>${g.n - g.neu} von ${g.n}</small></span><span class="ir-r chb">${stackBar(g)}</span></div>`))}
     ${memoryStatsHTML()}
     <h2>Aktivität</h2>
@@ -1574,9 +1528,14 @@ function viewSettings() {
 
   ${UI.group([
     UI.row('Prüfungsdatum', `<span class="idate"><span>${esc(fmtDateLong(st.examDate))}</span><input type="date" id="sExam" value="${esc(st.examDate)}" aria-label="Prüfungsdatum"></span>`),
+    UI.row('Erscheinungsbild', UI.select('sTheme', [['auto', 'Automatisch'], ['light', 'Hell'], ['dark', 'Dunkel']], st.theme)),
+  ])}
+
+  <details class="more adv2"><summary>Erweitert</summary>
+  ${UI.group([
     UI.row('Neue Karten', UI.select('sNewMode', [['auto', `Automatisch (${plannedNewPerDay()})`], ['manual', 'Manuell']], st.newMode)),
     st.newMode === 'manual' ? UI.row('Pro Tag', UI.stepper('sNew', st.newPerDay, 0, 80, 1)) : '',
-  ], { header: 'Lernplan', footer: 'Das Prüfungsdatum bestimmt das Tempo der neuen Karten und sorgt dafür, dass kurz vor der Prüfung alles nochmals drankommt.' })}
+  ], { header: 'Lernplan' })}
 
   ${UI.group([
     UI.row('Zeitbudget pro Tag', UI.stepper('sBudget', st.budget || 0, 0, 300, 5, ' Min')),
@@ -1594,7 +1553,6 @@ function viewSettings() {
   ${UI.group([
     UI.toggle('sLogic', st.showLogic !== false, 'Prädikatenlogik anzeigen'),
     UI.toggle('sType', !!st.typeAnswer, 'Notizfeld vor dem Aufdecken'),
-    UI.row('Erscheinungsbild', UI.select('sTheme', [['auto', 'Automatisch'], ['light', 'Hell'], ['dark', 'Dunkel']], st.theme)),
   ], { header: 'Karten & Darstellung' })}
 
   ${UI.group([
@@ -1614,9 +1572,15 @@ function viewSettings() {
     UI.item('pencil', '#30a46c', 'Ehrlich bewerten', 'Nur nach rechts wischen, wenn alles stimmte.'),
   ], { header: 'So funktioniert LemmaLab' })}
 
-  ${UI.group([UI.action('Gesamten Fortschritt löschen', 'resetall', { danger: true })])}
+  ${UI.group([
+    typeof Cloud !== 'undefined' && Cloud.user ? UI.action('Jetzt abgleichen', 'cloudsync') : '',
+    UI.action('Gesamten Fortschritt löschen', 'resetall', { danger: true }),
+    typeof Cloud !== 'undefined' && Cloud.user ? UI.action('Konto-Daten löschen', 'clouddelete', { danger: true }) : '',
+  ])}
 
-  <div class="ig-foot">LemmaLab ${APP_VERSION}<br><a href="#mehr" data-act="update">Nach Update suchen</a> · <a href="datenschutz.html">Datenschutz</a><br>Inoffizielle Lernhilfe, ohne Gewähr. Inhalte aus dem Vorlesungsskript (Kapitel 1–9). Prioritäten aus alten Prüfungen geschätzt. Algorithmus FSRS-6.</div>
+  </details>
+
+  <div class="ig-foot">LemmaLab · <a href="#mehr" data-act="update">Version ${APP_VERSION}</a> · <a href="datenschutz.html">Datenschutz</a><br>Inoffiziell, ohne Gewähr.</div>
   </div>`;
 }
 
@@ -1710,8 +1674,8 @@ document.addEventListener('click', e => {
     case 'ahead': startSession(aheadIds().slice(0, 20)); break;
     case 'reveal': reveal(); break;
     case 'undo': undo(); break;
-    case 'quizstart': startQuiz('match', $('#qScope').value, +$('#qN').value); break;
-    case 'teststart': startQuiz('test', $('#tScope').value, +$('#tN').value); break;
+    case 'quizstart': startQuiz('match', 'intro', 15); break;
+    case 'teststart': startQuiz('test', 'kern', 12); break;
     case 'quiznext': quizNext(); break;
     case 'qreveal': qReveal(); break;
     case 'quizend': quiz = null; render(); break;
