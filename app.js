@@ -381,6 +381,8 @@ window.addEventListener('hashchange', () => { const t = location.hash.slice(1); 
 
 function render() {
   applyTheme();
+  const focusMode = (tab === 'heute' && session && session.cur) || (tab === 'quiz' && quiz && quiz.i < quiz.items.length);
+  document.body.classList.toggle('focus', !!focusMode);
   renderTabs();
   const v = $('#view');
   if (tab === 'heute') v.innerHTML = session && (session.cur || session.done) ? viewStudy() : viewHome();
@@ -486,7 +488,7 @@ function promptFor(c) {
 }
 function scanHTML(c, masked) {
   const m = masked && c.mask ? `<div class="mask" style="left:${c.mask[0] / c.w * 100}%;top:${c.mask[1] / c.h * 100}%;width:${(c.mask[2] - c.mask[0]) / c.w * 100}%;height:${(c.mask[3] - c.mask[1]) / c.h * 100}%"></div>` : '';
-  return `<div class="scanwrap" ${masked ? '' : `data-zoom="${c.id}" title="Antippen zum Vergrössern"`}><img class="scan" src="img/${c.img}" width="${c.w}" height="${c.h}" alt="${esc(c.kind + ' ' + c.nr)}" loading="lazy">${m}</div>`;
+  return `<div class="scanwrap" ${masked ? '' : `data-zoom="${c.id}" title="Antippen zum Vergrössern"`}><img class="scan" src="img/${c.img}" width="${c.w}" height="${c.h}" alt="${esc(c.kind + ' ' + c.nr)}" loading="lazy">${m}${masked ? '' : '<span class="zoomchip">⤢ Vergrössern</span>'}</div>`;
 }
 function viewStudy() {
   const s = session;
@@ -523,17 +525,17 @@ function viewStudy() {
       <div class="prompt">${promptFor(c)}</div>
       ${S.settings.typeAnswer ? `<textarea class="note" id="answer" placeholder="Hier aufschreiben (wird nicht gespeichert) …"></textarea>` : ''}
       <div class="spacer"></div>
-      <button class="btn primary big" style="margin-top:16px" data-act="reveal">Aufdecken <span class="kbd" style="color:#fff;opacity:.8">␣</span></button>
+      <div class="actionbar"><button class="btn primary big" data-act="reveal">Aufdecken <span class="kbd hide-touch" style="color:#fff;opacity:.8">␣</span></button></div>
     ` : `
       ${scanHTML(c, false)}
       ${c.tip ? `<div class="tip"><b>Worauf achten:</b> ${esc(c.tip)}</div>` : ''}
-      <div class="rate">
+      <div class="actionbar"><div class="rate">
         <button class="r1" data-rate="1">Nochmal<small>${ivls[0]}</small></button>
         <button class="r2" data-rate="2">Schwer<small>${ivls[1]}</small></button>
         <button class="r3" data-rate="3">Gut<small>${ivls[2]}</small></button>
         <button class="r4" data-rate="4">Einfach<small>${ivls[3]}</small></button>
-      </div>
-      <div class="kbd center" style="margin-top:8px">Nochmal = wesentlicher Teil fehlte · Schwer = mit Mühe/kleine Lücke · Gut = vollständig · Einfach = sofort und sicher</div>
+      </div></div>
+      <div class="kbd center ratehelp" style="margin-top:8px">Nochmal = wesentlicher Teil fehlte · Schwer = mit Mühe/kleine Lücke · Gut = vollständig · Einfach = sofort und sicher</div>
     `}
   </div>`;
 }
@@ -629,7 +631,7 @@ function viewQuiz() {
           if (quiz.picked) { if (o === id) cl = 'ok'; else if (o === quiz.picked) cl = 'bad'; }
           return `<button class="opt ${cl}" data-opt="${o}" ${quiz.picked ? 'disabled' : ''}>${esc(oc.title)}${quiz.picked ? ` <span class="muted small">(${KIND_SHORT[oc.kind]} ${oc.nr})</span>` : ''}</button>`;
         }).join('')}</div>
-        ${quiz.picked ? `<button class="btn primary big" style="margin-top:14px" data-act="quiznext">Weiter</button>` : ''}
+        ${quiz.picked ? `<div class="actionbar"><button class="btn primary big" data-act="quiznext">Weiter</button></div>` : ''}
       </div>`;
     }
     // Prüfungstest
@@ -638,12 +640,12 @@ function viewQuiz() {
       <div class="ttl">${esc(c.title)}</div>
       <div class="meta">Kap. ${c.chap} · ${esc(c.sec)}</div>
       ${!quiz.revealed ? `<div class="prompt">Prüfungssituation: Schreibe die ${c.kind === 'Definition' ? 'Definition' : 'Aussage'} so auf, wie du sie in der Prüfung hinschreiben würdest. Erst dann aufdecken.</div>
-        <div class="spacer"></div><button class="btn primary big" style="margin-top:16px" data-act="qreveal">Aufdecken</button>`
+        <div class="spacer"></div><div class="actionbar"><button class="btn primary big" data-act="qreveal">Aufdecken</button></div>`
       : `${scanHTML(c, false)}
-        <div class="rate three">
+        <div class="actionbar"><div class="rate three">
           <button class="r1" data-trate="1">Nicht gewusst</button>
           <button class="r2" data-trate="2">Lückenhaft</button>
-          <button class="r3" data-trate="3">Vollständig</button></div>`}
+          <button class="r3" data-trate="3">Vollständig</button></div></div>`}
     </div>`;
   }
   if (quiz && quiz.i >= quiz.items.length) {
@@ -1005,6 +1007,7 @@ function modal(html) {
   document.body.appendChild(m);
 }
 function closeModal() { const m = $('#modal'); if (m) m.remove(); }
+let zoomW = (() => { try { return +localStorage.getItem('ana1-zoom') || Math.max(780, Math.round(window.innerWidth * 1.9)); } catch (e) { return 780; } })();
 let toastT;
 function toast(s) { const t = $('#toast'); t.textContent = s; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2200); }
 function applyTheme() {
@@ -1046,7 +1049,7 @@ document.addEventListener('click', e => {
   const opt = t.closest('[data-opt]');
   if (opt && !opt.disabled) return quizAnswer(opt.dataset.opt);
   const z = t.closest('[data-zoom]');
-  if (z && !t.closest('.zoombox')) { const c = BY_ID[z.dataset.zoom]; return modal(`<div class="row"><b>${esc(c.kind)} ${c.nr}</b><div class="spacer"></div><button class="btn ghost" data-act="close">✕</button></div><div class="zoombox"><img class="scan" src="img/${c.img}" alt=""></div><div class="muted small">Seitlich wischen zum Lesen. Querformat hilft auch.</div>`); }
+  if (z && !t.closest('.zoombox')) { const c = BY_ID[z.dataset.zoom]; modal(`<div class="row"><b>${esc(c.kind)} ${c.nr}</b><div class="spacer"></div><button class="btn" data-act="zin">＋</button><button class="btn" data-act="zout">－</button><button class="btn ghost" data-act="close">✕</button></div><div class="zoombox"><img class="scan" id="zimg" src="img/${c.img}" alt="" style="width:${zoomW}px"></div><div class="muted small">Seitlich wischen zum Lesen · Tipp: Handy quer halten.</div>`); $('#modal').classList.add('full'); return; }
   const li = t.closest('[data-card]');
   if (li && !act) return openCard(li.dataset.card);
   const ca = t.closest('[data-cardact]');
@@ -1071,6 +1074,7 @@ document.addEventListener('click', e => {
     case 'learnwrong': { const ids = quiz.answers.filter(a => !a.ok).map(a => a.id); quiz = null; tab = 'heute'; startSession(ids); break; }
     case 'learnfiltered': { const ids = filteredCatalog().slice(0, 50).map(c => c.id); tab = 'heute'; startSession(ids); break; }
     case 'close': closeModal(); break;
+    case 'zin': case 'zout': { zoomW = clamp(Math.round(zoomW * (act === 'zin' ? 1.25 : 0.8)), 300, 2400); const im = $('#zimg'); if (im) im.style.width = zoomW + 'px'; try { localStorage.setItem('ana1-zoom', zoomW); } catch (e) { } break; }
     case 'export': exportJSON(); break;
     case 'csv': exportCSV(); break;
     case 'gistconnect': { const v = ($('#gistTok') || {}).value || ''; if (v.trim().length < 20) { toast('Bitte gültigen Token einfügen'); break; } Gist.connect(v); break; }
