@@ -1276,7 +1276,7 @@ function viewSettings() {
   </div>
   <h2>Zurücksetzen</h2>
   <div class="card"><button class="btn" style="color:var(--again)" data-act="resetall">Gesamten Fortschritt löschen</button></div>
-  <div class="muted small" style="margin:18px 4px">Version ${APP_VERSION} · <a href="#mehr" data-act="update">Nach Update suchen</a><br>LemmaLab – inoffizielle Lernhilfe, ohne Gewähr. Inhalte: Ausschnitte aus dem Skript «Analysis I und II» (Kapitel 1–9). Prioritäten & Beweis-Wahrscheinlichkeiten: eigene Schätzung aus alten Prüfungen. Algorithmus: FSRS-5.</div>`;
+  <div class="muted small" style="margin:18px 4px">Version ${APP_VERSION} · <a href="#mehr" data-act="update">Nach Update suchen</a> · <a href="datenschutz.html">Datenschutz</a><br>LemmaLab – inoffizielle Lernhilfe, ohne Gewähr. Inhalte: Ausschnitte aus dem Skript «Analysis I und II» (Kapitel 1–9). Prioritäten & Beweis-Wahrscheinlichkeiten: eigene Schätzung aus alten Prüfungen. Algorithmus: FSRS-5.</div>`;
 }
 
 /* ============================================================

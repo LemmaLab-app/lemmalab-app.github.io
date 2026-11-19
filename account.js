@@ -144,6 +144,7 @@ function showLogin() {
     </div>
     <p class="small muted lnote">Du bleibst auf diesem Gerät angemeldet. Dein Lernstand wird mit deinem Konto auf allen Geräten abgeglichen.</p>
     <button class="linkbtn" id="lgLocal">Ohne Konto weiter (nur auf diesem Gerät)</button>
+    <div class="small"><a href="datenschutz.html" class="muted">Datenschutz</a></div>
   </div>`;
   document.body.appendChild(el);
   const email = () => ($('#lgEmail').value || '').trim();
