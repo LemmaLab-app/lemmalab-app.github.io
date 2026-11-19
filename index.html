@@ -959,7 +959,7 @@ details.more[open]>summary{margin-bottom:6px}
   .solo{min-height:calc(100vh - 180px)}
   .solo-n{font-size:40px}
 }
-details.adv2{margin-top:0}
+details.adv2{margin-top:0;margin-bottom:30px}
 details.adv2[open]>summary{margin-bottom:22px}
 .fc .meta{margin-bottom:2px}
 .study-head .progress{margin-right:4px}
@@ -987,6 +987,20 @@ details.adv2[open]>summary{margin-bottom:22px}
 .solo{min-height:auto;padding-top:28px}
 .solo-list{max-width:420px;margin:26px auto 0}
 .solo-list .ig{margin:0}
+
+/* Bewertungsknöpfe wie Annehmen/Ablehnen in der Telefon-App */
+.rbtns{gap:72px}
+.rb .rc{width:68px;height:68px;background:var(--c)!important;
+  box-shadow:0 8px 22px color-mix(in srgb,var(--c) 38%,transparent),inset 0 1px 0 rgba(255,255,255,.25)!important;
+  transition:transform .35s var(--spring),box-shadow .25s,filter .2s}
+.rb svg{stroke:#fff;width:28px;height:28px;stroke-width:3}
+.rb.no{--c:#ff3b30} .rb.ok{--c:#34c759}
+:root.dark .rb.no{--c:#ff453a} :root.dark .rb.ok{--c:#30d158}
+@media (prefers-color-scheme:dark){:root:not(.light) .rb.no{--c:#ff453a}:root:not(.light) .rb.ok{--c:#30d158}}
+.rb .rl{font-size:12.5px;font-weight:500;color:var(--ink);opacity:.75}
+.rb:active .rc,.rb.hit .rc{transform:scale(.9);filter:brightness(.92);box-shadow:0 4px 12px color-mix(in srgb,var(--c) 30%,transparent)!important}
+@media (hover:hover){.rb:hover .rc{filter:brightness(1.05)}}
+.ig a.ir{text-decoration:none}
 </style>
 </head>
 <body>
@@ -1006,10 +1020,10 @@ details.adv2[open]>summary{margin-bottom:22px}
 <div id="navbar" aria-hidden="true"><span id="navTitle"></span></div>
 <div class="toast" id="toast"></div>
 <script src="vendor/katex/katex.min.js"></script>
-<script src="data.js?v=2026-11-19.31"></script>
-<script src="logic.js?v=2026-11-19.31"></script>
-<script src="app.js?v=2026-11-19.31"></script>
+<script src="data.js?v=2026-11-19.32"></script>
+<script src="logic.js?v=2026-11-19.32"></script>
+<script src="app.js?v=2026-11-19.32"></script>
 <script src="vendor/supabase/supabase.js"></script>
-<script src="account.js?v=2026-11-19.31"></script>
+<script src="account.js?v=2026-11-19.32"></script>
 </body>
 </html>

@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-19.31';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-19.32';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -1591,7 +1591,8 @@ function viewSettings() {
 
   </details>
 
-  <div class="ig-foot">LemmaLab · <a href="#mehr" data-act="update">Version ${APP_VERSION}</a> · <a href="datenschutz.html">Datenschutz</a><br>Inoffiziell, ohne Gewähr.</div>
+  ${UI.group([UI.action('Nach Update suchen', 'update'), `<a class="ir ia" href="datenschutz.html"><span class="ir-l">Datenschutz</span><span class="ir-r"><svg class="chev" viewBox="0 0 8 14" aria-hidden="true"><path d="M1.5 1.5L6.5 7l-5 5.5"/></svg></span></a>`])}
+  <div class="ig-foot">LemmaLab ${APP_VERSION}<br>Inoffiziell, ohne Gewähr.</div>
   </div>`;
 }
 
