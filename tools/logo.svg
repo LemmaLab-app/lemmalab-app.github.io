@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+ <defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+   <stop offset="0" stop-color="#6a4dff"/><stop offset=".5" stop-color="#3f2bc4"/><stop offset="1" stop-color="#160c4a"/>
+  </linearGradient>
+  <radialGradient id="light" cx=".22" cy=".12" r=".7"><stop offset="0" stop-color="#ffffff" stop-opacity=".22"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></radialGradient>
+  <radialGradient id="glow" cx=".5" cy=".7" r=".42"><stop offset="0" stop-color="#3ff5c8" stop-opacity=".55"/><stop offset="1" stop-color="#3ff5c8" stop-opacity="0"/></radialGradient>
+  <linearGradient id="liqB" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2fd6b4"/><stop offset="1" stop-color="#0f8f86"/></linearGradient>
+  <linearGradient id="liqF" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6bffd9"/><stop offset="1" stop-color="#16b8a3"/></linearGradient>
+  <filter id="sh" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#0a0630" flood-opacity=".45"/></filter>
+  <filter id="soft"><feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#06403a" flood-opacity=".5"/></filter>
+  <clipPath id="fl"><path d="M428 268 h168 v176 l176 300 a64 64 0 0 1 -55 97 H307 a64 64 0 0 1 -55 -97 l176 -300 z"/></clipPath>
+ </defs>
+ <rect width="1024" height="1024" fill="url(#bg)"/>
+ <rect width="1024" height="1024" fill="url(#light)"/>
+ <circle cx="512" cy="700" r="400" fill="url(#glow)"/>
+
+ <!-- Glas (leicht getönt) -->
+ <path d="M428 268 h168 v176 l176 300 a64 64 0 0 1 -55 97 H307 a64 64 0 0 1 -55 -97 l176 -300 z" fill="#ffffff" fill-opacity=".08"/>
+
+ <!-- Flüssigkeit: hintere und vordere Welle, Blasen -->
+ <g clip-path="url(#fl)">
+  <path d="M200 600 C300 572 400 628 512 598 S720 560 830 590 V900 H200z" fill="url(#liqB)"/>
+  <path d="M200 632 C330 600 430 668 540 630 S730 600 830 628 V900 H200z" fill="url(#liqF)"/>
+  <circle cx="610" cy="700" r="15" fill="#fff" opacity=".75"/>
+  <circle cx="650" cy="760" r="9" fill="#fff" opacity=".6"/>
+  <circle cx="395" cy="770" r="11" fill="#fff" opacity=".55"/>
+  <circle cx="575" cy="560" r="10" fill="#fff" opacity=".55"/>
+  <circle cx="600" cy="510" r="6" fill="#fff" opacity=".45"/>
+ </g>
+
+ <!-- Glanzlicht am Glas -->
+ <path d="M440 470 L312 690" stroke="#fff" stroke-opacity=".35" stroke-width="18" stroke-linecap="round"/>
+
+ <!-- Kolben-Kontur -->
+ <g filter="url(#sh)">
+  <path d="M428 268 h168 v176 l176 300 a64 64 0 0 1 -55 97 H307 a64 64 0 0 1 -55 -97 l176 -300 z" fill="none" stroke="#fff" stroke-width="42" stroke-linejoin="round"/>
+  <rect x="392" y="222" width="240" height="56" rx="28" fill="#fff"/>
+ </g>
+
+ <!-- Integralzeichen -->
+ <g filter="url(#soft)" transform="translate(-22 18)">
+  <path d="M556 420 C545 392 512 392 503 430 C490 488 506 600 492 690 C484 742 458 766 428 756" fill="none" stroke="#fff" stroke-width="40" stroke-linecap="round"/>
+  <circle cx="557" cy="424" r="25" fill="#fff"/>
+  <circle cx="428" cy="754" r="26" fill="#fff"/>
+ </g>
+
+ <!-- Funke -->
+ <path d="M770 250 l14 38 l38 14 l-38 14 l-14 38 l-14 -38 l-38 -14 l38 -14 z" fill="#ffe27a"/>
+ <circle cx="720" cy="190" r="9" fill="#ffe27a" opacity=".8"/>
+</svg>
