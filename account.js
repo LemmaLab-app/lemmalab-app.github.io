@@ -13,7 +13,7 @@ const ADMIN_EMAILS = ['lemmalab.app@gmail.com', 'martin.senn2@gmail.com'];   // 
 const isAdmin = () => !!(Cloud.user && ADMIN_EMAILS.includes((Cloud.user.email || '').toLowerCase()));
 
 const Cloud = {
-  sb: null, user: null, busy: false, dirty: false, timer: null, status: '', lastSync: 0, ready: false,
+  sb: null, user: null, lastSent: '', busy: false, dirty: false, timer: null, status: '', lastSync: 0, ready: false,
 
   init() {
     if (!window.supabase || !window.supabase.createClient) { this.ready = true; maybeShowLogin(); return; }
@@ -56,15 +56,30 @@ const Cloud = {
     this.busy = true; this.dirty = false;
     this.setStatus('Abgleich …');
     try {
-      const { data, error } = await this.sb.from('progress').select('state').eq('user_id', this.user.id).maybeSingle();
+      // Zuerst nur den Zeitstempel holen (wenige Bytes). Den ganzen Lernstand nur
+      // herunterladen, wenn ein anderes Gerät seit dem letzten Abgleich etwas gespeichert hat.
+      // Spart Datenvolumen (Supabase-Gratis-Kontingent: 5 GB pro Monat).
+      const { data: meta, error } = await this.sb.from('progress').select('updated_at').eq('user_id', this.user.id).maybeSingle();
       if (error) throw error;
+      const remoteMs = meta && meta.updated_at ? Date.parse(meta.updated_at) : 0;
+      const known = this.knownAt();
       const before = JSON.stringify([S.cards, S.log.length, S.settings]);
-      if (data && data.state) mergeInto(data.state);
+      if (remoteMs && remoteMs !== known) {
+        const { data, error: e1 } = await this.sb.from('progress').select('state').eq('user_id', this.user.id).maybeSingle();
+        if (e1) throw e1;
+        if (data && data.state) mergeInto(data.state);
+      }
       S.owner = this.user.id;
       const changedLocal = before !== JSON.stringify([S.cards, S.log.length, S.settings]);
       try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (e) { }
-      const { error: e2 } = await this.sb.from('progress').upsert({ user_id: this.user.id, state: S, updated_at: new Date().toISOString() });
-      if (e2) throw e2;
+      const changedHere = changedLocal || before !== this.lastSent || !remoteMs;
+      if (changedHere || remoteMs !== known) {
+        const at = new Date().toISOString();
+        const { error: e2 } = await this.sb.from('progress').upsert({ user_id: this.user.id, state: S, updated_at: at });
+        if (e2) throw e2;
+        this.setKnownAt(Date.parse(at));
+      }
+      this.lastSent = JSON.stringify([S.cards, S.log.length, S.settings]);
       this.lastSync = Date.now();
       this.setStatus('✓ gespeichert ' + new Date().toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' }));
       if (changedLocal && !session && !quiz) render();
@@ -78,6 +93,8 @@ const Cloud = {
       if (this.dirty) { clearTimeout(this.timer); this.timer = setTimeout(() => this.sync(), 3000); }
     }
   },
+  knownAt() { try { const o = JSON.parse(localStorage.getItem('lemmalab-cloudat') || '{}'); return o.u === (this.user && this.user.id) ? o.t : 0; } catch (e) { return 0; } },
+  setKnownAt(t) { try { localStorage.setItem('lemmalab-cloudat', JSON.stringify({ u: this.user.id, t })); } catch (e) { } },
   schedule() {
     if (!this.user) return;
     this.dirty = true;
@@ -102,6 +119,7 @@ const Cloud = {
   async signOut() {
     if (this.dirty || Date.now() - this.lastSync > 5000) { try { await this.sync(); } catch (e) { } }
     try { await this.sb.auth.signOut(); } catch (e) { }
+    try { localStorage.removeItem('lemmalab-cloudat'); } catch (e) { }
     this.user = null;
     // Lokale Kopie entfernen (liegt ja im Konto) – wichtig auf fremden Geräten
     const st = S.settings; S = blankState(); S.settings = { ...st, resetAt: 0 };
