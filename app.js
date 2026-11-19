@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-19.19';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-19.20';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -656,8 +656,7 @@ function viewHome() {
   const chap = groupStats(c => c.chap, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
   return `<div class="home"><div class="col">
   <div class="card hero">
-    <div class="row" style="gap:14px;align-items:center">${ringSVG(todayLog.length, todayLog.length + q.queue.length, 64)}<div><div class="htitle">Heute</div><div class="muted small">${ts.allDone ? 'Alles erledigt' : `${todayLog.length} von ${todayLog.length + q.queue.length} Karten`}</div></div><div class="spacer"></div>
-      <span class="pill gray">${dte > 0 ? `Prüfung in ${dte} Tagen` : dte === 0 ? 'Prüfung heute' : 'Prüfung vorbei'}</span></div>
+    <div class="row" style="gap:14px;align-items:center;flex-wrap:nowrap">${ringSVG(todayLog.length, todayLog.length + q.queue.length, 64)}<div style="min-width:0"><div class="htitle">Heute</div><div class="muted small">${ts.allDone ? 'Alles erledigt' : `${todayLog.length} von ${todayLog.length + q.queue.length} Karten`} · ${dte > 0 ? `Prüfung in ${dte} Tagen` : dte === 0 ? 'Prüfung heute' : 'Prüfung vorbei'}</div></div></div>
     ${ts.allDone ? doneHeroHTML(ts) : todoHTML(ts)}
     <div style="margin-top:14px">
       ${q.queue.length
@@ -666,19 +665,18 @@ function viewHome() {
            <div class="muted small center" style="margin-bottom:8px">Freiwillig weiterüben:</div>
            <div class="row" style="gap:8px"><button class="btn big" style="flex:1" data-act="extra">10 neue Karten</button>${aheadIds().length ? `<button class="btn big" style="flex:1" data-act="ahead">Vorausüben (${Math.min(20, aheadIds().length)})</button>` : ''}</div>`}
     </div>
-    <div class="muted small" style="margin-top:10px">Heute erledigt: ${todayLog.length} Bewertungen · ${minToday} Min · Neue Karten pro Tag: ${plannedNewPerDay()} (${S.settings.newMode === 'auto' ? 'automatisch aus Prüfungsdatum' : 'manuell'})</div>
   </div>
 
   <div class="grid g2" style="margin-top:12px">
-    <div class="card kpi"><div class="l">Prüfungsbereitschaft (gewichtet)</div><div class="v">${Math.round(rd.exam * 100)}%</div>
-      <div class="bar" style="margin-top:8px"><span style="width:${rd.exam * 100}%;background:var(--good)"></span></div>
-      <div class="s">Erwartete Abrufwahrscheinlichkeit am Prüfungstag, Kernstoff zählt stärker.</div></div>
-    <div class="card kpi"><div class="l">Eingeführt</div><div class="v">${introduced}<span class="muted" style="font-size:16px"> / ${CARDS.length}</span></div>
-      <div class="bar" style="margin-top:8px">${prioBarSegments()}</div>
-      <div class="s">Kern ${countIntro(5)} · Wichtig ${countIntro(4)} · Solide ${countIntro(3)}</div></div>
+    <div class="card kpi"><div class="l">Prüfungsbereit</div><div class="v">${Math.round(rd.exam * 100)}%</div>
+      <div class="bar" style="margin-top:10px"><span style="width:${rd.exam * 100}%;background:var(--good)"></span></div>
+      <div class="s">erwartet am Prüfungstag</div></div>
+    <div class="card kpi"><div class="l">Eingeführt</div><div class="v">${introduced}<span class="muted" style="font-size:.5em;font-weight:600"> / ${CARDS.length}</span></div>
+      <div class="bar" style="margin-top:10px">${prioBarSegments()}</div>
+      <div class="s">Kern ${countIntro(5)} · Wichtig ${countIntro(4)}</div></div>
   </div>
   </div><div class="col">
-  ${focus ? `<h2>Nächster Fokus</h2><div class="card small">${focus}</div>` : ''}
+  ${focus ? `<h2>Nächster Fokus</h2>${focus}` : ''}
   <h2>Kapitel</h2>
   <div class="card">
     <table class="t">${chap.map(g => `<tr><td style="width:46%"><span class="muted">${g.k}.</span> ${esc((window.CHAPTERS || {})[g.k] || '')}</td><td>${stackBar(g)}</td><td class="num muted" style="width:52px">${g.n - g.neu}/${g.n}</td></tr>`).join('')}</table>
@@ -686,13 +684,13 @@ function viewHome() {
   </div>
 
   <h2>So funktioniert's</h2>
-  <div class="card small muted">
-    Karten kommen nach <b>Prüfungsrelevanz</b>: zuerst alle <span style="color:var(--p5)">Kern</span>-Definitionen und -Sätze, dann <span style="color:var(--p4)">Wichtig</span>, dann der Rest – jeweils in Skript-Reihenfolge.
-    Der Algorithmus (FSRS) plant jede Karte so, dass du sie kurz vor dem Vergessen wiederholst; Kernstoff wird auf 95 % Abrufsicherheit gehalten, Randstoff auf 85 %.
-    Keine Wiederholung wird über das Prüfungsdatum hinaus geplant – alles kommt in den letzten Tagen vor der Prüfung noch einmal.
-    <br><br><b>Ablauf:</b> Titel lesen → Aussage im Kopf oder auf Papier <i>vollständig</i> formulieren (alle Voraussetzungen!) → aufdecken → ehrlich bewerten.
-    <span class="kbd">Tastatur: Leertaste = aufdecken, 1–4 = bewerten, U = rückgängig.</span>
-  </div>
+  ${UI.group([
+    UI.item('stack', '#ff9f0a', 'Wichtiges zuerst', 'Erst Kern, dann Wichtig, dann der Rest.'),
+    UI.item('brain', '#5e5ce6', 'Kurz vor dem Vergessen', 'Jede Karte kommt genau dann wieder, wenn es nötig ist.'),
+    UI.item('calendar', '#ff375f', 'Bis zur Prüfung', 'Vor dem Prüfungstag kommt alles nochmals dran.'),
+    UI.item('pencil', '#30a46c', 'Ehrlich bewerten', 'Aussage vollständig formulieren, dann aufdecken.'),
+    `<div class="ir ii hide-touch">${icon('keyboard', '#8e8e93')}<span class="ir-l"><b>Tastatur</b><small><span class="k">Leertaste</span> aufdecken · <span class="k">1</span>–<span class="k">4</span> bewerten · <span class="k">U</span> rückgängig</small></span></div>`,
+  ])}
   </div></div>`;
 }
 function ringSVG(done, total, size = 38) {
@@ -745,12 +743,12 @@ function prioBarSegments() {
 function nextFocus() {
   const weak = CARDS.filter(c => { const x = S.cards[c.id]; return x && x.st === 2 && prioOf(c) >= 4 && retrievability(x, examTime()) < 0.8; });
   const kernLeft = CARDS.filter(c => prioOf(c) === 5 && !(S.cards[c.id] && S.cards[c.id].st)).length;
-  const parts = [];
-  if (kernLeft) parts.push(`Noch <b>${kernLeft} Kern-Karten</b> nicht eingeführt – die kommen als Nächstes dran.`);
-  if (weak.length) parts.push(`<b>${weak.length} wichtige Karte${weak.length === 1 ? '' : 'n'}</b> wäre${weak.length === 1 ? '' : 'n'} am Prüfungstag noch unsicher (&lt; 80 %): ${weak.slice(0, 5).map(c => esc(KIND_SHORT[c.kind] + ' ' + c.nr)).join(', ')}${weak.length > 5 ? ' …' : ''}. Sie werden automatisch öfter wiederholt.`);
   const leeches = CARDS.filter(c => (S.cards[c.id]?.lapses || 0) >= 3);
-  if (leeches.length) parts.push(`${leeches.length} Karte(n) mit ≥ 3 Fehlern – im Katalog unter „Schwach“. Tipp: Beweisidee oder Gegenbeispiel dazu nachlesen.`);
-  return parts.join('<br>');
+  const rows = [];
+  if (kernLeft) rows.push(UI.item('target', '#ff453a', `${kernLeft} Kernkarten noch neu`, 'Kommen als Nächstes dran.', '', { act: 'cat:neu:5' }));
+  if (weak.length) rows.push(UI.item('wave', '#ff9f0a', `${weak.length} wichtige Karte${weak.length === 1 ? '' : 'n'} wackel${weak.length === 1 ? 't' : 'n'}`, 'Werden automatisch öfter wiederholt.', '', { act: 'cat:wackelig:' }));
+  if (leeches.length) rows.push(UI.item('alert', '#8e8e93', `${leeches.length} Problemkarte${leeches.length === 1 ? '' : 'n'}`, 'Dreimal oder öfter vergessen. Beweisidee nachlesen hilft.', '', { act: 'cat:schwach:' }));
+  return rows.length ? UI.group(rows) : '';
 }
 
 /* ---------- Lernkarte ---------- */
@@ -972,22 +970,20 @@ function viewQuiz() {
   }
   const chOpts = Object.entries(window.CHAPTERS || {}).map(([k, v]) => `<option value="k${k}">Kapitel ${k}: ${esc(v)}</option>`).join('');
   return `<div class="quizgrid">
-  <div class="card">
-    <h3>Zuordnen (Quizlet-Stil)</h3>
-    <div class="muted small">Du siehst die Aussage aus dem Skript ohne Titel und wählst den richtigen Namen. Trainiert das Wiedererkennen – ideal zwischendurch auf dem Handy. Bevorzugt werden Karten, die bei dir wackeln.</div>
-    <div class="filters" style="margin-top:12px">
-      <select id="qScope"><option value="intro">Bereits eingeführte Karten</option><option value="kern">Nur Kern & Wichtig</option><option value="all">Alle Karten</option>${chOpts}</select>
-      <select id="qN"><option>10</option><option selected>15</option><option>25</option><option>40</option></select>
-    </div>
+  <div class="mode">
+    ${UI.group([
+      UI.item('match', '#0a84ff', 'Zuordnen', 'Aussage sehen, richtigen Namen wählen.'),
+      UI.row('Karten', `<span class="isel"><select id="qScope"><option value="intro">Eingeführte</option><option value="kern">Kern & Wichtig</option><option value="all">Alle</option>${chOpts}</select><svg viewBox="0 0 10 16" aria-hidden="true"><path d="M2 6l3-3 3 3M2 10l3 3 3-3"/></svg></span>`),
+      UI.row('Anzahl', UI.select('qN', [['10', '10'], ['15', '15'], ['25', '25'], ['40', '40']], '15')),
+    ])}
     <button class="btn primary big" data-act="quizstart">Zuordnen starten</button>
   </div>
-  <div class="card" style="margin-top:12px">
-    <h3>Prüfungstest</h3>
-    <div class="muted small">Zufällige Auswahl nach Prüfungsrelevanz und deinen Schwächen. Aufschreiben, aufdecken, ehrlich bewerten – das Ergebnis fliesst in den Lernplan ein.</div>
-    <div class="filters" style="margin-top:12px">
-      <select id="tScope"><option value="kern">Kern & Wichtig</option><option value="intro">Bereits eingeführte Karten</option><option value="all">Alle Karten</option>${chOpts}</select>
-      <select id="tN"><option>8</option><option selected>12</option><option>20</option></select>
-    </div>
+  <div class="mode">
+    ${UI.group([
+      UI.item('test', '#ff375f', 'Prüfungstest', 'Wie an der Prüfung: aufschreiben, aufdecken, bewerten.'),
+      UI.row('Karten', `<span class="isel"><select id="tScope"><option value="kern">Kern & Wichtig</option><option value="intro">Eingeführte</option><option value="all">Alle</option>${chOpts}</select><svg viewBox="0 0 10 16" aria-hidden="true"><path d="M2 6l3-3 3 3M2 10l3 3 3-3"/></svg></span>`),
+      UI.row('Anzahl', UI.select('tN', [['8', '8'], ['12', '12'], ['20', '20']], '12')),
+    ])}
     <button class="btn primary big" data-act="teststart">Test starten</button>
   </div>
   </div>
@@ -1159,9 +1155,7 @@ function viewStats() {
     .filter(o => (o.x.lapses || 0) + (o.x.qBad || 0) > 0).slice(0, 10);
   const plan = planText();
   const grp = (title, arr, lbl) => `<div class="card"><h3>${title}</h3>
-    <div class="legend"><span><i style="background:var(--good)"></i>sitzt (≥ 21 T)</span><span><i style="background:var(--easy)"></i>jung</span><span><i style="background:var(--hard)"></i>lernend</span><span><i style="background:var(--line)"></i>neu</span></div>
-    <table class="t">${arr.map(g => `<tr><td style="width:38%">${lbl(g.k)}</td><td>${stackBar(g)}</td><td class="num" style="width:56px">${g.r == null ? '–' : Math.round(g.r * 100) + '%'}</td></tr>`).join('')}</table>
-    <div class="muted small">Rechte Spalte: mittlere Abrufwahrscheinlichkeit heute (eingeführte Karten).</div></div>`;
+    <table class="t">${arr.map(g => `<tr><td style="width:40%">${lbl(g.k)}</td><td>${stackBar(g)}</td><td class="num muted" style="width:52px">${g.r == null ? '–' : Math.round(g.r * 100) + '%'}</td></tr>`).join('')}</table></div>`;
   return `
   <div class="grid g4">
     <div class="card kpi"><div class="l">Bereitschaft Prüfung</div><div class="v">${Math.round(rd.exam * 100)}%</div><div class="s">heute ${Math.round(rd.now * 100)}%</div></div>
@@ -1169,20 +1163,21 @@ function viewStats() {
     <div class="card kpi"><div class="l">Behaltensquote</div><div class="v">${retention == null ? '–' : Math.round(retention * 100) + '%'}</div><div class="s">bei fälligen Wiederholungen</div></div>
     <div class="card kpi"><div class="l">Serie</div><div class="v">${streak} T</div><div class="s">${totalMin} Min gesamt · ${logs.length} Bewertungen</div></div>
   </div>
-  <h2>Plan bis zur Prüfung</h2><div class="card small">${plan}</div>
+  <h2>Plan bis zur Prüfung</h2>${plan}
   <h2>Fortschritt</h2>
+  <div class="legend" style="margin:-4px 4px 12px"><span><i style="background:var(--good)"></i>sitzt</span><span><i style="background:var(--easy)"></i>jung</span><span><i style="background:var(--hard)"></i>lernend</span><span><i style="background:var(--line)"></i>neu</span><span style="margin-left:auto">% = heute abrufbar</span></div>
   <div class="grid cols2">${grp('Nach Priorität', byPrio, k => `<span class="dot" style="background:${PRIO[k].color}"></span> ${PRIO[k].name}`)}
   ${grp('Nach Kapitel', byChap, k => `${k}. ${esc((window.CHAPTERS || {})[k] || '')}`)}
   ${grp('Nach Typ', byKind, k => k === 'Satz' ? 'Sätze/Theoreme' : k === 'Definition' ? 'Definitionen' : k === 'Lemma' ? 'Lemmata' : k === 'Proposition' ? 'Propositionen' : 'Korollare')}</div>
   ${memoryStatsHTML()}
-  <h2>Prognose: fällige Karten nächste 14 Tage</h2>
+  <h2>Fällige Karten, nächste 14 Tage</h2>
   <div class="card">${barChart(fc, i => i === 0 ? 'heute' : fmtDate(dayStart() + i * DAY).replace('.', ''))}</div>
   <h2>Aktivität</h2>
-  <div class="card"><div class="heat">${heat}</div><div class="muted small" style="margin-top:6px">Letzte 18 Wochen, je dunkler desto mehr Bewertungen.</div>
-    <h3 style="margin-top:14px">Anteil gewusst (≠ Nochmal), letzte 21 Tage</h3>${lineChart(acc)}</div>
+  <div class="card"><h3>Letzte 18 Wochen</h3><div class="heat">${heat}</div>
+    <h3 style="margin-top:18px">Gewusst, letzte 21 Tage</h3>${lineChart(acc)}</div>
   ${timeStatsHTML()}
   <h2>Problemkarten</h2>
-  <div class="card" style="padding:4px 12px">${problem.length ? `<div class="list">${problem.map(o => liHTML(o.c)).join('')}</div>` : '<div class="empty muted small">Noch keine – sehr gut.</div>'}</div>`;
+  <div class="card" style="padding:4px 12px">${problem.length ? `<div class="list">${problem.map(o => liHTML(o.c)).join('')}</div>` : '<div class="empty muted small">Noch keine.</div>'}</div>`;
 }
 function memoryStatsHTML() {
   const { reviews, timeline } = Replay.run();
@@ -1216,25 +1211,24 @@ function memoryStatsHTML() {
   const stab = sb.map(([l, a, b]) => CARDS.filter(c => { const x = S.cards[c.id]; const v = x && x.st ? x.S * K : null; return v != null && v >= a && v < b; }).length);
   const pct = v => v == null ? '–' : Math.round(v * 100) + '%';
   return `<h2>Gedächtnis & Algorithmus</h2>
-  <div class="card"><h3>Erwartete Abrufquote (gewichtet), letzte 30 Tage</h3>${lineChart(hist.map(v => v || null), { min: 0, label0: 'vor 29 T' })}
-    <div class="muted small">So viel vom gesamten Stoff (Kern zählt stärker) hättest du an diesem Tag abrufen können. Neue, noch nicht eingeführte Karten zählen als 0.</div></div>
+  <div class="card"><h3>Abrufbarer Stoff, letzte 30 Tage</h3>${lineChart(hist.map(v => v || null), { min: 0, label0: 'vor 29 T' })}
+    <div class="muted small">Gewichtet nach Priorität, neue Karten zählen als 0.</div></div>
   <div class="grid cols2" style="margin-top:12px">
     <div class="card"><h3>Kalibrierung: stimmt die Vorhersage?</h3>
       <table class="t"><tr><th>vorhergesagt</th><th class="num">Ø vorhergesagt</th><th class="num">tatsächlich</th><th class="num">n</th></tr>
       ${cal.map(b => `<tr><td>${Math.round(b.a * 100)}–${Math.min(100, Math.round(b.b * 100))} %</td><td class="num">${pct(b.pred)}</td><td class="num" style="${b.n >= 10 && Math.abs(b.act - b.pred) > .08 ? 'color:var(--again);font-weight:700' : ''}">${pct(b.act)}</td><td class="num">${b.n}</td></tr>`).join('')}</table>
-      <div class="small" style="margin-top:8px">Persönlicher Gedächtnisfaktor: <b>${K.toFixed(2)}</b>${Calib._n >= 40 ? ` (Rohwert ${Calib._raw.toFixed(2)} aus ${Calib._n} Wiederholungen, gedämpft)` : ` – aktiv ab 40 Wiederholungen (bisher ${Calib._n})`}.</div>
-      <div class="muted small">Faktor &gt; 1: du behältst besser als das Standardmodell → längere Abstände, weniger Arbeit. Faktor &lt; 1: kürzere Abstände, damit die Zielsicherheit trotzdem erreicht wird.</div></div>
+      <div class="muted small" style="margin-top:10px">Gedächtnisfaktor <b style="color:var(--ink)">${K.toFixed(2)}</b>${Calib._n >= 40 ? ` aus ${Calib._n} Wiederholungen` : ` · aktiv ab 40 Wiederholungen (${Calib._n})`}. Über 1 heisst längere Abstände.</div></div>
     <div class="card"><h3>Behaltensquote je Priorität</h3>
       <table class="t"><tr><th></th><th class="num">Ziel</th><th class="num">erreicht</th><th class="num">n</th></tr>
       ${byP.map(b => `<tr><td><span class="dot" style="background:${PRIO[b.p].color}"></span> ${PRIO[b.p].name}</td><td class="num">${Math.round(PRIO[b.p].ret * 100)}%</td><td class="num" style="${b.n >= 15 && b.act < PRIO[b.p].ret - .05 ? 'color:var(--again);font-weight:700' : ''}">${pct(b.act)}</td><td class="num">${b.n}</td></tr>`).join('')}</table>
       <h3 style="margin-top:14px">Stabilität der eingeführten Karten</h3>
       ${barChart(stab, i => sb[i][0])}
-      <div class="muted small">Stabilität = Zeit, bis die Abrufwahrscheinlichkeit auf 90 % fällt.</div></div>
+      <div class="muted small">Zeit, bis eine Karte auf 90 % fällt.</div></div>
   </div>`;
 }
 function timeStatsHTML() {
   const L = S.log.filter(l => modeOf(l) !== 'q');
-  if (!L.length) return `<h2>Lernzeit</h2><div class="card small muted">Noch keine Daten – ab der ersten Bewertung wird für jede Karte gemessen, wie lange du zum Erinnern (Denkzeit) und zum Kontrollieren (Prüfzeit) brauchst.</div>`;
+  if (!L.length) return `<h2>Lernzeit</h2><div class="card small muted">Erscheint nach der ersten Bewertung.</div>`;
   const sec = arr => arr.reduce((a, l) => a + l[4], 0) / 10;
   const d0 = dayStart();
   const today = sec(S.log.filter(l => l[0] >= d0)), week = sec(S.log.filter(l => l[0] >= d0 - 6 * DAY)), all = sec(S.log);
@@ -1269,17 +1263,17 @@ function timeStatsHTML() {
     <div class="card kpi"><div class="l">Ø pro Karte</div><div class="v" style="font-size:20px">${fmtSec(avg(timed, 6) || 0)} + ${fmtSec(avg(timed, 7) || 0)}</div><div class="s">Denkzeit + Prüfzeit</div></div>
   </div>
   <div class="card" style="margin-top:12px"><h3>Minuten pro Tag (14 Tage)</h3>${barChart(mins, i => i === 13 ? 'heute' : fmtDate(d0 - (13 - i) * DAY).replace('.', ''))}
-    <div class="muted small">${sess30.length} Lernsitzungen in 30 Tagen · Ø ${sess30.length ? Math.round(sess30.reduce((a, x) => a + x.act, 0) / sess30.length / 60) : 0} Min aktiv · Ø ${sess30.length ? Math.round(sess30.reduce((a, x) => a + x.n, 0) / sess30.length) : 0} Karten pro Sitzung. Gemessen wird nur, solange die Seite offen und sichtbar ist.</div></div>
+    <div class="muted small">${sess30.length} Sitzungen in 30 Tagen · Ø ${sess30.length ? Math.round(sess30.reduce((a, x) => a + x.act, 0) / sess30.length / 60) : 0} Min · Ø ${sess30.length ? Math.round(sess30.reduce((a, x) => a + x.n, 0) / sess30.length) : 0} Karten</div></div>
   <div class="card" style="margin-top:12px"><h3>Zeit nach Typ</h3>
     <table class="t"><tr><th></th><th class="num">Ø Denken</th><th class="num">Ø Prüfen</th><th class="num">gewusst</th><th class="num">n</th></tr>${grp(c => c.kind === 'Theorem' ? 'Satz' : c.kind, Object.keys(kindL), k => kindL[k])}</table>
     <h3 style="margin-top:14px">Zeit nach Priorität</h3>
     <table class="t"><tr><th></th><th class="num">Ø Denken</th><th class="num">Ø Prüfen</th><th class="num">gewusst</th><th class="num">n</th></tr>${grp(c => prioOf(c), [5, 4, 3, 2, 1], k => PRIO[k].name)}</table>
-    <div class="muted small">„gewusst“ = Anteil nicht „Nochmal“ bei fälligen Wiederholungen.</div></div>
-  ${byRate ? `<div class="card" style="margin-top:12px"><h3>Denkzeit je nach Ergebnis (Wiederholungen)</h3><table class="t"><tr><th></th><th class="num">Ø Denkzeit</th><th class="num">n</th></tr>${byRate}</table>
-    <div class="muted small">Wenn du bei „Gut“ deutlich länger brauchst als bei „Einfach“, ist die Karte noch nicht automatisiert – genau das soll die Wiederholung festigen.</div></div>` : ''}
+</div>
+  ${byRate ? `<div class="card" style="margin-top:12px"><h3>Denkzeit nach Bewertung</h3><table class="t"><tr><th></th><th class="num">Ø Denkzeit</th><th class="num">n</th></tr>${byRate}</table>
+</div>` : ''}
   ${bySlot ? `<div class="card" style="margin-top:12px"><h3>Tageszeit</h3><table class="t"><tr><th></th><th class="num">gewusst</th><th class="num">Ø Denken</th><th class="num">n</th></tr>${bySlot}</table>
-    <div class="muted small">Zeigt, wann du am zuverlässigsten abrufst (ab 5 Wiederholungen pro Zeitfenster).</div></div>` : ''}
-  <div class="card" style="margin-top:12px;padding:4px 12px"><h3 style="margin:12px 0 4px">Zeitfresser (meiste Lernzeit)</h3>
+</div>` : ''}
+  <div class="card" style="margin-top:12px;padding:4px 12px"><h3 style="margin:14px 4px 4px">Meiste Lernzeit</h3>
     <div class="list">${hogs.map(([id, v]) => { const c = BY_ID[id]; return `<div class="li" data-card="${id}">${kindTag(c)}<div class="t"><b>${esc(c.title)}</b><div class="m">${v.n}× · Ø ${fmtSec(v.t / v.n)}</div></div><span class="pill gray">${fmtSec(v.t)}</span></div>`; }).join('')}</div></div>`;
 }
 function planText() {
@@ -1287,20 +1281,20 @@ function planText() {
   const remaining = eligibleNew();
   const rem5 = remaining.filter(c => prioOf(c) === 5).length, rem4 = remaining.filter(c => prioOf(c) === 4).length;
   const npd = plannedNewPerDay();
-  // Tempo der letzten 7 Tage
   const intro7 = CARDS.filter(c => { const x = S.cards[c.id]; return x && x.intro && x.intro > now() - 7 * DAY; }).length;
   const pace = intro7 / 7;
   const finish = pace > 0 ? now() + remaining.length / pace * DAY : null;
-  const finishKern = pace > 0 ? now() + (rem5 + rem4) / pace * DAY : null;
-  let s = `Prüfung am <b>${new Date(examTime()).toLocaleDateString('de-CH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</b> (${dte > 0 ? 'in ' + dte + ' Tagen' : 'vorbei'}). `;
-  if (!remaining.length) s += 'Alle Karten sind eingeführt – jetzt zählen nur noch die Wiederholungen. ';
-  else {
-    s += `Noch <b>${remaining.length}</b> Karten neu (davon ${rem5} Kern, ${rem4} Wichtig). Geplant: <b>${npd} neue/Tag</b> (Ziel: alles spätestens 3 Wochen vor der Prüfung eingeführt). `;
-    if (pace > 0) s += `Dein Tempo der letzten 7 Tage: ${pace.toFixed(1)}/Tag → Kern & Wichtig eingeführt bis ${fmtDate(finishKern)}, alles bis ${fmtDate(finish)}${finish > examTime() - 14 * DAY ? ' <b style="color:var(--again)">– zu spät, bitte Tempo erhöhen</b>' : ' ✓'}. `;
-  }
+  const late = finish && finish > examTime() - 14 * DAY;
   const load7 = []; for (let i = 0; i < 7; i++) { const a = dayStart() + i * DAY; load7.push(CARDS.filter(c => { const x = S.cards[c.id]; return x && x.st && x.due < a + DAY && (i === 0 || x.due >= a); }).length); }
-  s += `Erwartete Wiederholungen in den nächsten 7 Tagen: ${load7.reduce((a, b) => a + b, 0)} (≈ ${Math.round(load7.reduce((a, b) => a + b, 0) * 25 / 60 / 7)} Min/Tag).`;
-  return s;
+  const rev7 = load7.reduce((a, b) => a + b, 0);
+  return UI.group([
+    UI.item('calendar', '#ff375f', new Date(examTime()).toLocaleDateString('de-CH', { weekday: 'long', day: 'numeric', month: 'long' }), dte > 0 ? `in ${dte} Tagen` : 'vorbei'),
+    remaining.length
+      ? UI.item('cards', '#0a84ff', `${remaining.length} Karten noch neu`, `${rem5} Kern · ${rem4} Wichtig`, `<span class="v">${npd} pro Tag</span>`)
+      : UI.item('check', '#30a46c', 'Alle Karten eingeführt', 'Jetzt zählen nur noch die Wiederholungen.'),
+    remaining.length && pace > 0 ? UI.item('bolt', late ? '#ff453a' : '#30a46c', late ? 'Tempo zu langsam' : 'Tempo reicht', `Bisher ${pace.toFixed(1)} pro Tag, fertig am ${fmtDate(finish)}`) : '',
+    UI.item('clock', '#5e5ce6', `${rev7} Wiederholungen`, 'in den nächsten 7 Tagen', `<span class="v">≈ ${Math.round(rev7 * 25 / 60 / 7)} Min/Tag</span>`),
+  ]);
 }
 function barChart(vals, lbl, hi = 0) {
   const W = 420, H = 150, pad = 10, bw = (W - pad) / vals.length, max = Math.max(1, ...vals), gap = vals.length > 14 ? 2 : 6;
@@ -1324,7 +1318,25 @@ function lineChart(vals, o = {}) {
  * Einstellungen
  * ============================================================ */
 /* ---------- Bausteine im Stil der iOS-Einstellungen ---------- */
+const ICON = {
+  target: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r=".6" fill="#fff"/>',
+  wave: '<path d="M3 13c2.5 0 2.5-6 5-6s2.5 10 5 10 2.5-8 5-8 1.5 4 3 4"/>',
+  alert: '<path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17v.2"/>',
+  stack: '<path d="M12 4l8 4-8 4-8-4z"/><path d="M4 12l8 4 8-4M4 16l8 4 8-4"/>',
+  brain: '<path d="M9 5a3 3 0 00-3 3 3 3 0 00-1 5.5A3 3 0 009 19h1V5z"/><path d="M15 5a3 3 0 013 3 3 3 0 011 5.5A3 3 0 0115 19h-1V5z"/>',
+  calendar: '<rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 10h16M9 3v4M15 3v4"/>',
+  pencil: '<path d="M5 19l1-4L16 5l3 3L9 18z"/><path d="M14 7l3 3"/>',
+  keyboard: '<rect x="3" y="7" width="18" height="11" rx="2.5"/><path d="M7 11h.01M11 11h.01M15 11h.01M8 15h8"/>',
+  bolt: '<path d="M13 3L5 14h6l-1 7 8-11h-6z"/>',
+  clock: '<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>',
+  cards: '<rect x="4" y="7" width="12" height="13" rx="2"/><path d="M8 4h10a2 2 0 012 2v11"/>',
+  check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  match: '<path d="M4 7h7M4 12h7M4 17h7"/><path d="M15 7l5 5-5 5"/>',
+  test: '<rect x="5" y="4" width="14" height="17" rx="2.5"/><path d="M9 9h6M9 13h6M9 17h3"/>',
+};
+const icon = (name, color) => `<span class="ico" style="background:${color}"><svg viewBox="0 0 24 24">${ICON[name] || ''}</svg></span>`;
 const UI = {
+  item: (ic, color, title, sub = '', right = '', o = {}) => `<${o.act ? `button type="button" data-act="${o.act}"` : 'div'} class="ir ii${o.act ? ' ia' : ''}">${icon(ic, color)}<span class="ir-l"><b>${title}</b>${sub ? `<small>${sub}</small>` : ''}</span>${right || o.act ? `<span class="ir-r">${right}${o.act ? '<svg class="chev" viewBox="0 0 8 14" aria-hidden="true"><path d="M1.5 1.5L6.5 7l-5 5.5"/></svg>' : ''}</span>` : ''}</${o.act ? 'button' : 'div'}>`,
   group: (rows, o = {}) => `<section class="ig">${o.header ? `<div class="ig-h">${o.header}</div>` : ''}<div class="ig-b">${rows.filter(Boolean).join('')}</div>${o.footer ? `<div class="ig-f">${o.footer}</div>` : ''}</section>`,
   row: (label, right = '', o = {}) => `<div class="ir${o.cls ? ' ' + o.cls : ''}"><span class="ir-l">${label}${o.sub ? `<small>${o.sub}</small>` : ''}</span><span class="ir-r">${right}</span></div>`,
   toggle: (id, on, label, sub) => `<label class="ir" for="${id}"><span class="ir-l">${label}${sub ? `<small>${sub}</small>` : ''}</span><span class="ir-r"><span class="sw"><input type="checkbox" role="switch" id="${id}" ${on ? 'checked' : ''}><i></i></span></span></label>`,
@@ -1456,6 +1468,7 @@ document.addEventListener('click', e => {
   if (ca && ca.tagName === 'BUTTON') return cardAction(ca.dataset.cardact, ca.dataset.id);
   if (!act) return;
   if (act.startsWith('tab:')) { session = null; return go(act.slice(4)); }
+  if (act.startsWith('cat:')) { const [, st, pr] = act.split(':'); cat = { q: '', chap: '', kind: '', prio: pr || '', status: st || '' }; return go('katalog'); }
   switch (act) {
     case 'start': startSession(); break;
     case 'extra': {
