@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-19.28';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-19.29';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -840,7 +840,7 @@ function viewHome() {
   const chap = groupStats(c => c.chap, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
   return `<div class="home"><div class="col">
   <div class="card hero">
-    <div class="row" style="gap:14px;align-items:center;flex-wrap:nowrap">${ringSVG(todayLog.length, todayLog.length + q.queue.length, 64)}<div style="min-width:0"><div class="htitle">Heute</div><div class="muted small">${ts.allDone ? 'Alles erledigt' : `${todayLog.length} von ${todayLog.length + q.queue.length} Karten`} · ${dte > 0 ? `Prüfung in ${dte} Tagen` : dte === 0 ? 'Prüfung heute' : 'Prüfung vorbei'}</div></div></div>
+    <div class="row" style="gap:14px;align-items:center;flex-wrap:nowrap">${ringSVG(todayLog.length, todayLog.length + q.queue.length, 64)}<div style="min-width:0"><div class="htitle">Heute</div><div class="muted small">${ts.allDone ? 'Alles erledigt' : `${todayLog.length} von ${todayLog.length + q.queue.length} Karten`}</div></div></div>
     ${ts.allDone ? doneHeroHTML(ts) : todoHTML(ts)}
     <div style="margin-top:14px">
       ${q.queue.length
@@ -851,30 +851,13 @@ function viewHome() {
     </div>
   </div>
 
-  <div class="grid g2" style="margin-top:12px">
-    <div class="card kpi"><div class="l">Prüfungsbereit</div><div class="v">${Math.round(rd.exam * 100)}%</div>
-      <div class="bar" style="margin-top:10px"><span style="width:${rd.exam * 100}%;background:var(--good)"></span></div>
-      <div class="s">erwartet am Prüfungstag</div></div>
-    <div class="card kpi"><div class="l">Eingeführt</div><div class="v">${introduced}<span class="muted" style="font-size:.5em;font-weight:600"> / ${CARDS.length}</span></div>
-      <div class="bar" style="margin-top:10px">${prioBarSegments()}</div>
-      <div class="s">Kern ${countIntro(5)} · Wichtig ${countIntro(4)}</div></div>
-  </div>
-  </div><div class="col">
-  ${focus ? `<h2>Nächster Fokus</h2>${focus}` : ''}
-  <h2>Kapitel</h2>
-  <div class="card">
-    <table class="t">${chap.map(g => `<tr><td style="width:46%"><span class="muted">${g.k}.</span> ${esc((window.CHAPTERS || {})[g.k] || '')}</td><td>${stackBar(g)}</td><td class="num muted" style="width:52px">${g.n - g.neu}/${g.n}</td></tr>`).join('')}</table>
-    <div class="legend" style="margin-bottom:0"><span><i style="background:var(--good)"></i>sitzt</span><span><i style="background:var(--easy)"></i>jung</span><span><i style="background:var(--hard)"></i>lernend</span><span><i style="background:var(--line)"></i>neu</span></div>
-  </div>
-
-  <h2>So funktioniert's</h2>
   ${UI.group([
-    UI.item('stack', '#ff9f0a', 'Wichtiges zuerst', 'Erst Kern, dann Wichtig, dann der Rest.'),
-    UI.item('brain', '#5e5ce6', 'Kurz vor dem Vergessen', 'Jede Karte kommt genau dann wieder, wenn es nötig ist.'),
-    UI.item('calendar', '#ff375f', 'Bis zur Prüfung', 'Vor dem Prüfungstag kommt alles nochmals dran.'),
-    UI.item('pencil', '#30a46c', 'Ehrlich bewerten', 'Nur nach rechts wischen, wenn alles stimmte.'),
-    `<div class="ir ii hide-touch">${icon('keyboard', '#8e8e93')}<span class="ir-l"><b>Tastatur</b><small><span class="k">Leertaste</span> aufdecken · <span class="k">←</span> <span class="k">→</span> bewerten · <span class="k">U</span> rückgängig</small></span></div>`,
-  ])}
+    UI.row('Prüfungsbereit', `<span class="v">${Math.round(rd.exam * 100)} %</span>`),
+    UI.row('Eingeführt', `<span class="v">${introduced} von ${CARDS.length}</span>`),
+    UI.row('Prüfung', `<span class="v">${dte > 0 ? `in ${dte} Tagen` : dte === 0 ? 'heute' : 'vorbei'}</span>`),
+  ], { cls: 'tight' })}
+  </div><div class="col">
+  ${focus ? `<h2>Als Nächstes</h2>${focus}` : ''}
   </div></div>`;
 }
 function ringSVG(done, total, size = 38) {
@@ -984,7 +967,7 @@ function viewStudy() {
         <div class="kpi center"><div class="v">${Math.max(1, Math.round(secs / 60))}</div><div class="l">Minuten</div></div>
       </div>
       <div class="muted small center" style="margin-top:10px">${ts.allDone ? '' : `Morgen fällig: ${tomorrow} Karten · `}Ø ${L.length ? fmtSec(secs / L.length) : '–'} pro Bewertung</div>
-      ${lapsed.length ? `<h3 style="margin-top:16px">Vergessen – lohnt sich kurz nachzulesen</h3><div class="list">${lapsed.map(liHTML).join('')}</div>` : ''}
+      ${lapsed.length ? `<h3 style="margin-top:18px">Kurz nachlesen</h3>${UI.group(lapsed.map(liHTML))}` : ''}
       <div class="row" style="justify-content:center;margin-top:16px">
         <button class="btn" data-act="home">Zur Übersicht</button>
         <button class="btn primary" data-act="tab:statistik">Statistik ansehen</button></div></div>`;
@@ -1005,12 +988,10 @@ function viewStudy() {
     ${s.revealed && swipeMode() ? '<span class="sbadge no" aria-hidden="true">Nicht gewusst</span><span class="sbadge ok" aria-hidden="true">Gewusst</span>' : ''}
     <div class="row">
       <span class="kind" style="color:${KIND_COLOR[c.kind]}">${esc(c.kind)} ${c.nr}</span>
-      ${isNew ? '<span class="pill" style="background:color-mix(in srgb,var(--good) 15%,transparent);color:var(--good)">neu</span>' : ''}
-      ${x.st === 1 || x.st === 3 ? '<span class="pill" style="background:color-mix(in srgb,var(--hard) 15%,transparent);color:var(--hard)">Lernschritt</span>' : ''}
-      <div class="spacer"></div>${prioTag(c)}
+      ${isNew ? '<span class="muted small">· neu</span>' : ''}
     </div>
     <div class="ttl">${esc(c.title) || esc(c.kind + ' ' + c.nr)}</div>
-    <div class="meta">Kap. ${c.chap} · ${esc(c.sec)} · Skript S. ${c.page}${c.proofP ? ` · Beweis-Prüfungschance ≈ ${Math.max(1, Math.round(c.proofP * 100))}%` : ''}</div>
+    <div class="meta">Kapitel ${c.chap} · S. ${c.page}${c.proofP && c.proofP >= 0.2 ? ` · Beweis oft geprüft` : ''}</div>
     ${!s.revealed ? `
       <div class="prompt">${promptFor(c)}</div>
       ${S.settings.typeAnswer ? `<textarea class="note" id="answer" placeholder="Hier aufschreiben (wird nicht gespeichert) …"></textarea>` : ''}
@@ -1020,7 +1001,6 @@ function viewStudy() {
       ${scanHTML(c, false)}
       ${logicHTML(c)}
       ${c.tip ? `<div class="tip"><b>Worauf achten:</b> ${esc(c.tip)}</div>` : ''}
-      ${historyLine(c)}
       ${swipeMode() ? '' : `<div class="actionbar"><div class="rate">
         <button class="r1" data-rate="1">Nochmal<small>${ivls[0]}</small></button>
         <button class="r2" data-rate="2">Schwer<small>${ivls[1]}</small></button>
@@ -1204,7 +1184,7 @@ function viewQuiz() {
     const wrong = quiz.answers.filter(a => !a.ok).map(a => BY_ID[a.id]);
     return `<div class="card"><div class="center"><div style="font-size:42px;font-weight:800">${Math.round(ok / n * 100)}%</div>
       <div class="muted">${ok} von ${n} ${quiz.type === 'match' ? 'richtig zugeordnet' : 'vollständig gewusst'}</div></div>
-      ${wrong.length ? `<h3 style="margin-top:16px">Nochmals anschauen</h3><div class="list">${wrong.map(liHTML).join('')}</div>
+      ${wrong.length ? `<h3 style="margin-top:18px">Nochmals anschauen</h3>${UI.group(wrong.map(liHTML))}
         <div class="muted small" style="margin-top:6px">${quiz.type === 'match' ? 'Falsch zugeordnete Karten kommen heute nochmals im Lernmodus.' : 'Die Test-Bewertungen wurden direkt in deinen Lernplan übernommen.'}</div>` : ''}
       <div class="row" style="margin-top:16px"><button class="btn" data-act="quizend">Zurück</button>
       ${wrong.length ? `<button class="btn primary" data-act="learnwrong">Falsche jetzt lernen</button>` : ''}</div></div>`;
@@ -1244,13 +1224,8 @@ function quizHistory() {
 let cat = { q: '', chap: '', kind: '', prio: '', status: '' };
 function liHTML(c) {
   const st = statusOf(c), x = S.cards[c.id];
-  const r = x && x.st ? Math.round(retrievability(x) * 100) + '%' : '';
-  return `<div class="li" data-card="${c.id}">
-    ${kindTag(c)}
-    <div class="t"><b>${esc(c.title) || '—'}</b>${(S.cards[c.id] || {}).flag ? ' <span title="markiert">★</span>' : ''}<div class="m">${esc(c.sec)} · S. ${c.page}</div></div>
-    <span class="dot" title="${PRIO[prioOf(c)].name}" style="background:${PRIO[prioOf(c)].color}"></span>
-    <span class="pill" style="background:color-mix(in srgb,${st.col} 14%,transparent);color:${st.col};min-width:66px;justify-content:center">${st.l}${r ? ' ' + r : ''}</span>
-  </div>`;
+  const right = x && x.st ? (st.k === 'lernend' ? 'lernt' : Math.round(retrievability(x) * 100) + ' %') : '';
+  return `<div class="ir li2" data-card="${c.id}"><span class="ir-l"><b>${esc(c.title) || '—'}${(x || {}).flag ? ' ★' : ''}</b><small>${esc(KIND_SHORT[c.kind] + ' ' + c.nr)} · S. ${c.page}</small></span><span class="ir-r">${right ? `<span class="v${st.k === 'schwach' || st.l === 'Wackelig' ? ' warn' : ''}">${right}</span>` : ''}<svg class="chev" viewBox="0 0 8 14" aria-hidden="true"><path d="M1.5 1.5L6.5 7l-5 5.5"/></svg></span></div>`;
 }
 function filteredCatalog() {
   const q = cat.q.trim().toLowerCase();
@@ -1270,19 +1245,19 @@ function filteredCatalog() {
 }
 function viewCatalog() {
   const list = filteredCatalog();
-  const ch = Object.entries(window.CHAPTERS || {}).map(([k, v]) => `<option value="${k}" ${cat.chap == k ? 'selected' : ''}>${k}. ${esc(v)}</option>`).join('');
-  const sel = (id, opts, val) => `<select id="${id}">${opts.map(([v, l]) => `<option value="${v}" ${String(val) === String(v) ? 'selected' : ''}>${l}</option>`).join('')}</select>`;
+  const segs = [['', 'Alle'], ['neu', 'Neu'], ['lernend', 'Lernend'], ['sitzt', 'Sitzt'], ['schwach', 'Schwach']];
+  const extra = [];
+  if (cat.prio) extra.push(['prio', PRIO[cat.prio].name]);
+  if (cat.kind) extra.push(['kind', cat.kind === 'Satz' ? 'Sätze' : cat.kind]);
+  if (cat.chap) extra.push(['chap', 'Kapitel ' + cat.chap]);
+  if (cat.status && !segs.some(x => x[0] === cat.status)) extra.push(['status', { wackelig: 'Wackelig', jung: 'Jung', flag: 'Markiert', pause: 'Pausiert' }[cat.status] || cat.status]);
+  const by = {}; for (const c of list) (by[c.chap] = by[c.chap] || []).push(c);
   return `
-  <div class="filters">
-    <input id="cq" type="search" placeholder="Suchen (z. B. Supremum, 7.30, stetig) …" value="${esc(cat.q)}">
-    <select id="cchap"><option value="">Alle Kapitel</option>${ch}</select>
-    ${sel('ckind', [['', 'Alle Typen'], ['Definition', 'Definitionen'], ['Satz', 'Sätze & Theoreme'], ['Lemma', 'Lemmata'], ['Proposition', 'Propositionen'], ['Korollar', 'Korollare']], cat.kind)}
-    ${sel('cprio', [['', 'Alle Prioritäten'], [5, 'Kern'], [4, 'Wichtig'], [3, 'Solide'], [2, 'Ergänzung'], [1, 'Rand']], cat.prio)}
-    ${sel('cstat', [['', 'Jeder Status'], ['neu', 'Neu'], ['lernend', 'Lernend'], ['jung', 'Jung'], ['sitzt', 'Sitzt'], ['wackelig', 'Wackelig (< 85 %)'], ['schwach', 'Schwach (≥ 3 Fehler)'], ['flag', 'Markiert ★'], ['pause', 'Pausiert']], cat.status)}
-  </div>
-  <div class="row small muted" style="margin:0 2px 8px"><span>${list.length} Karten</span><div class="spacer"></div>
-    ${list.length ? `<button class="btn small" data-act="learnfiltered">Diese ${Math.min(list.length, 50)} jetzt üben</button>` : ''}</div>
-  <div class="card" style="padding:4px 12px">${list.length ? `<div class="list">${list.map(liHTML).join('')}</div>` : '<div class="empty muted">Keine Treffer</div>'}</div>`;
+  <div class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></svg><input id="cq" type="search" placeholder="Suchen" value="${esc(cat.q)}" autocomplete="off"></div>
+  <div class="seg" role="tablist">${segs.map(([v, l]) => `<button role="tab" data-seg="${v}" class="${cat.status === v ? 'on' : ''}">${l}</button>`).join('')}</div>
+  ${extra.length ? `<div class="chips">${extra.map(([k, l]) => `<button class="chip" data-unfilter="${k}">${esc(l)} <span aria-hidden="true">×</span></button>`).join('')}</div>` : ''}
+  <div class="cathead"><span>${list.length} Karten</span>${list.length ? `<button class="linkbtn2" data-act="learnfiltered">${Math.min(list.length, 50) === list.length ? 'Alle' : 'Erste ' + Math.min(list.length, 50)} üben</button>` : ''}</div>
+  ${list.length ? Object.keys(by).sort((a, b) => a - b).map(k => UI.group(by[k].map(liHTML), { header: `${k}. ${esc((window.CHAPTERS || {})[k] || '')}` })).join('') : '<div class="empty muted">Keine Treffer</div>'}`;
 }
 
 function openCard(id) {
@@ -1398,27 +1373,25 @@ function viewStats() {
   const grp = (title, arr, lbl) => `<div class="card"><h3>${title}</h3>
     <table class="t">${arr.map(g => `<tr><td style="width:40%">${lbl(g.k)}</td><td>${stackBar(g)}</td><td class="num muted" style="width:52px">${g.r == null ? '–' : Math.round(g.r * 100) + '%'}</td></tr>`).join('')}</table></div>`;
   return `
-  <div class="grid g4">
-    <div class="card kpi"><div class="l">Bereitschaft Prüfung</div><div class="v">${Math.round(rd.exam * 100)}%</div><div class="s">heute ${Math.round(rd.now * 100)}%</div></div>
-    <div class="card kpi"><div class="l">Sitzt sicher</div><div class="v">${sitzt}</div><div class="s">von ${CARDS.length} Karten</div></div>
-    <div class="card kpi"><div class="l">Behaltensquote</div><div class="v">${retention == null ? '–' : Math.round(retention * 100) + '%'}</div><div class="s">bei fälligen Wiederholungen</div></div>
-    <div class="card kpi"><div class="l">Serie</div><div class="v">${streak} T</div><div class="s">${totalMin} Min gesamt · ${logs.length} Bewertungen</div></div>
+  <div class="grid g2">
+    <div class="card kpi"><div class="l">Prüfungsbereit</div><div class="v">${Math.round(rd.exam * 100)}%</div></div>
+    <div class="card kpi"><div class="l">Sitzt sicher</div><div class="v">${sitzt}<span class="of"> / ${CARDS.length}</span></div></div>
+    <div class="card kpi"><div class="l">Gewusst</div><div class="v">${retention == null ? '–' : Math.round(retention * 100) + '%'}</div></div>
+    <div class="card kpi"><div class="l">Serie</div><div class="v">${streak}<span class="of"> Tage</span></div></div>
   </div>
-  <h2>Plan bis zur Prüfung</h2>${plan}
-  <h2>Fortschritt</h2>
-  <div class="legend" style="margin:-4px 4px 12px"><span><i style="background:var(--good)"></i>sitzt</span><span><i style="background:var(--easy)"></i>jung</span><span><i style="background:var(--hard)"></i>lernend</span><span><i style="background:var(--line)"></i>neu</span><span style="margin-left:auto">% = heute abrufbar</span></div>
-  <div class="grid cols2">${grp('Nach Priorität', byPrio, k => `<span class="dot" style="background:${PRIO[k].color}"></span> ${PRIO[k].name}`)}
-  ${grp('Nach Kapitel', byChap, k => `${k}. ${esc((window.CHAPTERS || {})[k] || '')}`)}
-  ${grp('Nach Typ', byKind, k => k === 'Satz' ? 'Sätze/Theoreme' : k === 'Definition' ? 'Definitionen' : k === 'Lemma' ? 'Lemmata' : k === 'Proposition' ? 'Propositionen' : 'Korollare')}</div>
-  ${memoryStatsHTML()}
-  <h2>Fällige Karten, nächste 14 Tage</h2>
+  <h2>Plan</h2>${plan}
+  <h2>Kapitel</h2>
+  ${UI.group(byChap.map(g => `<div class="ir chr"><span class="ir-l"><b>${esc((window.CHAPTERS || {})[g.k] || '')}</b><small>Kapitel ${g.k} · ${g.n - g.neu} von ${g.n}</small></span><span class="ir-r chb">${stackBar(g)}</span></div>`))}
+  <h2>Nächste 14 Tage</h2>
   <div class="card">${barChart(fc, i => i === 0 ? 'heute' : fmtDate(dayStart() + i * DAY).replace('.', ''))}</div>
-  <h2>Aktivität</h2>
-  <div class="card"><h3>Letzte 18 Wochen</h3><div class="heat">${heat}</div>
-    <h3 style="margin-top:18px">Gewusst, letzte 21 Tage</h3>${lineChart(acc)}</div>
-  ${timeStatsHTML()}
-  <h2>Problemkarten</h2>
-  <div class="card" style="padding:4px 12px">${problem.length ? `<div class="list">${problem.map(o => liHTML(o.c)).join('')}</div>` : '<div class="empty muted small">Noch keine.</div>'}</div>`;
+  ${problem.length ? `<h2>Schwierige Karten</h2>${UI.group(problem.map(o => liHTML(o.c)))}` : ''}
+  <details class="more"><summary>Weitere Statistiken</summary>
+    <h2>Nach Priorität</h2>${UI.group(byPrio.map(g => `<div class="ir chr"><span class="ir-l"><b>${PRIO[g.k].name}</b><small>${g.n - g.neu} von ${g.n}</small></span><span class="ir-r chb">${stackBar(g)}</span></div>`))}
+    ${memoryStatsHTML()}
+    <h2>Aktivität</h2>
+    <div class="card"><div class="heat">${heat}</div><h3 style="margin-top:18px">Gewusst, letzte 21 Tage</h3>${lineChart(acc)}</div>
+    ${timeStatsHTML()}
+  </details>`;
 }
 function memoryStatsHTML() {
   const { reviews, timeline } = Replay.run();
@@ -1634,6 +1607,13 @@ function viewSettings() {
 
   ${Sync.ok ? '' : `<details class="adv ig"><summary class="ig-h">Erweitert: Abgleich über GitHub-Gist</summary><div class="ig-b ig-pad">${gistSettingsHTML()}</div></details>`}
 
+  ${UI.group([
+    UI.item('stack', '#ff9f0a', 'Wichtiges zuerst', 'Erst Kern, dann Wichtig, dann der Rest.'),
+    UI.item('brain', '#5e5ce6', 'Kurz vor dem Vergessen', 'Jede Karte kommt wieder, wenn es nötig ist.'),
+    UI.item('calendar', '#ff375f', 'Bis zur Prüfung', 'Vorher kommt alles nochmals dran.'),
+    UI.item('pencil', '#30a46c', 'Ehrlich bewerten', 'Nur nach rechts wischen, wenn alles stimmte.'),
+  ], { header: 'So funktioniert LemmaLab' })}
+
   ${UI.group([UI.action('Gesamten Fortschritt löschen', 'resetall', { danger: true })])}
 
   <div class="ig-foot">LemmaLab ${APP_VERSION}<br><a href="#mehr" data-act="update">Nach Update suchen</a> · <a href="datenschutz.html">Datenschutz</a><br>Inoffizielle Lernhilfe, ohne Gewähr. Inhalte aus dem Vorlesungsskript (Kapitel 1–9). Prioritäten aus alten Prüfungen geschätzt. Algorithmus FSRS-6.</div>
@@ -1677,7 +1657,8 @@ function afterRender() {
   }
   const on = (sel, ev, fn) => { const el = $(sel); if (el) el.addEventListener(ev, fn); };
   on('#cq', 'input', e => { cat.q = e.target.value; const pos = e.target.selectionStart; render(); const el = $('#cq'); el.focus(); el.setSelectionRange(pos, pos); });
-  for (const [id, key] of [['#cchap', 'chap'], ['#ckind', 'kind'], ['#cprio', 'prio'], ['#cstat', 'status']]) on(id, 'change', e => { cat[key] = e.target.value; render(); });
+  document.querySelectorAll('.seg [data-seg]').forEach(b => b.addEventListener('click', () => { cat.status = b.dataset.seg; render(); }));
+  document.querySelectorAll('[data-unfilter]').forEach(b => b.addEventListener('click', () => { cat[b.dataset.unfilter] = ''; render(); }));
   on('#sExam', 'change', e => { if (e.target.value) { S.settings.examDate = e.target.value; touchSettings(); rescheduleForExam(); } });
   on('#sNewMode', 'change', e => { S.settings.newMode = e.target.value; touchSettings(); render(); });
   on('#sNew', 'change', e => { S.settings.newPerDay = clamp(+e.target.value || 0, 0, 80); touchSettings(); });

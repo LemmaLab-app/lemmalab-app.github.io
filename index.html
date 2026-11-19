@@ -882,6 +882,65 @@ nav.tabs::after,.modal .sheet::after,body.focus .actionbar::after{display:none!i
   #tabs .lens.moving{background:color-mix(in srgb,var(--ink) 12%,transparent)!important}
   nav.tabs button:hover:not(.on){background:color-mix(in srgb,var(--ink) 4%,transparent)!important}
 }
+
+/* =====================================================================
+ * Schlicht wie Apple: ruhiger grauer Grund, keine Zierfarben,
+ * Inhalte als gruppierte Listen, Suche + Segmente im Katalog.
+ * ===================================================================== */
+:root{--bg:#f2f2f7}
+:root.dark{--bg:#000}
+@media (prefers-color-scheme:dark){:root:not(.light){--bg:#000}}
+body::before{display:none!important}
+#syncPill{display:none!important}
+header.top{margin-bottom:14px}
+
+/* Kennzahlen */
+.kpi .of{font-size:.5em;font-weight:600;color:var(--muted);letter-spacing:-.01em}
+.grid.g2{gap:10px}
+
+/* Kapitel-Zeilen mit Balken rechts */
+.chr .ir-l{flex:1 1 auto}
+.chb{width:34%;max-width:200px}
+.chb .bar{width:100%;height:6px}
+
+/* Listeneinträge (Karten) */
+.li2{cursor:pointer;min-height:56px}
+.li2 .ir-l b{font-weight:500;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.li2 .ir-l small{font-size:13px}
+.ir-r .v.warn{color:var(--again)}
+@media (hover:hover){.li2:hover{background:color-mix(in srgb,var(--ink) 3%,transparent)}}
+.li2:active{background:var(--line2)}
+@media (min-width:768px) and (min-height:560px){.li2 .ir-l b{font-size:15px}}
+
+/* Suche wie in iOS */
+.search{display:flex;align-items:center;gap:6px;background:color-mix(in srgb,var(--ink) 7%,transparent);border-radius:11px;padding:0 10px;height:38px;margin-bottom:10px}
+.search svg{width:17px;height:17px;flex:none;fill:none;stroke:var(--muted);stroke-width:2;stroke-linecap:round}
+.search input{flex:1;min-width:0;border:0;background:none;outline:none;font-size:16px;color:var(--ink);padding:0}
+.search input::placeholder{color:var(--muted)}
+.search input::-webkit-search-cancel-button{opacity:.5}
+
+/* Segment-Steuerung */
+.seg{display:flex;background:color-mix(in srgb,var(--ink) 7%,transparent);border-radius:10px;padding:2px;margin-bottom:12px;gap:2px}
+.seg button{flex:1;border:0;background:none;border-radius:8px;padding:6px 2px;font-size:13px;font-weight:500;color:var(--ink);transition:background .2s,box-shadow .2s;min-width:0;white-space:nowrap}
+.seg button.on{background:var(--panel);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.12),0 0 0 .5px rgba(0,0,0,.04)}
+:root.dark .seg button.on{background:#636366}
+@media (prefers-color-scheme:dark){:root:not(.light) .seg button.on{background:#636366}}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:-4px 0 12px}
+.chip{border:0;border-radius:99px;background:var(--accent-soft);color:var(--accent);font-size:13px;font-weight:600;padding:5px 11px}
+.cathead{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--muted);padding:0 4px 14px}
+.linkbtn2{border:0;background:none;color:var(--accent);font-size:15px;font-weight:500;padding:0}
+
+/* «Weitere Statistiken» */
+details.more{margin-top:26px}
+details.more>summary{list-style:none;cursor:pointer;background:var(--panel);border-radius:12px;padding:13px 16px;font-size:16px;color:var(--accent);display:flex;justify-content:space-between;align-items:center}
+details.more>summary::-webkit-details-marker{display:none}
+details.more>summary::after{content:"";width:8px;height:8px;border-right:2px solid color-mix(in srgb,var(--muted) 70%,transparent);border-bottom:2px solid color-mix(in srgb,var(--muted) 70%,transparent);transform:rotate(-45deg);transition:transform .25s var(--ease)}
+details.more[open]>summary::after{transform:rotate(45deg)}
+details.more[open]>summary{margin-bottom:6px}
+
+/* Startseite */
+.home .ig{margin-top:12px}
+.hero ul.todo{margin-top:16px}
 </style>
 </head>
 <body>
@@ -901,10 +960,10 @@ nav.tabs::after,.modal .sheet::after,body.focus .actionbar::after{display:none!i
 <div id="navbar" aria-hidden="true"><span id="navTitle"></span></div>
 <div class="toast" id="toast"></div>
 <script src="vendor/katex/katex.min.js"></script>
-<script src="data.js?v=2026-11-19.28"></script>
-<script src="logic.js?v=2026-11-19.28"></script>
-<script src="app.js?v=2026-11-19.28"></script>
+<script src="data.js?v=2026-11-19.29"></script>
+<script src="logic.js?v=2026-11-19.29"></script>
+<script src="app.js?v=2026-11-19.29"></script>
 <script src="vendor/supabase/supabase.js"></script>
-<script src="account.js?v=2026-11-19.28"></script>
+<script src="account.js?v=2026-11-19.29"></script>
 </body>
 </html>
