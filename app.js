@@ -3,16 +3,18 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-19.34';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-19.36';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
  * ============================================================ */
+const FACH = window.FACH || 'ana1';
+const FACH_CFG = (window.FAECHER || {})[FACH] || { name: 'Analysis 1', ls: 'lemmalab-v1', gist: 'lemmalab-fortschritt.json', syncPrefix: '', examDate: '2027-01-25' };
 const CARDS = window.CARDS || [];
 const BY_ID = Object.fromEntries(CARDS.map(c => [c.id, c]));
 const MIN = 60e3, HOUR = 3600e3, DAY = 86400e3;
 const DAY_START_HOUR = 4;                     // neuer Lerntag beginnt um 04:00
-const LS_KEY = 'lemmalab-v1';
+const LS_KEY = FACH_CFG.ls;              // pro Fach eigener Lernstand
 // Frühere Speicher-Namen einmalig übernehmen (Fortschritt geht nicht verloren)
 (() => { try {
   for (const [o, n] of [['ana1-lernen-v1', 'lemmalab-v1'], ['ana1-zoom', 'lemmalab-zoom'], ['ana1-gist-v1', 'lemmalab-gist-v1']]) {
@@ -28,8 +30,15 @@ const PRIO = {
   2: { name: 'Ergänzung', color: 'var(--p2)', ret: 0.87, w: 1 },
   1: { name: 'Rand',      color: 'var(--p1)', ret: 0.85, w: 0.4 },
 };
-const KIND_COLOR = { Definition: 'var(--def)', Satz: 'var(--satz)', Theorem: 'var(--satz)', Lemma: 'var(--lem)', Proposition: 'var(--prop)', Korollar: 'var(--kor)' };
-const KIND_SHORT = { Definition: 'Def.', Satz: 'Satz', Theorem: 'Thm.', Lemma: 'Lemma', Proposition: 'Prop.', Korollar: 'Kor.' };
+const KIND_COLOR = { Definition: 'var(--def)', Satz: 'var(--satz)', Theorem: 'var(--satz)', Lemma: 'var(--lem)', Proposition: 'var(--prop)', Korollar: 'var(--kor)',
+  Gesetz: 'var(--satz)', Formel: 'var(--prop)', Konzept: 'var(--kor)', Rezept: 'var(--lem)' };
+const KIND_SHORT = { Definition: 'Def.', Satz: 'Satz', Theorem: 'Thm.', Lemma: 'Lemma', Proposition: 'Prop.', Korollar: 'Kor.',
+  Gesetz: 'Gesetz', Formel: 'Formel', Konzept: 'Konzept', Rezept: 'Rezept' };
+const KIND_PLURAL = { Definition: 'Definitionen', Satz: 'Sätze/Theoreme', Lemma: 'Lemmata', Proposition: 'Propositionen', Korollar: 'Korollare',
+  Gesetz: 'Gesetze', Formel: 'Formeln', Konzept: 'Konzeptfragen', Rezept: 'Rezepte' };
+const kindKey = c => c.kind === 'Theorem' ? 'Satz' : c.kind;
+const KINDS = Object.keys(KIND_PLURAL).filter(k => CARDS.some(c => kindKey(c) === k));
+const CHAP_KEYS = Object.keys(window.CHAPTERS || {}).map(Number).sort((a, b) => a - b);
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -95,7 +104,7 @@ let FSRS = makeFSRS(FSRS6_DEFAULT);
  * Zustand & Speicherung
  * ============================================================ */
 const DEFAULT_SETTINGS = {
-  examDate: '2027-01-25', newMode: 'auto', newPerDay: 15, maxReviews: 250,
+  examDate: FACH_CFG.examDate || '2027-01-25', newMode: 'auto', newPerDay: 15, maxReviews: 250,
   includeRand: false, theme: 'auto', typeAnswer: false, budget: 0, u: 0, fourButtons: false,
 };
 const swipeMode = () => !S.settings.fourButtons;
@@ -413,7 +422,7 @@ function trainWorker() {
  * (anonyme Summen aus der Datenbank, mind. 5 Personen pro Karte)
  * ============================================================ */
 const Community = {
-  KEY: 'lemmalab-community', ver: '0', data: null,
+  KEY: 'lemmalab-community' + (FACH === 'ana1' ? '' : '-' + FACH), ver: '0', data: null,
   init() { try { this.data = JSON.parse(localStorage.getItem(this.KEY) || 'null'); } catch (e) { } this.ver = this.data ? String(this.data.at) : '0'; },
   delta(id) {
     if (S.settings.community === false || !this.data || !this.data.cards) return 0;
@@ -558,7 +567,7 @@ function startSession(customIds) {
 const Pre = {
   m: new Map(),
   get(c) {
-    if (!c) return;
+    if (!c || !c.img) return;
     const src = 'img/' + c.img;
     if (this.m.has(src)) return;
     const im = new Image();
@@ -686,6 +695,8 @@ function render() {
   applyTheme();
   Model.sync();
   { const h = $('#hdrTitle'); if (h) h.textContent = ({ heute: 'Lernen', quiz: 'Quiz', katalog: 'Karten', statistik: 'Fortschritt', mehr: 'Einstellungen', admin: 'Admin' })[tab] || 'LemmaLab'; }
+  { const h = $('#hdrSub'); if (h && !h.dataset.f) { h.dataset.f = 1; h.innerHTML = `<button class="fachbtn" data-act="fachpick" title="Fach wechseln">${esc(FACH_CFG.name)} <span class="car">▼</span></button>`; } }
+  { const b = document.querySelector('nav.tabs .brand span'); if (b && !b.dataset.f) { b.dataset.f = 1; b.textContent = 'LemmaLab · ' + (FACH_CFG.short || FACH_CFG.name); } }
   const focusMode = (tab === 'heute' && session && session.cur) || (tab === 'quiz' && quiz && quiz.i < quiz.items.length);
   document.body.classList.toggle('focus', !!focusMode);
   renderTabs();
@@ -921,16 +932,36 @@ function nextFocus() {
   const rows = [];
   if (kernLeft) rows.push(UI.item('target', '#ff453a', `${kernLeft} Kernkarten noch neu`, 'Kommen als Nächstes dran.', '', { act: 'cat:neu:5' }));
   if (weak.length) rows.push(UI.item('wave', '#ff9f0a', `${weak.length} wichtige Karte${weak.length === 1 ? '' : 'n'} wackel${weak.length === 1 ? 't' : 'n'}`, 'Werden automatisch öfter wiederholt.', '', { act: 'cat:wackelig:' }));
-  if (leeches.length) rows.push(UI.item('alert', '#8e8e93', `${leeches.length} Problemkarte${leeches.length === 1 ? '' : 'n'}`, 'Dreimal oder öfter vergessen. Beweisidee nachlesen hilft.', '', { act: 'cat:schwach:' }));
+  if (leeches.length) rows.push(UI.item('alert', '#8e8e93', `${leeches.length} Problemkarte${leeches.length === 1 ? '' : 'n'}`, FACH === 'ana1' ? 'Dreimal oder öfter vergessen. Beweisidee nachlesen hilft.' : 'Dreimal oder öfter vergessen. Herleitung im Skript nachlesen hilft.', '', { act: 'cat:schwach:' }));
   return rows.length ? UI.group(rows) : '';
 }
 
 /* ---------- Lernkarte ---------- */
 function promptFor(c) {
+  if (c.kind === 'Konzept') return 'Beantworte die Frage und <b>begründe</b> sie in einem Satz.';
+  if (c.kind === 'Rezept') return 'Zähle die <b>Schritte</b> des Lösungswegs der Reihe nach auf.';
+  if (c.kind === 'Formel' || c.kind === 'Gesetz') return 'Schreibe die <b>Formel mit allen Grössen</b> und Gültigkeitsbedingungen hin.';
   if (c.kind === 'Definition') return 'Gib die Definition <b>vollständig und präzise</b> wieder (alle Begriffe, Quantoren, Bedingungen).';
   return 'Formuliere die Aussage mit <b>allen Voraussetzungen</b> und der genauen Folgerung.';
 }
+/* Textkarte (Physik): HTML mit $…$ / $$…$$, gerendert mit KaTeX */
+const _richCache = {};
+function richHTML(c) {
+  if (_richCache[c.id]) return _richCache[c.id];
+  const k = (t, d) => { if (!window.katex) return `<code>${esc(t)}</code>`; try { return window.katex.renderToString(t, { displayMode: d, throwOnError: false, strict: false }); } catch (e) { return `<code>${esc(t)}</code>`; } };
+  const html = String(c.body || '').replace(/\$\$([\s\S]+?)\$\$/g, (m, t) => `<div class="md">${k(t, true)}</div>`).replace(/\$([^$]+?)\$/g, (m, t) => k(t, false));
+  return (_richCache[c.id] = `<div class="rich">${html}</div>`);
+}
+function cardExtras(c) {
+  if (c.img) return '';
+  return `${c.fs === false ? '<div class="fsnote">✎ Nicht auf der Formelsammlung – selbst ergänzen.</div>' : ''}${c.ex ? `<div class="exnote muted">Prüfungen: ${esc(c.ex)}</div>` : ''}`;
+}
+function metaLine(c, long) {
+  if (!c.img) return `Kap. ${c.chap}${long ? ' ' + esc(c.chapTitle) : ''} · Skript ${esc(c.sec)}`;
+  return long ? `Kap. ${c.chap} ${esc(c.chapTitle)} · ${esc(c.sec)} · Skript S. ${c.page}` : `Kapitel ${c.chap} · Skript S. ${c.page}`;
+}
 function scanHTML(c, masked) {
+  if (!c.img) return richHTML(c) + (masked ? '' : cardExtras(c));
   const m = masked && c.mask ? `<div class="mask" style="left:${c.mask[0] / c.w * 100}%;top:${c.mask[1] / c.h * 100}%;width:${(c.mask[2] - c.mask[0]) / c.w * 100}%;height:${(c.mask[3] - c.mask[1]) / c.h * 100}%"></div>` : '';
   return `<div class="scanwrap" ${masked ? '' : `data-zoom="${c.id}" title="Antippen zum Vergrössern"`}><img class="scan" src="img/${c.img}" width="${c.w}" height="${c.h}" alt="${esc(c.kind + ' ' + c.nr)}" decoding="sync">${m}${masked ? '' : '<span class="zoomchip">⤢ Vergrössern</span>'}</div>`;
 }
@@ -988,7 +1019,7 @@ function viewStudy() {
       ${isNew ? '<span class="muted small">· neu</span>' : ''}
     </div>
     <div class="ttl">${esc(c.title) || esc(c.kind + ' ' + c.nr)}</div>
-    <div class="meta">Kapitel ${c.chap} · Skript S. ${c.page}</div>
+    <div class="meta">${metaLine(c)}</div>
     ${!s.revealed ? `
       ${S.settings.typeAnswer ? `<textarea class="note" id="answer" placeholder="Hier aufschreiben (wird nicht gespeichert) …"></textarea>` : ''}
       <div class="spacer"></div>
@@ -1101,7 +1132,7 @@ function startQuiz(type, scope, n) {
 }
 function makeOpts(id) {
   const c = BY_ID[id];
-  const sameKindGroup = k => (k === 'Definition') === (c.kind === 'Definition');
+  const sameKindGroup = k => c.img ? (k === 'Definition') === (c.kind === 'Definition') : (k === 'Konzept') === (c.kind === 'Konzept');
   let cands = CARDS.filter(o => o.id !== id && o.title && o.title !== c.title);
   const near = cands.filter(o => o.chap === c.chap && sameKindGroup(o.kind));
   const pool = near.length >= 3 ? near : cands.filter(o => Math.abs(o.chap - c.chap) <= 1);
@@ -1153,7 +1184,7 @@ function viewQuiz() {
       <span class="small muted">${quiz.i + 1}/${quiz.items.length}</span></div>`;
     if (quiz.type === 'match') {
       return head + `<div class="card fc">
-        <div class="row"><span class="kind" style="color:var(--muted)">Welcher Name gehört zu dieser Aussage?</span><div class="spacer"></div><span class="pill gray">Kap. ${c.chap}</span></div>
+        <div class="row"><span class="kind" style="color:var(--muted)">${c.kind === 'Konzept' ? 'Zu welcher Frage gehört diese Antwort?' : 'Welcher Name gehört zu dieser Aussage?'}</span><div class="spacer"></div><span class="pill gray">Kap. ${c.chap}</span></div>
         ${scanHTML(c, true)}
         <div class="opts">${quiz.opts.map(o => {
           const oc = BY_ID[o];
@@ -1169,7 +1200,7 @@ function viewQuiz() {
       <div class="row"><span class="kind" style="color:${KIND_COLOR[c.kind]}">${esc(c.kind)} ${c.nr}</span><div class="spacer"></div>${prioTag(c)}</div>
       <div class="ttl">${esc(c.title)}</div>
       <div class="meta">Kap. ${c.chap} · ${esc(c.sec)}</div>
-      ${!quiz.revealed ? `<div class="prompt">Prüfungssituation: Schreibe die ${c.kind === 'Definition' ? 'Definition' : 'Aussage'} so auf, wie du sie in der Prüfung hinschreiben würdest. Erst dann aufdecken.</div>
+      ${!quiz.revealed ? `<div class="prompt">Prüfungssituation: ${c.img ? `Schreibe die ${c.kind === 'Definition' ? 'Definition' : 'Aussage'} so auf, wie du sie in der Prüfung hinschreiben würdest.` : promptFor(c)} Erst dann aufdecken.</div>
         <div class="spacer"></div><div class="actionbar"><button class="btn primary big" data-act="qreveal">Aufdecken</button></div>`
       : `${scanHTML(c, false)}${logicHTML(c)}
         <div class="actionbar"><div class="rate three">
@@ -1235,7 +1266,7 @@ function viewCatalog() {
   const segs = [['', 'Alle'], ['neu', 'Neu'], ['lernend', 'Lernend'], ['sitzt', 'Sitzt'], ['schwach', 'Schwach']];
   const extra = [];
   if (cat.prio) extra.push(['prio', PRIO[cat.prio].name]);
-  if (cat.kind) extra.push(['kind', cat.kind === 'Satz' ? 'Sätze' : cat.kind]);
+  if (cat.kind) extra.push(['kind', KIND_PLURAL[cat.kind] || cat.kind]);
   if (cat.chap) extra.push(['chap', 'Kapitel ' + cat.chap]);
   if (cat.status && !segs.some(x => x[0] === cat.status)) extra.push(['status', { wackelig: 'Wackelig', jung: 'Jung', flag: 'Markiert', pause: 'Pausiert' }[cat.status] || cat.status]);
   const by = {}; for (const c of list) (by[c.chap] = by[c.chap] || []).push(c);
@@ -1270,7 +1301,7 @@ function openCard(id) {
   modal(`
     <div class="row">${kindTag(c)}<div class="spacer"></div>${prioTag(c)}<button class="btn ghost" data-act="close">✕</button></div>
     <h3 style="font-size:19px;margin:10px 0 2px">${esc(c.title)}</h3>
-    <div class="muted small">Kap. ${c.chap} ${esc(c.chapTitle)} · ${esc(c.sec)} · Skript S. ${c.page}${!c.titled ? ' · Titel ergänzt (im Skript ohne Namen)' : ''}</div>
+    <div class="muted small">${metaLine(c, true)}${!c.titled ? ' · Titel ergänzt (im Skript ohne Namen)' : ''}</div>
     ${scanHTML(c, false)}
     ${logicHTML(c)}
     ${c.tip ? `<div class="tip"><b>Worauf achten:</b> ${esc(c.tip)}</div>` : ''}
@@ -1348,9 +1379,9 @@ function viewStats() {
   // Genauigkeit letzte 21 Tage
   const acc = []; for (let i = 20; i >= 0; i--) { const k = dayKey(dayStart() - i * DAY + HOUR); acc.push(days[k] && days[k].s ? days[k].ok / days[k].s : null); }
 
-  const byChap = groupStats(c => c.chap, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  const byChap = groupStats(c => c.chap, CHAP_KEYS);
   const byPrio = groupStats(c => prioOf(c), [5, 4, 3, 2, 1]);
-  const byKind = groupStats(c => c.kind === 'Theorem' ? 'Satz' : c.kind, ['Definition', 'Satz', 'Lemma', 'Proposition', 'Korollar']);
+  const byKind = groupStats(kindKey, KINDS);
   const problem = CARDS.filter(c => S.cards[c.id] && S.cards[c.id].st)
     .map(c => ({ c, x: S.cards[c.id] }))
     .sort((a, b) => ((b.x.lapses || 0) * 2 + (b.x.qBad || 0) + (b.x.D || 0) / 3) - ((a.x.lapses || 0) * 2 + (a.x.qBad || 0) + (a.x.D || 0) / 3))
@@ -1446,7 +1477,7 @@ function timeStatsHTML() {
     const srs = a.filter(l => l[3] === 2);
     return a.length ? `<tr><td>${lbl(k)}</td><td class="num">${fmtSec(avg(a, 6))}</td><td class="num">${fmtSec(avg(a, 7))}</td><td class="num">${srs.length ? Math.round(srs.filter(l => l[2] >= 2).length / srs.length * 100) + '%' : '–'}</td><td class="num">${a.length}</td></tr>` : '';
   }).join('');
-  const kindL = { Definition: 'Definitionen', Satz: 'Sätze/Theoreme', Lemma: 'Lemmata', Proposition: 'Propositionen', Korollar: 'Korollare' };
+  const kindL = Object.fromEntries(KINDS.map(k => [k, KIND_PLURAL[k]]));
   // Denkzeit nach Bewertung
   const byRate = [1, 2, 3, 4].map(g => { const a = timed.filter(l => l[2] === g && l[3] === 2); return a.length ? `<tr><td>${['', 'Nochmal', 'Schwer', 'Gut', 'Einfach'][g]}</td><td class="num">${fmtSec(avg(a, 6))}</td><td class="num">${a.length}</td></tr>` : ''; }).join('');
   // Tageszeit
@@ -1558,6 +1589,9 @@ function viewSettings() {
   return `<div class="settings">
   ${typeof accountSettingsHTML === 'function' ? accountSettingsHTML() : ''}
 
+  ${UI.group([UI.item('cards', 'var(--accent)', esc(FACH_CFG.name), `${CARDS.length} Karten · ${esc(FACH_CFG.sub || '')}`, 'Wechseln', { act: 'fachpick' })],
+    { header: 'Fach', footer: 'Jedes Fach hat eigene Karten, einen eigenen Lernplan und ein eigenes Prüfungsdatum. Der Fortschritt bleibt beim Wechseln erhalten.' })}
+
   ${UI.group([
     UI.row('Prüfungsdatum', `<span class="idate"><span>${esc(fmtDateLong(st.examDate))}</span><input type="date" id="sExam" value="${esc(st.examDate)}" aria-label="Prüfungsdatum"></span>`),
     UI.row('Erscheinungsbild', UI.select('sTheme', [['auto', 'Automatisch'], ['light', 'Hell'], ['dark', 'Dunkel']], st.theme)),
@@ -1583,7 +1617,7 @@ function viewSettings() {
   ], { header: 'Algorithmus', footer: 'FSRS-6. Das persönliche Modell lernt aus deinen Wiederholungen und wird nur übernommen, wenn es deine neuesten Ergebnisse besser vorhersagt. Das Wissen aller Nutzer zeigt, welche Karten allgemein schwer sind.' })}
 
   ${UI.group([
-    UI.toggle('sLogic', st.showLogic !== false, 'Prädikatenlogik anzeigen'),
+    Object.keys(window.LOGIC || {}).length ? UI.toggle('sLogic', st.showLogic !== false, 'Prädikatenlogik anzeigen') : '',
     UI.toggle('sType', !!st.typeAnswer, 'Notizfeld vor dem Aufdecken'),
   ], { header: 'Karten & Darstellung' })}
 
@@ -1620,6 +1654,37 @@ function viewSettings() {
 /* ============================================================
  * Modal, Toast, Theme
  * ============================================================ */
+/* ---------- Fachwahl ---------- */
+function fachSummary(id) {
+  const st = id === FACH ? S : (window.FachStore ? FachStore.read(id) : null);
+  if (!st || !st.cards) return 'noch nicht begonnen';
+  const n = Object.values(st.cards).filter(x => x && x.st).length;
+  const ds = dayStart();
+  const due = Object.values(st.cards).filter(x => x && x.st && !x.susp && x.due < ds + DAY).length;
+  return n ? `${n} Karte${n === 1 ? "" : "n"} begonnen${due ? ` · ${due} heute fällig` : ''}` : 'noch nicht begonnen';
+}
+function fachPicker() {
+  if (session || quiz) { toast('Zuerst die laufende Sitzung beenden'); return; }
+  const F = window.FAECHER || {};
+  const col = { ana1: '#3a2bb5', phy1: '#b4531f' };
+  modal(`<div class="row"><h3 style="margin:0">Fach wählen</h3><div class="spacer"></div><button class="btn ghost" data-act="close">✕</button></div>
+    <div class="fachlist">${Object.entries(F).map(([id, f]) => `<button class="fachopt${id === FACH ? ' on' : ''}" data-fach="${id}">
+      <span class="dot" style="background:${col[id] || 'var(--accent)'}"></span>
+      <span style="flex:1"><b>${esc(f.name)}</b><small>${esc(f.sub || '')}<br>${esc(fachSummary(id))}</small></span>
+      ${id === FACH ? '<span class="pill">aktiv</span>' : ''}</button>`).join('')}</div>`);
+}
+document.addEventListener('click', e => {
+  if (e.target.closest('[data-act="fachpick"]')) { e.stopPropagation(); fachPicker(); return; }
+  const b = e.target.closest('.fachopt[data-fach]'); if (!b) return;
+  const id = b.dataset.fach;
+  if (id === FACH) { closeModal(); return; }
+  try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (err) { }
+  if (Sync.pending && Sync.pending.size) Sync.flush();
+  if (Gist.dirty) Gist.push();
+  const go2 = () => window.switchFach(id);
+  if (typeof Cloud !== 'undefined' && Cloud.user && Cloud.dirty) { Cloud.sync().finally(go2); setTimeout(go2, 2500); } else go2();
+}, true);
+
 function modal(html) {
   closeModal();
   const m = document.createElement('div');
@@ -1765,7 +1830,7 @@ document.addEventListener('keydown', e => {
 });
 
 /* ---------- Export / Import ---------- */
-function exportString() { return JSON.stringify({ app: 'lemmalab', exported: new Date().toISOString(), ...S }); }
+function exportString() { return JSON.stringify({ app: 'lemmalab', fach: FACH, exported: new Date().toISOString(), ...S }); }
 function exportJSON() {
   const s = exportString();
   const done = () => toast('Fortschritt in die Zwischenablage kopiert');
@@ -1776,7 +1841,7 @@ function showText(s) { modal(`<h3>Export</h3><p class="small muted">Diesen Text 
 function exportFile() {
   try {
     const blob = new Blob([exportString()], { type: 'application/json' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `lemmalab-fortschritt-${dayKey()}.json`;
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `lemmalab-${FACH === 'ana1' ? 'fortschritt' : FACH}-${dayKey()}.json`;
     document.body.appendChild(a); a.click(); a.remove();
     toast('Datei gespeichert');
   } catch (e) { showText(exportString()); }
@@ -1803,14 +1868,15 @@ function importJSON(txt) {
   try {
     const o = JSON.parse(txt);
     if (!o.cards || !o.log) throw new Error('kein gültiger Export');
+    if ((o.fach || 'ana1') !== FACH) throw new Error(`Export gehört zum Fach ${((window.FAECHER || {})[o.fach || 'ana1'] || {}).name || o.fach} – zuerst dorthin wechseln`);
     mergeInto(o);
     save(); closeModal(); render(); toast('Import erfolgreich');
   } catch (e) { toast('Import fehlgeschlagen: ' + e.message); }
 }
-function mergeInto(o) {
+function mergeInto(o, anyId) {     // anyId: Lernstand eines anderen (nicht geladenen) Fachs zusammenführen
   const ra = Math.max(S.settings.resetAt || 0, (o.settings && o.settings.resetAt) || 0);
   for (const [id, y] of Object.entries(o.cards || {})) {
-    if (!BY_ID[id] || (y.u || 0) < ra) continue;
+    if ((!anyId && !BY_ID[id]) || !y || (y.u || 0) < ra) continue;
     const x = S.cards[id];
     if (!x || (y.u || 0) > (x.u || 0)) S.cards[id] = y;
   }
@@ -1849,7 +1915,7 @@ const Sync = {
       render();
     } catch (e) { console.warn('Sync nicht verfügbar', e); setPill('lokal'); }
   },
-  ref(name) { return this.db.doc(`data/users/${this.uid}/${name}`); },
+  ref(name) { return this.db.doc(`data/users/${this.uid}/${FACH_CFG.syncPrefix || ''}${name}`); },
   timeout(p, ms = 12000) { return Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]); },
   async pull() {
     const [cSnap, sSnap] = await this.timeout(Promise.all([this.ref('cards').get(), this.ref('settings').get()]));
@@ -1902,7 +1968,8 @@ window.addEventListener('visibilitychange', () => {
  * Geräte-Abgleich über ein privates GitHub-Gist
  * Token + Gist-ID liegen nur lokal (eigener Schlüssel), nie im Export.
  * ============================================================ */
-const GIST_KEY = 'lemmalab-gist-v1', GIST_FILE = 'lemmalab-fortschritt.json', OLD_GIST_FILE = 'analysis1-fortschritt.json';
+const GIST_KEY = 'lemmalab-gist-v1', GIST_FILE = FACH_CFG.gist || 'lemmalab-fortschritt.json', OLD_GIST_FILE = FACH === 'ana1' ? 'analysis1-fortschritt.json' : '__keine__';
+const ANY_GIST_FILES = ['analysis1-fortschritt.json', ...Object.values(window.FAECHER || {}).map(f => f.gist)];
 const Gist = {
   cfg: (() => { try { return JSON.parse(localStorage.getItem(GIST_KEY) || '{}'); } catch (e) { return {}; } })(),
   dirty: false, timer: null, busy: false, status: '', lastSync: 0,
@@ -1927,7 +1994,7 @@ const Gist = {
       let id = null;
       for (let page = 1; page <= 5 && !id; page++) {
         const list = await this.api(`/gists?per_page=100&page=${page}`);
-        const g = list.find(g => g.files && (g.files[GIST_FILE] || g.files[OLD_GIST_FILE]));
+        const g = list.find(g => g.files && ANY_GIST_FILES.some(n => g.files[n]));
         if (g) id = g.id;
         if (list.length < 100) break;
       }

@@ -1,7 +1,7 @@
 """Erzeugt sw.js mit der Liste aller Dateien, die offline verfügbar sein sollen."""
 import os, json, hashlib
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-files = ['./', 'index.html', 'app.js', 'data.js', 'logic.js', 'account.js', 'manifest.webmanifest',
+files = ['./', 'index.html', 'fach.js', 'app.js', 'data.js', 'logic.js', 'physik.js', 'account.js', 'manifest.webmanifest',
          'vendor/supabase/supabase.js',
          'vendor/katex/katex.min.js', 'vendor/katex/katex.min.css']
 files += ['vendor/katex/fonts/' + f for f in sorted(os.listdir(os.path.join(ROOT, 'vendor/katex/fonts')))]

@@ -31,15 +31,23 @@ begin
 
   delete from public.card_stats;
 
-  with lg as (
-    select p.user_id,
+  -- Analysis 1 liegt in state.log, weitere Fächer (Physik 1 …) in state.subjects.<fach>.log
+  with logs as (
+    select p.user_id, p.state->'log' as log from public.progress p
+    union all
+    select p.user_id, s.v->'log'
+    from public.progress p,
+         jsonb_each(case when jsonb_typeof(p.state->'subjects') = 'object' then p.state->'subjects' else '{}'::jsonb end) s(k, v)
+  ),
+  lg as (
+    select l.user_id,
            ((e->>0)::numeric)::bigint            as t,
            e->>1                                 as card,
            ((e->>2)::numeric)::int               as g,
            coalesce(((e->>3)::numeric)::int, 0)  as st,
            coalesce(e->>5, 'l')                  as mode
-    from public.progress p,
-         jsonb_array_elements(case when jsonb_typeof(p.state->'log') = 'array' then p.state->'log' else '[]'::jsonb end) e
+    from logs l,
+         jsonb_array_elements(case when jsonb_typeof(l.log) = 'array' then l.log else '[]'::jsonb end) e
     where jsonb_typeof(e) = 'array'
   ),
   firsts as (

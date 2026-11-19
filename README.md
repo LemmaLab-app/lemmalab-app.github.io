@@ -1,12 +1,19 @@
 <p align="center"><img src="icons/icon-512.png" width="140" alt="LemmaLab"></p>
 
-# LemmaLab – Definitionen & Sätze lernen
+# LemmaLab – Analysis 1 & Physik 1 lernen
 
 Private Lernhilfe, nur für den Eigengebrauch, ohne Gewähr.
 
-Lern-Website (Anki + Quizlet in einem) für **alle 228 Definitionen, Sätze, Theoreme, Lemmata,
-Propositionen und Korollare aus Kapitel 1–9** des Vorlesungsskripts.
-Die Aussagen sind exakt aus dem Skript ausgeschnitten (keine Abtippfehler).
+Lern-Website (Anki + Quizlet in einem) mit zwei getrennten **Fächern** (Umschalter oben über dem Seitentitel
+bzw. *Einstellungen → Fach*). Jedes Fach hat eigene Karten, eigenen Lernplan, eigenes Prüfungsdatum und eigene Statistik.
+
+- **Analysis 1:** alle 228 Definitionen, Sätze, Theoreme, Lemmata, Propositionen und Korollare aus Kapitel 1–9
+  des Vorlesungsskripts. Die Aussagen sind exakt aus dem Skript ausgeschnitten (keine Abtippfehler).
+- **Physik 1** (Skript Ensslin HS25, Formelsammlung HS26): 131 Karten zu Kapitel 2–10 – Gesetze, Formeln, Definitionen,
+  **Konzeptfragen** (wie im Single-Choice-Teil) und **Rezepte** (Lösungswege, z. B. Kreisprozess, Trägheitsmoment per Integral).
+  Prioritäten aus der Auswertung der Prüfungen HS23–FS26 und des Probeexams HS26 (Thermodynamik, starrer Körper,
+  Stösse, Schwingungen und Gravitation = Kern). Karten mit *✎ Nicht auf der Formelsammlung* zeigen, was man selbst
+  auf die Formelsammlung schreiben sollte. Quelle: `physik.js` (von Hand gepflegt, Formeln mit KaTeX).
 
 ## Funktionen
 - **Lernen (Spaced Repetition, FSRS-6):** Titel → Aussage selbst formulieren → aufdecken → nach rechts (gewusst) oder links (nicht gewusst) wischen. Persönliches Modell wird im Browser trainiert; die Schwierigkeit neuer Karten kommt aus anonymen Daten aller Nutzer (`tools/community.sql`).
@@ -38,8 +45,15 @@ Die Aussagen sind exakt aus dem Skript ausgeschnitten (keine Abtippfehler).
 
 Tastatur: Leertaste = aufdecken, 1–4 = bewerten, U = rückgängig.
 
+## Fächer & Speicher
+- `fach.js` legt die Fächer fest und lädt die Karten des aktiven Fachs (`data.js` + `logic.js` bzw. `physik.js`).
+- Lernstand pro Fach im `localStorage` (`lemmalab-v1` = Analysis wie bisher, `lemmalab-phy1-v1` = Physik).
+- Konto (Supabase): eine Zeile pro Konto; Analysis liegt wie bisher in `state`, weitere Fächer unter `state.subjects.<fach>`.
+  Damit auch Physik-Karten im «Wissen aller Nutzer» landen, `tools/community.sql` nochmals im Supabase SQL Editor ausführen.
+- Gist-Abgleich: pro Fach eine eigene Datei im selben privaten Gist.
+
 ## Dateien
-- `index.html`, `app.js` – App (keine Abhängigkeiten)
+- `index.html`, `app.js` – App (keine Abhängigkeiten); `fach.js` – Fächer; `physik.js` – Karten Physik 1
 - `icons/`, `manifest.webmanifest` – App-Symbol (iPhone/iPad: Teilen → Zum Home-Bildschirm; Mac: Safari → Ablage → Zum Dock hinzufügen)
 - `data.js`, `img/` – Karten (automatisch erzeugt)
 - `tools/extract.py` – schneidet die Einträge aus dem Skript-PDF aus; `tools/build_data.py` – erzeugt `data.js`;

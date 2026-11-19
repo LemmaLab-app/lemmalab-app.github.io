@@ -1,12 +1,14 @@
 /* Service Worker: macht die Lern-App offline nutzbar.
  * Automatisch erzeugt aus tools/sw.template.js (tools/build_sw.py) – nicht von Hand ändern. */
-const CACHE = 'lemmalab-baba56738c';
+const CACHE = 'lemmalab-83953b79e3';
 const FILES = [
  "./",
  "index.html",
+ "fach.js",
  "app.js",
  "data.js",
  "logic.js",
+ "physik.js",
  "account.js",
  "manifest.webmanifest",
  "vendor/supabase/supabase.js",
@@ -267,7 +269,7 @@ const FILES = [
  "img/the-9-2.png",
  "img/the-9-46.png"
 ];
-const CORE = ['index.html', 'app.js', 'data.js', 'logic.js', 'account.js'];   // Netz zuerst (für Updates), sonst Cache
+const CORE = ['index.html', 'fach.js', 'app.js', 'data.js', 'logic.js', 'physik.js', 'account.js'];   // Netz zuerst (für Updates), sonst Cache
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));

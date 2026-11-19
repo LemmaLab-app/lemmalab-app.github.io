@@ -12,6 +12,33 @@ const LOCAL_MODE_KEY = 'lemmalab-localmode';
 const ADMIN_EMAILS = ['lemmalab.app@gmail.com', 'martin.senn2@gmail.com'];   // nur Anzeige – die echte Prüfung macht die Datenbank (admin_stats)
 const isAdmin = () => !!(Cloud.user && ADMIN_EMAILS.includes((Cloud.user.email || '').toLowerCase()));
 
+/* ---------------- Mehrere Fächer in einem Konto ----------------
+ * Die Datenbank hat pro Konto eine Zeile (progress.state). Analysis 1 liegt wie bisher
+ * direkt in state (kompatibel mit älteren Versionen und tools/*.sql), jedes weitere Fach
+ * unter state.subjects[<fach>]. Geladen ist immer nur ein Fach (S); die anderen liegen
+ * lokal unter ihrem eigenen Schlüssel und werden beim Abgleich mit zusammengeführt. */
+const FACH_IDS = Object.keys(window.FAECHER || { ana1: 1 });
+function blankFor(id) { const st = blankState(); const f = (window.FAECHER || {})[id]; if (f && f.examDate) st.settings.examDate = f.examDate; return st; }
+function localState(id) { return id === FACH ? S : (window.FachStore && FachStore.read(id)); }
+function sigAll() { return JSON.stringify(FACH_IDS.map(id => { const st = localState(id); return st ? [st.cards, (st.log || []).length, st.settings] : null; })); }
+function splitRemote(state) {
+  const { subjects, ...base } = state || {};
+  return { ana1: base, ...(subjects && typeof subjects === 'object' ? subjects : {}) };
+}
+function buildRemote() {
+  const base = { ...(localState('ana1') || blankFor('ana1')) }; delete base.subjects;
+  const subjects = {};
+  for (const id of FACH_IDS) if (id !== 'ana1') { const st = localState(id); if (st && ((st.log || []).length || Object.keys(st.cards || {}).length || st.settings.u)) subjects[id] = st; }
+  return Object.keys(subjects).length ? { ...base, subjects } : base;
+}
+function mergeOther(id, remote) {      // in den lokalen Stand eines nicht geladenen Fachs
+  const keep = S;
+  let st = FachStore.read(id) || blankFor(id);
+  st.cards = st.cards || {}; st.log = st.log || []; st.settings = { ...blankFor(id).settings, ...(st.settings || {}) };
+  try { S = st; mergeInto(remote, true); st = S; } finally { S = keep; }
+  FachStore.write(id, st);
+}
+
 const Cloud = {
   sb: null, user: null, lastSent: '', busy: false, dirty: false, timer: null, status: '', lastSync: 0, ready: false,
 
@@ -44,6 +71,10 @@ const Cloud = {
       const st = S.settings; S = blankState(); S.settings = { ...st, resetAt: 0 };
     }
     S.owner = u.id;
+    for (const id of FACH_IDS) if (id !== FACH && window.FachStore) {
+      const o = FachStore.read(id);
+      if (o && o.owner && o.owner !== u.id) { const n = blankFor(id); n.settings = { ...o.settings, resetAt: 0 }; FachStore.write(id, n); }
+    }
     try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (e) { }
     hideLogin();
     this.sync();
@@ -63,26 +94,33 @@ const Cloud = {
       if (error) throw error;
       const remoteMs = meta && meta.updated_at ? Date.parse(meta.updated_at) : 0;
       const known = this.knownAt();
-      const before = JSON.stringify([S.cards, S.log.length, S.settings]);
+      const before = sigAll();
+      const beforeHere = JSON.stringify([S.cards, S.log.length, S.settings]);
       if (remoteMs && remoteMs !== known) {
         const { data, error: e1 } = await this.sb.from('progress').select('state').eq('user_id', this.user.id).maybeSingle();
         if (e1) throw e1;
-        if (data && data.state) mergeInto(data.state);
+        if (data && data.state) {
+          const parts = splitRemote(data.state);
+          for (const [id, part] of Object.entries(parts)) {
+            if (!part || !FACH_IDS.includes(id)) continue;
+            if (id === FACH) mergeInto(part); else mergeOther(id, part);
+          }
+        }
       }
       S.owner = this.user.id;
-      const changedLocal = before !== JSON.stringify([S.cards, S.log.length, S.settings]);
+      const changedLocal = before !== sigAll();
       try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (e) { }
       const changedHere = changedLocal || before !== this.lastSent || !remoteMs;
       if (changedHere || remoteMs !== known) {
         const at = new Date().toISOString();
-        const { error: e2 } = await this.sb.from('progress').upsert({ user_id: this.user.id, state: S, updated_at: at });
+        const { error: e2 } = await this.sb.from('progress').upsert({ user_id: this.user.id, state: buildRemote(), updated_at: at });
         if (e2) throw e2;
         this.setKnownAt(Date.parse(at));
       }
-      this.lastSent = JSON.stringify([S.cards, S.log.length, S.settings]);
+      this.lastSent = sigAll();
       this.lastSync = Date.now();
       this.setStatus('✓ gespeichert ' + new Date().toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' }));
-      if (changedLocal && !session && !quiz) render();
+      if (beforeHere !== JSON.stringify([S.cards, S.log.length, S.settings]) && !session && !quiz) render();
     } catch (e) {
       console.warn('Cloud-Sync', e);
       this.setStatus('⚠︎ Abgleich ausstehend');
@@ -124,6 +162,7 @@ const Cloud = {
     // Lokale Kopie entfernen (liegt ja im Konto) – wichtig auf fremden Geräten
     const st = S.settings; S = blankState(); S.settings = { ...st, resetAt: 0 };
     try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (e) { }
+    for (const id of FACH_IDS) if (id !== FACH && window.FachStore) { const o = FachStore.read(id); if (o) { const n = blankFor(id); n.settings = { ...o.settings, resetAt: 0 }; FachStore.write(id, n); } }
     session = null; quiz = null;
     render(); showLogin();
   },
@@ -150,7 +189,7 @@ function showLogin() {
   <div class="lbox">
     <img src="icons/favicon.svg" alt="" class="llogo">
     <h1>LemmaLab</h1>
-    <p class="muted">Definitionen, Sätze und Korollare<br>mit Spaced Repetition lernen</p>
+    <p class="muted">Analysis 1 und Physik 1<br>mit Spaced Repetition lernen</p>
     <button class="gbtn" id="lgGoogle"><svg viewBox="0 0 48 48" width="20" height="20"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.2-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.2-.1-2.4-.4-3.5z"/></svg>Mit Google anmelden</button>
     <div class="lor"><span>oder mit E-Mail-Code</span></div>
     <div id="lgMail">
