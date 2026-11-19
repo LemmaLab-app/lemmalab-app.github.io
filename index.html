@@ -220,7 +220,10 @@ body.focus .actionbar{padding-left:calc(12px + var(--safe-l));padding-right:calc
 @media (max-width:480px){.app{padding-left:calc(12px + var(--safe-l));padding-right:calc(12px + var(--safe-r))}}
 /* iPhone quer: wenig Höhe → alles kompakter */
 @media (orientation:landscape) and (max-height:559px){
-  .app{padding-top:calc(8px + var(--safe-t))}
+  .app{padding-top:calc(8px + var(--safe-t));padding-left:max(48px, calc(14px + var(--safe-l)));padding-right:max(48px, calc(14px + var(--safe-r)))}
+  body.focus .actionbar{padding-left:max(48px, calc(12px + var(--safe-l)));padding-right:max(48px, calc(12px + var(--safe-r)))}
+  nav.tabs{padding-left:max(40px, var(--safe-l));padding-right:max(40px, var(--safe-r))}
+  .modal .sheet{padding-left:max(48px, calc(16px + var(--safe-l)));padding-right:max(48px, calc(16px + var(--safe-r)))}
   body.focus .app{padding-top:8px;padding-bottom:calc(78px + var(--safe-b))}
   body.focus .study-head{margin-bottom:6px}
   body.focus .study-head .btn{padding:6px 11px}
@@ -256,7 +259,7 @@ body.focus .actionbar{padding-left:calc(12px + var(--safe-l));padding-right:calc
 </div>
 <nav class="tabs"><div class="in" id="tabs"></div></nav>
 <div class="toast" id="toast"></div>
-<script src="data.js"></script>
-<script src="app.js"></script>
+<script src="data.js?v=2026-11-19.4"></script>
+<script src="app.js?v=2026-11-19.4"></script>
 </body>
 </html>

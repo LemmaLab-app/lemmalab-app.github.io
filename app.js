@@ -3,6 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
+const APP_VERSION = '2026-11-19.4';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -1152,7 +1153,7 @@ function viewSettings() {
   </div>
   <h2>Zurücksetzen</h2>
   <div class="card"><button class="btn" style="color:var(--again)" data-act="resetall">Gesamten Fortschritt löschen</button></div>
-  <div class="muted small" style="margin:18px 4px">Private Lernhilfe, ohne Gewähr. Inhalte: Ausschnitte aus dem Skript «Analysis I und II» (Kapitel 1–9). Prioritäten & Beweis-Wahrscheinlichkeiten: eigene Schätzung aus alten Prüfungen. Algorithmus: FSRS-5.</div>`;
+  <div class="muted small" style="margin:18px 4px">Version ${APP_VERSION} · <a href="#mehr" data-act="update">Nach Update suchen</a><br>Private Lernhilfe, ohne Gewähr. Inhalte: Ausschnitte aus dem Skript «Analysis I und II» (Kapitel 1–9). Prioritäten & Beweis-Wahrscheinlichkeiten: eigene Schätzung aus alten Prüfungen. Algorithmus: FSRS-5.</div>`;
 }
 
 /* ============================================================
@@ -1225,6 +1226,7 @@ document.addEventListener('click', e => {
       startSession(ids); break;
     }
     case 'home': session = null; render(); break;
+    case 'update': e.preventDefault(); checkUpdate(true); break;
     case 'ahead': startSession(aheadIds().slice(0, 20)); break;
     case 'reveal': reveal(); break;
     case 'undo': undo(); break;
@@ -1520,10 +1522,28 @@ function gistSettingsHTML() {
 }
 
 /* ============================================================
+ * Update-Erkennung: Als App auf dem Home-Bildschirm hält iOS alte Versionen
+ * im Cache. Wir prüfen die Version auf dem Server und laden bei Bedarf neu.
+ * ============================================================ */
+async function checkUpdate(manual) {
+  if (location.protocol === 'file:') return;
+  try {
+    const r = await fetch('app.js?check=' + Date.now(), { cache: 'no-store' });
+    const m = (await r.text()).match(/APP_VERSION = '([^']+)'/);
+    if (m && m[1] !== APP_VERSION) {
+      if (session || quiz) { toast('Neue Version verfügbar – wird nach der Sitzung geladen'); return; }
+      location.replace(location.pathname + '?v=' + encodeURIComponent(m[1]) + location.hash);
+    } else if (manual) toast('Du hast die neueste Version (' + APP_VERSION + ')');
+  } catch (e) { if (manual) toast('Keine Verbindung'); }
+}
+window.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkUpdate(); });
+
+/* ============================================================
  * Start
  * ============================================================ */
 render();
 Sync.init();
 Gist.init();
+checkUpdate();
 // Neuer Tag während die Seite offen ist → Übersicht aktualisieren
 setInterval(() => { if (tab === 'heute' && !session) render(); }, 5 * 60e3);
