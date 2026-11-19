@@ -20,6 +20,9 @@ Die Aussagen sind exakt aus dem Skript ausgeschnitten (keine Abtippfehler).
 - **Statistik:** Prüfungsbereitschaft, Fortschritt nach Priorität/Kapitel/Typ, Prognose, Aktivität, Problemkarten, Plan bis zur Prüfung.
 
 ## Benutzen
+- **GitHub Pages:** https://teddy8002.github.io/Analysis-1-Definitionen-und-S-tze-lernen/ – unter *Einstellungen → Geräte abgleichen*
+  einmal pro Gerät einen GitHub-Token (nur Recht `gist`) eintragen; der Fortschritt wird dann in einem privaten Gist gespeichert
+  und ist auf iPhone und Mac derselbe.
 - **Lokal:** `index.html` im Browser öffnen (funktioniert offline). Fortschritt liegt im `localStorage` des Browsers;
   Export/Import unter *Einstellungen*.
 - **Als claude.ai-Artifact:** Fortschritt wird zusätzlich im claude.ai-Konto gespeichert und ist auf iPhone und Mac derselbe.

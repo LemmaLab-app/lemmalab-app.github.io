@@ -101,6 +101,7 @@ let saveTimer = null;
 function save(syncKeys = ['cards', 'settings', 'log']) {
   try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (e) { console.warn('localStorage', e); }
   Sync.schedule(syncKeys);
+  Gist.schedule();
 }
 function cs(id) {               // Lernzustand einer Karte
   return S.cards[id] || (S.cards[id] = { st: 0, u: 0 });
@@ -846,6 +847,8 @@ function viewSettings() {
     <div class="field"><label><input type="checkbox" id="sType" ${st.typeAnswer ? 'checked' : ''}> Notizfeld zum Aufschreiben vor dem Aufdecken anzeigen</label></div>
     <div class="field"><label for="sTheme">Darstellung</label><select id="sTheme"><option value="auto" ${st.theme === 'auto' ? 'selected' : ''}>Wie System</option><option value="light" ${st.theme === 'light' ? 'selected' : ''}>Hell</option><option value="dark" ${st.theme === 'dark' ? 'selected' : ''}>Dunkel</option></select></div>
   </div>
+  ${Sync.ok ? '' : `<h2>Geräte abgleichen (GitHub)</h2>
+  <div class="card">${gistSettingsHTML()}</div>`}
   <h2>Fortschritt sichern</h2>
   <div class="card">
     <div class="small" id="syncInfo">${Sync.ok ? '✓ Cloud-Sync aktiv: Dein Fortschritt wird in deinem claude.ai-Konto gespeichert und ist auf allen Geräten derselbe.' : 'Fortschritt wird in diesem Browser gespeichert (localStorage). Für ein anderes Gerät: unten exportieren und dort importieren.'}</div>
@@ -939,6 +942,9 @@ document.addEventListener('click', e => {
     case 'learnfiltered': { const ids = filteredCatalog().slice(0, 50).map(c => c.id); tab = 'heute'; startSession(ids); break; }
     case 'close': closeModal(); break;
     case 'export': exportJSON(); break;
+    case 'gistconnect': { const v = ($('#gistTok') || {}).value || ''; if (v.trim().length < 20) { toast('Bitte gültigen Token einfügen'); break; } Gist.connect(v); break; }
+    case 'gistoff': confirmBox('Abgleich auf diesem Gerät trennen? Der Fortschritt bleibt lokal und im Gist erhalten.', () => Gist.disconnect()); break;
+    case 'gistsync': Gist.pull().then(() => Gist.push()); break;
     case 'exportfile': exportFile(); break;
     case 'importpaste': importPaste(); break;
     case 'resetall': confirmBox('Wirklich den gesamten Fortschritt löschen? Das kann nicht rückgängig gemacht werden.', () => { const st = S.settings; S = blankState(); S.settings = st; S.settings.u = now(); S.settings.resetAt = now(); Sync.wroteOnce = false; save(); render(); toast('Zurückgesetzt'); }); break;
@@ -1090,12 +1096,122 @@ const Sync = {
   },
 };
 function setPill(s) { const p = $('#syncPill'); if (p) p.textContent = s; }
-window.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && Sync.pending.size) Sync.flush(); });
+window.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') { if (Sync.pending.size) Sync.flush(); if (Gist.dirty) Gist.push(); }
+  else if (Gist.cfg.token && !session) Gist.pull(true);   // beim Zurückkehren neuesten Stand holen
+});
+
+/* ============================================================
+ * Geräte-Abgleich über ein privates GitHub-Gist
+ * Token + Gist-ID liegen nur lokal (eigener Schlüssel), nie im Export.
+ * ============================================================ */
+const GIST_KEY = 'ana1-gist-v1', GIST_FILE = 'analysis1-fortschritt.json';
+const Gist = {
+  cfg: (() => { try { return JSON.parse(localStorage.getItem(GIST_KEY) || '{}'); } catch (e) { return {}; } })(),
+  dirty: false, timer: null, busy: false, status: '', lastSync: 0,
+  saveCfg() { try { localStorage.setItem(GIST_KEY, JSON.stringify(this.cfg)); } catch (e) { } },
+  async api(path, opts = {}) {
+    const r = await fetch('https://api.github.com' + path, {
+      ...opts,
+      headers: { Authorization: 'Bearer ' + this.cfg.token, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json', ...(opts.headers || {}) },
+      cache: 'no-store',
+    });
+    if (r.status === 401) throw new Error('Token ungültig oder abgelaufen');
+    if (r.status === 404) throw new Error('nicht gefunden (Token braucht das Recht „gist“)');
+    if (!r.ok) throw new Error('GitHub-Fehler ' + r.status);
+    return r.json();
+  },
+  setStatus(t) { this.status = t; const el = $('#gistStatus'); if (el) el.textContent = t; if (this.cfg.token && !Sync.ok) setPill(t.startsWith('✓') ? '☁︎ GitHub' : t.startsWith('⚠︎') ? '⚠︎ Sync' : 'Sync …'); },
+  async connect(token) {
+    this.cfg = { token: token.trim() }; this.saveCfg();
+    this.setStatus('Verbinde …');
+    try {
+      // vorhandenes Gist suchen (z. B. vom anderen Gerät angelegt)
+      let id = null;
+      for (let page = 1; page <= 5 && !id; page++) {
+        const list = await this.api(`/gists?per_page=100&page=${page}`);
+        const g = list.find(g => g.files && g.files[GIST_FILE]);
+        if (g) id = g.id;
+        if (list.length < 100) break;
+      }
+      if (!id) {
+        const g = await this.api('/gists', { method: 'POST', body: JSON.stringify({ description: 'Analysis I – Lernfortschritt (automatisch)', public: false, files: { [GIST_FILE]: { content: exportString() } } }) });
+        id = g.id;
+      }
+      this.cfg.gistId = id; this.saveCfg();
+      await this.pull();
+      await this.push();
+      toast('Abgleich eingerichtet');
+    } catch (e) { this.setStatus('⚠︎ ' + e.message); toast('Verbindung fehlgeschlagen: ' + e.message); }
+    render();
+  },
+  disconnect() { this.cfg = {}; this.saveCfg(); this.setStatus(''); setPill(Sync.ok ? '☁︎ synchronisiert' : 'lokal'); render(); },
+  init() { if (this.cfg.token && this.cfg.gistId) this.pull(); },
+  async pull(quiet) {
+    if (!this.cfg.token || !this.cfg.gistId || this.busy) return;
+    this.busy = true;
+    if (!quiet) this.setStatus('Lade …');
+    try {
+      const g = await this.api('/gists/' + this.cfg.gistId);
+      const f = g.files && g.files[GIST_FILE];
+      if (f) {
+        let txt = f.content;
+        if (f.truncated && f.raw_url) txt = await (await fetch(f.raw_url, { cache: 'no-store' })).text();
+        const before = JSON.stringify([S.cards, S.log.length, S.settings]);
+        mergeInto(JSON.parse(txt));
+        try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (e) { }
+        const changed = before !== JSON.stringify([S.cards, S.log.length, S.settings]);
+        if (changed && !session && !quiz) render();
+        // lokal Neueres hochladen
+        if (txt.length !== exportString().length) this.dirty = true;
+      }
+      this.lastSync = now();
+      this.setStatus('✓ abgeglichen ' + new Date().toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' }));
+    } catch (e) { this.setStatus('⚠︎ ' + e.message); }
+    finally { this.busy = false; }
+    if (this.dirty) this.schedule();
+  },
+  schedule() {
+    if (!this.cfg.token || !this.cfg.gistId) return;
+    this.dirty = true;
+    clearTimeout(this.timer);
+    this.timer = setTimeout(() => this.push(), 4000);
+  },
+  async push() {
+    if (!this.cfg.token || !this.cfg.gistId) return;
+    if (this.busy) { this.timer = setTimeout(() => this.push(), 1500); return; }
+    this.busy = true; this.dirty = false;
+    try {
+      await this.api('/gists/' + this.cfg.gistId, { method: 'PATCH', body: JSON.stringify({ files: { [GIST_FILE]: { content: exportString() } } }) });
+      this.lastSync = now();
+      this.setStatus('✓ abgeglichen ' + new Date().toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' }));
+    } catch (e) { this.dirty = true; this.setStatus('⚠︎ ' + e.message); this.timer = setTimeout(() => this.push(), 30000); }
+    finally { this.busy = false; }
+  },
+};
+function gistSettingsHTML() {
+  if (Gist.cfg.token && Gist.cfg.gistId) return `
+    <div class="small">✓ Verbunden. Dein Fortschritt wird nach jeder Bewertung in einem <b>privaten Gist</b> auf deinem GitHub-Konto gespeichert und beim Öffnen von dort geladen.</div>
+    <div class="small muted" id="gistStatus" style="margin-top:6px">${esc(Gist.status)}</div>
+    <div class="row" style="margin-top:12px"><button class="btn" data-act="gistsync">Jetzt abgleichen</button><button class="btn" data-act="gistoff">Trennen</button></div>`;
+  return `
+    <div class="small">Damit iPhone und Mac denselben Stand haben: einmal pro Gerät einen GitHub-Token eintragen. Der Fortschritt landet dann in einem privaten Gist (nur für dich sichtbar).</div>
+    <ol class="small" style="margin:10px 0 10px 18px;padding:0">
+      <li>Token erstellen: <a href="https://github.com/settings/tokens/new?scopes=gist&description=Analysis-1-Lernen" target="_blank" rel="noopener">github.com/settings/tokens/new</a> – nur das Häkchen <b>gist</b>, Ablauf z. B. „No expiration“ oder nach der Prüfung.</li>
+      <li>Token (beginnt mit <code>ghp_</code>) kopieren und hier einfügen.</li>
+      <li>Auf dem zweiten Gerät denselben Token eintragen – das Gist wird automatisch gefunden.</li>
+    </ol>
+    <div class="row"><input id="gistTok" type="password" autocomplete="off" placeholder="ghp_…" style="flex:1;min-width:180px;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:9px 10px">
+    <button class="btn primary" data-act="gistconnect">Verbinden</button></div>
+    <div class="small muted" id="gistStatus" style="margin-top:6px">${esc(Gist.status)}</div>
+    <div class="small muted" style="margin-top:6px">Der Token bleibt nur auf diesem Gerät gespeichert und ist nicht im Export enthalten.</div>`;
+}
 
 /* ============================================================
  * Start
  * ============================================================ */
 render();
 Sync.init();
+Gist.init();
 // Neuer Tag während die Seite offen ist → Übersicht aktualisieren
 setInterval(() => { if (tab === 'heute' && !session) render(); }, 5 * 60e3);
