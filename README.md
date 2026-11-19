@@ -34,6 +34,7 @@ Tastatur: Leertaste = aufdecken, 1–4 = bewerten, U = rückgängig.
 
 ## Dateien
 - `index.html`, `app.js` – App (keine Abhängigkeiten)
+- `icons/`, `manifest.webmanifest` – App-Symbol (iPhone/iPad: Teilen → Zum Home-Bildschirm; Mac: Safari → Ablage → Zum Dock hinzufügen)
 - `data.js`, `img/` – Karten (automatisch erzeugt)
 - `tools/extract.py` – schneidet die Einträge aus dem Skript-PDF aus; `tools/build_data.py` – erzeugt `data.js`;
   `tools/meta.py` – Prioritäten, ergänzte Titel und Merkhinweise (hier anpassen)
