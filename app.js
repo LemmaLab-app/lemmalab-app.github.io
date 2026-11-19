@@ -472,7 +472,7 @@ function schedule(c, x, g, t = now(), opts = {}) {
   y.last = t;
   if (!x.st || !x.S) {                            // neue Karte
     const m = FSRS.init(g, Community.delta(c.id)); y.S = m.S; y.D = m.D; y.intro = x.intro || t; y.lapses = 0;
-    if (g === 1) { y.st = 1; y.step = 0; y.due = t + 1 * MIN; }
+    if (g === 1) { y.st = 1; y.step = 0; y.due = t + 3 * MIN; }
     else if (g === 2) { y.st = 1; y.step = 0; y.due = t + 6 * MIN; }
     else if (g === 3) { y.st = 1; y.step = 1; y.due = t + 10 * MIN; }
     else { y.st = 2; y.due = t + toDays(y.S) * DAY; }
@@ -484,7 +484,7 @@ function schedule(c, x, g, t = now(), opts = {}) {
       if (g === 1) { y.lapses = (x.lapses || 0) + 1; y.st = 3; y.step = 0; y.due = t + 10 * MIN; }
       else y.due = t + fuzz(toDays(y.S)) * DAY;
     } else {                                        // Lernen / Neu-Lernen (st 1/3)
-      if (g === 1) { y.step = 0; y.due = t + (x.st === 3 ? 10 : 1) * MIN; }
+      if (g === 1) { y.step = 0; y.due = t + (x.st === 3 ? 10 : 3) * MIN; }
       else if (g === 2) { y.due = t + (x.st === 3 ? 10 : 6) * MIN; }
       else if (g === 3 && x.st === 1 && (x.step || 0) < 1) { y.step = 1; y.due = t + 10 * MIN; }
       else { y.st = 2; y.step = 0; y.due = t + fuzz(toDays(y.S)) * DAY; }
@@ -558,7 +558,7 @@ function buildQueue() {
 
 function startSession(customIds) {
   const q = customIds ? { queue: customIds.slice(), later: [], nNew: 0, nRev: customIds.length } : buildQueue();
-  session = { ...q, total: q.queue.length, done: 0, cur: null, revealed: false, undo: [], again: 0, custom: !!customIds, start: now(), logFrom: S.log.length };
+  session = { ...q, total: q.queue.length, done: 0, cur: null, revealed: false, undo: [], again: 0, custom: !!customIds, start: now(), logFrom: S.log.length, shown: 0, gap: {} };
   nextCard();
 }
 
@@ -587,20 +587,30 @@ function preloadQuiz() {
   if (!quiz) return;
   Pre.ids(quiz.items.slice(quiz.i, quiz.i + 4));
 }
-function nextCard() {
+const WAIT_SOON = 60e3;   // so kurz vor der Fälligkeit darf eine Lernkarte schon kommen
+function laterReady(id, t) { return S.cards[id].due <= t + WAIT_SOON && (session.shown || 0) >= ((session.gap || {})[id] || 0); }
+function nextCard(force) {
   const t = now();
-  // Lernkarten, die inzwischen fällig sind, nach vorne holen
+  clearTimeout(session.waitTimer); session.waiting = false;
+  // Lernkarten, die fällig sind UND genug andere Karten dazwischen hatten
   if (session.later.length) {
-    const ready = session.later.filter(id => S.cards[id].due <= t + 60e3);
+    const ready = session.later.filter(id => laterReady(id, t));
     session.later = session.later.filter(id => !ready.includes(id));
-    session.queue.unshift(...ready);
+    session.queue.push(...ready);
   }
   if (!session.queue.length && session.later.length) {
-    // nichts anderes mehr da → Lernkarten vorziehen
     session.later.sort((a, b) => S.cards[a].due - S.cards[b].due);
-    session.queue.push(session.later.shift());
+    const id = session.later[0], wait = S.cards[id].due - t;
+    if (force || wait <= WAIT_SOON) session.queue.push(session.later.shift());
+    else {
+      // sonst kurz warten statt dieselbe Karte gleich nochmals zu zeigen
+      session.cur = null; session.revealed = false; session.waiting = true;
+      session.waitTimer = setTimeout(() => { if (session && session.waiting) nextCard(); }, Math.max(1000, wait - WAIT_SOON + 500));
+      Motion.set('tab'); render(); return;
+    }
   }
   session.cur = session.queue.shift() || null;
+  if (session.cur) session.shown = (session.shown || 0) + 1;
   session.revealed = false;
   Timer.start();
   Motion.set(session.cur ? 'next' : 'tab');
@@ -633,7 +643,12 @@ function rate(g, o = {}) {
   session.undo.push({ id, before, queue: session.queue.slice(), later: session.later.slice(), done: session.done });
   session.done++;
   if (g === 1) session.again++;
-  if (after.st === 1 || after.st === 3) session.later.push(id);
+  if (after.st === 1 || after.st === 3) {
+    // Nicht sofort wieder zeigen: erst ein paar andere Karten dazwischen (Abstand hilft beim Merken)
+    session.later.push(id);
+    session.gap = session.gap || {};
+    session.gap[id] = (session.shown || 0) + Math.min(5, session.queue.length);
+  }
   save();
   if (o.flown) nextCard();
   else Motion.leave(g === 1 ? 'leave-again' : 'leave', nextCard);
@@ -1003,6 +1018,13 @@ function historyLine(c) {
 }
 function viewStudy() {
   const s = session;
+  if (!s.cur && s.waiting && s.later.length) {
+    const mins = Math.max(1, Math.ceil((Math.min(...s.later.map(id => S.cards[id].due)) - now()) / 60e3));
+    return `<div class="solo"><div class="donehero"><div class="dt">Kurze Pause</div>
+      <div class="ds">${s.later.length === 1 ? 'Eine Karte kommt' : s.later.length + ' Karten kommen'} in ${mins} Minute${mins === 1 ? '' : 'n'} wieder.<br>Etwas Abstand hilft beim Merken.</div></div>
+      <button class="btn primary big solo-btn" data-act="forcelater">Jetzt wiederholen</button>
+      <div class="solo-actions"><button class="linkbtn2" data-act="home">Später</button></div></div>`;
+  }
   if (!s.cur) {
     const L = S.log.slice(s.logFrom).filter(l => modeOf(l) !== 'q');
     const rev = L.filter(l => l[3] === 2), fresh = L.filter(l => l[3] === 0);
@@ -1795,6 +1817,7 @@ document.addEventListener('click', e => {
     case 'home': session = null; render(); break;
     case 'update': e.preventDefault(); checkUpdate(true); break;
     case 'ahead': startSession(aheadIds().slice(0, 20)); break;
+    case 'forcelater': if (session) nextCard(true); break;
     case 'weak': { const ids = weakIds().slice(0, 20); if (ids.length) startSession(ids); break; }
     case 'reveal': reveal(); break;
     case 'undo': undo(); break;
