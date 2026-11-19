@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-19.33';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-19.34';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -821,6 +821,10 @@ function doneHeroHTML(ts) {
     <div class="ds">Morgen ${tomorrow} Karte${tomorrow === 1 ? '' : 'n'}</div>
   </div>`;
 }
+function weakIds() {
+  return CARDS.filter(c => { const x = S.cards[c.id]; return x && x.st && !x.susp && ((x.lapses || 0) >= 2 || retrievability(x) < 0.85); })
+    .sort((a, b) => retrievability(S.cards[a.id]) - retrievability(S.cards[b.id])).map(c => c.id);
+}
 function viewHome() {
   const q = buildQueue();
   const todayLog = S.log.filter(l => l[0] >= dayStart());
@@ -829,22 +833,39 @@ function viewHome() {
   const estMin = Math.max(1, Math.round((q.nRev * pt.review + q.nNew * pt.newCost + Math.max(0, learning) * pt.learn) / 60));
   const ts = todayStatus();
   const dte = daysToExam();
-  if (ts.allDone || !q.queue.length) {
-    return `<div class="solo">${ts.allDone ? doneHeroHTML(ts) : `<div class="donehero"><div class="dt">Gleich geht's weiter</div><div class="ds">${q.later.length} Karte${q.later.length === 1 ? '' : 'n'} kommen in wenigen Minuten wieder.</div></div>`}
-      <div class="solo-actions"><button class="linkbtn2" data-act="extra">10 neue Karten lernen</button></div></div>`;
-  }
+  const rd = readiness();
+  const introduced = CARDS.filter(c => S.cards[c.id] && S.cards[c.id].st).length;
+  const minToday = Math.round(todayLog.reduce((a, l) => a + l[4], 0) / 600);
+  const weak = weakIds(), ahead = aheadIds();
   const total = todayLog.length + q.queue.length;
-  return `<div class="solo">
+  const hero = ts.allDone || !q.queue.length
+    ? `<div class="solo">${ts.allDone ? doneHeroHTML(ts) : `<div class="donehero"><div class="dt">Gleich geht's weiter</div><div class="ds">${q.later.length} Karte${q.later.length === 1 ? '' : 'n'} kommen in wenigen Minuten wieder.</div></div>`}</div>`
+    : `<div class="solo">
     ${ringSVG(todayLog.length, total, 168)}
     <div class="solo-n">${q.queue.length} Karte${q.queue.length === 1 ? '' : 'n'}</div>
-    <div class="solo-s">etwa ${estMin} Minute${estMin === 1 ? '' : 'n'}${dte > 0 ? ` · Prüfung in ${dte} Tagen` : ''}</div>
+    <div class="solo-s">etwa ${estMin} Minute${estMin === 1 ? '' : 'n'}</div>
     <button class="btn primary big solo-btn" data-act="start">${ts.startedToday ? 'Weiterlernen' : 'Lernen'}</button>
-  </div>
-  <div class="solo-list">${UI.group([
+  </div>`;
+  return `<div class="home"><div class="col">
+  ${hero}
+  ${UI.group([
     UI.row('Wiederholungen', `<span class="v">${q.nRev}</span>`),
     UI.row('Neue Karten', `<span class="v">${q.nNew}</span>`),
-    UI.row('Prüfungsbereit', `<span class="v">${Math.round(readiness().exam * 100)} %</span>`),
-  ])}</div>`;
+    UI.row('Heute gelernt', `<span class="v">${todayLog.length} Karten · ${minToday} Min</span>`),
+  ], { header: 'Heute' })}
+  </div><div class="col">
+  ${UI.group([
+    UI.row('Prüfung', `<span class="v">${dte > 0 ? `in ${dte} Tagen` : dte === 0 ? 'heute' : 'vorbei'}</span>`),
+    UI.row('Prüfungsbereit', `<span class="v">${Math.round(rd.exam * 100)} %</span>`),
+    UI.row('Eingeführt', `<span class="v">${introduced} von ${CARDS.length}</span>`),
+  ], { header: 'Stand' })}
+  ${UI.group([
+    UI.item('cards', '#0a84ff', '10 neue Karten', 'Zusätzlich zum Tagesplan', '', { act: 'extra' }),
+    weak.length ? UI.item('wave', '#ff9f0a', 'Schwache Karten üben', `${weak.length} Karte${weak.length === 1 ? '' : 'n'} wackeln`, '', { act: 'weak' }) : '',
+    ahead.length ? UI.item('bolt', '#5e5ce6', 'Vorausüben', 'Karten der nächsten Tage', '', { act: 'ahead' }) : '',
+    UI.item('test', '#ff375f', 'Prüfungstest', 'Zwölf Kernkarten wie an der Prüfung', '', { act: 'teststart' }),
+  ], { header: 'Üben' })}
+  </div></div>`;
 }
 function ringSVG(done, total, size = 38) {
   const f = total ? Math.min(1, done / total) : 1, sw = size > 100 ? 14 : size > 50 ? 7 : 4, r = (size - sw) / 2 - 1, C = 2 * Math.PI * r, c = size / 2;
@@ -1684,6 +1705,7 @@ document.addEventListener('click', e => {
     case 'home': session = null; render(); break;
     case 'update': e.preventDefault(); checkUpdate(true); break;
     case 'ahead': startSession(aheadIds().slice(0, 20)); break;
+    case 'weak': { const ids = weakIds().slice(0, 20); if (ids.length) startSession(ids); break; }
     case 'reveal': reveal(); break;
     case 'undo': undo(); break;
     case 'quizstart': startQuiz('match', 'intro', 15); break;
