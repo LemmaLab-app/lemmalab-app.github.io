@@ -1,12 +1,12 @@
 # Schneidet die Einträge aus der handschriftlichen Mitschrift aus (Zeilen aus lines.py, siehe entries.py)
 import pymupdf as fitz, json, os, sys, numpy as np
-from PIL import Image
+from PIL import Image, ImageFilter
 sys.path.insert(0, os.path.dirname(__file__) + '/..')
 from entries import E
 SRC, OUT = sys.argv[1], sys.argv[2]
 os.makedirs(OUT + '/img', exist_ok=True)
 B = json.load(open('ann/bands.json'))
-DPI0, DPI = 110, 150; S = DPI / DPI0
+DPI0, DPI = 110, 170; S = DPI / DPI0
 _pages = {}
 def page(f, p):
     if (f, p) not in _pages:
@@ -16,7 +16,12 @@ def page(f, p):
         mx, mn = im.max(2), im.min(2)
         light = (mn > 150) & (mx - mn < 70) | (mn > 195)
         im[light] = 255
-        _pages[(f, p)] = Image.fromarray(im.astype('uint8'))
+        img = Image.fromarray(im.astype('uint8'))
+        # Bessere Lesbarkeit: Striche verdicken (Minimumfilter) und Mitteltöne abdunkeln, Farben (rot) bleiben erhalten
+        img = img.filter(ImageFilter.MinFilter(3))
+        a = np.asarray(img).astype(float) / 255
+        a = np.where(a > 0.93, 1.0, a ** 2.4)
+        _pages[(f, p)] = Image.fromarray((a * 255).astype('uint8'))
     return _pages[(f, p)]
 def trim(im, pb, pt):
     # Nicht mitten durch eine Zeile schneiden: Schrift, die im Rand unten/oben nach einer Lücke beginnt, wegschneiden
@@ -42,7 +47,7 @@ for i, (kind, nr, title, regs) in enumerate(E):
     w = max(im.width for im in ims); h = sum(im.height for im in ims) + 14 * (len(ims) - 1)
     cv = Image.new('RGB', (w, h), 'white'); y = 0
     for im in ims: cv.paste(im, (0, y)); y += im.height + 14
-    cv = cv.quantize(colors=12, dither=Image.Dither.NONE)
+    cv = cv.quantize(colors=16, dither=Image.Dither.NONE)
     fn = f'm{i:03d}.png'
     cv.save(f'{OUT}/img/{fn}', optimize=True)
     out.append(dict(idx=i, kind=kind, nr=nr, title=title, img=fn, w=w, h=h, src=regs))
