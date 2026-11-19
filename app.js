@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-19.18';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-19.19';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -1323,40 +1323,65 @@ function lineChart(vals, o = {}) {
 /* ============================================================
  * Einstellungen
  * ============================================================ */
+/* ---------- Bausteine im Stil der iOS-Einstellungen ---------- */
+const UI = {
+  group: (rows, o = {}) => `<section class="ig">${o.header ? `<div class="ig-h">${o.header}</div>` : ''}<div class="ig-b">${rows.filter(Boolean).join('')}</div>${o.footer ? `<div class="ig-f">${o.footer}</div>` : ''}</section>`,
+  row: (label, right = '', o = {}) => `<div class="ir${o.cls ? ' ' + o.cls : ''}"><span class="ir-l">${label}${o.sub ? `<small>${o.sub}</small>` : ''}</span><span class="ir-r">${right}</span></div>`,
+  toggle: (id, on, label, sub) => `<label class="ir" for="${id}"><span class="ir-l">${label}${sub ? `<small>${sub}</small>` : ''}</span><span class="ir-r"><span class="sw"><input type="checkbox" role="switch" id="${id}" ${on ? 'checked' : ''}><i></i></span></span></label>`,
+  select: (id, opts, cur) => `<span class="isel"><select id="${id}">${opts.map(([v, l]) => `<option value="${esc(v)}" ${String(v) === String(cur) ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select><svg viewBox="0 0 10 16" aria-hidden="true"><path d="M2 6l3-3 3 3M2 10l3 3 3-3"/></svg></span>`,
+  stepper: (id, val, min, max, step = 1, unit = '') => `<span class="stp" data-stp="${id}" data-min="${min}" data-max="${max}" data-step="${step}" data-unit="${unit}"><output>${val}${unit}</output><span class="stp-b"><button type="button" data-d="-1" aria-label="weniger">−</button><i></i><button type="button" data-d="1" aria-label="mehr">+</button></span><input type="hidden" id="${id}" value="${val}"></span>`,
+  action: (label, act, o = {}) => `<button type="button" class="ir ia${o.danger ? ' danger' : ''}" data-act="${act}"><span class="ir-l">${label}</span>${o.chev ? '<span class="ir-r"><svg class="chev" viewBox="0 0 8 14" aria-hidden="true"><path d="M1.5 1.5L6.5 7l-5 5.5"/></svg></span>' : ''}</button>`,
+};
+document.addEventListener('click', e => {
+  const b = e.target.closest('.stp button[data-d]'); if (!b) return;
+  const w = b.closest('.stp'), inp = w.querySelector('input'), out = w.querySelector('output');
+  const v = clamp((+inp.value || 0) + (+b.dataset.d) * (+w.dataset.step), +w.dataset.min, +w.dataset.max);
+  inp.value = v; out.textContent = v + (w.dataset.unit || '');
+  inp.dispatchEvent(new Event('change', { bubbles: true }));
+});
+
 function viewSettings() {
-  const st = S.settings;
-  return `${typeof accountSettingsHTML === 'function' ? `<h2 style="margin-top:4px">Konto</h2><div class="card">${accountSettingsHTML()}</div><h2>Lernen</h2>` : ''}
-  <div class="card">
-    <div class="field"><label for="sExam">Prüfungsdatum</label><input type="date" id="sExam" value="${esc(st.examDate)}">
-      <span class="muted small">Steuert das Tempo der neuen Karten und sorgt dafür, dass alles kurz vor der Prüfung nochmals drankommt.</span></div>
-    <div class="field"><label for="sNewMode">Neue Karten pro Tag</label>
-      <div class="row"><select id="sNewMode"><option value="auto" ${st.newMode === 'auto' ? 'selected' : ''}>Automatisch (aktuell ${plannedNewPerDay()})</option><option value="manual" ${st.newMode === 'manual' ? 'selected' : ''}>Manuell</option></select>
-      <input type="number" id="sNew" min="0" max="80" value="${st.newPerDay}" style="width:90px" ${st.newMode === 'auto' ? 'disabled' : ''}></div></div>
-    <div class="field"><label for="sBudget">Tägliches Zeitbudget (Minuten, 0 = aus)</label><input type="number" id="sBudget" min="0" max="300" value="${st.budget || 0}">
-      <span class="muted small">Begrenzt die neuen Karten so, dass der Tag ins Budget passt – gerechnet mit deinen gemessenen Zeiten (${personalTimes().fromData ? `Wiederholung ≈ ${Math.round(personalTimes().review)} s, neue Karte inkl. Lernschritte ≈ ${Math.round(personalTimes().newCost)} s` : 'noch Standardwerte, bis genug Daten da sind'}).</span></div>
-    <div class="field"><label for="sMax">Maximal Wiederholungen pro Tag</label><input type="number" id="sMax" min="20" max="1000" value="${st.maxReviews}"></div>
-    <div class="field"><label><input type="checkbox" id="sRand" ${st.includeRand ? 'checked' : ''}> Randstoff (Priorität „Rand“) ebenfalls lernen</label></div>
-    <div class="field"><label><input type="checkbox" id="sCalib" ${st.calib !== false ? 'checked' : ''}> Abstände an mein Gedächtnis anpassen (persönliche Kalibrierung, aktuell Faktor ${Calib.k().toFixed(2)})</label></div>
-    <div class="field"><label><input type="checkbox" id="sLogic" ${st.showLogic !== false ? 'checked' : ''}> Prädikatenlogische Formulierung nach dem Aufdecken anzeigen</label></div>
-    <div class="field"><label><input type="checkbox" id="sType" ${st.typeAnswer ? 'checked' : ''}> Notizfeld zum Aufschreiben vor dem Aufdecken anzeigen</label></div>
-    <div class="field"><label for="sTheme">Darstellung</label><select id="sTheme"><option value="auto" ${st.theme === 'auto' ? 'selected' : ''}>Wie System</option><option value="light" ${st.theme === 'light' ? 'selected' : ''}>Hell</option><option value="dark" ${st.theme === 'dark' ? 'selected' : ''}>Dunkel</option></select></div>
-  </div>
-  ${Sync.ok ? '' : `<details class="adv"><summary>Erweitert: Abgleich über GitHub-Gist (alte Methode)</summary>
-  <div class="card" style="margin-top:8px">${gistSettingsHTML()}</div></details>`}
-  <h2>Fortschritt sichern</h2>
-  <div class="card">
-    <div class="small" id="syncInfo">${Sync.ok ? '✓ Cloud-Sync aktiv: Dein Fortschritt wird in deinem claude.ai-Konto gespeichert und ist auf allen Geräten derselbe.' : 'Fortschritt wird in diesem Browser gespeichert (localStorage). Für ein anderes Gerät: unten exportieren und dort importieren.'}</div>
-    <div class="row" style="margin-top:12px">
-      <button class="btn" data-act="export">Export (JSON kopieren)</button>
-      <button class="btn" data-act="exportfile">Als Datei speichern</button>
-      <label class="btn">Datei importieren<input type="file" id="impFile" accept=".json,application/json" class="hide"></label>
-      <button class="btn" data-act="importpaste">Text einfügen</button>
-      <button class="btn" data-act="csv">Lerndaten als CSV</button>
-    </div>
-  </div>
-  <h2>Zurücksetzen</h2>
-  <div class="card"><button class="btn" style="color:var(--again)" data-act="resetall">Gesamten Fortschritt löschen</button></div>
-  <div class="muted small" style="margin:18px 4px">Version ${APP_VERSION} · <a href="#mehr" data-act="update">Nach Update suchen</a> · <a href="datenschutz.html">Datenschutz</a><br>LemmaLab – inoffizielle Lernhilfe, ohne Gewähr. Inhalte: Ausschnitte aus dem Vorlesungsskript (Kapitel 1–9). Prioritäten & Beweis-Wahrscheinlichkeiten: eigene Schätzung aus alten Prüfungen. Algorithmus: FSRS-5.</div>`;
+  const st = S.settings, pt = personalTimes();
+  const fmtDateLong = d => { try { return new Date(d + 'T12:00').toLocaleDateString('de-CH', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (e) { return d; } };
+  return `<div class="settings">
+  ${typeof accountSettingsHTML === 'function' ? accountSettingsHTML() : ''}
+
+  ${UI.group([
+    UI.row('Prüfungsdatum', `<span class="idate"><span>${esc(fmtDateLong(st.examDate))}</span><input type="date" id="sExam" value="${esc(st.examDate)}" aria-label="Prüfungsdatum"></span>`),
+    UI.row('Neue Karten', UI.select('sNewMode', [['auto', `Automatisch (${plannedNewPerDay()})`], ['manual', 'Manuell']], st.newMode)),
+    st.newMode === 'manual' ? UI.row('Pro Tag', UI.stepper('sNew', st.newPerDay, 0, 80, 1)) : '',
+  ], { header: 'Lernplan', footer: 'Das Prüfungsdatum bestimmt das Tempo der neuen Karten und sorgt dafür, dass kurz vor der Prüfung alles nochmals drankommt.' })}
+
+  ${UI.group([
+    UI.row('Zeitbudget pro Tag', UI.stepper('sBudget', st.budget || 0, 0, 300, 5, ' Min')),
+    UI.row('Max. Wiederholungen', UI.stepper('sMax', st.maxReviews, 20, 1000, 10)),
+  ], { footer: `Mit Zeitbudget werden die neuen Karten so begrenzt, dass der Tag hineinpasst (0 = aus). ${pt.fromData ? `Gerechnet mit deinen Zeiten: Wiederholung ≈ ${Math.round(pt.review)} s, neue Karte ≈ ${Math.round(pt.newCost)} s.` : 'Bis genug Daten da sind, mit Standardwerten.'}` })}
+
+  ${UI.group([
+    UI.toggle('sCalib', st.calib !== false, 'An mein Gedächtnis anpassen', `Persönlicher Faktor ${Calib.k().toFixed(2)}`),
+    UI.toggle('sRand', !!st.includeRand, 'Randstoff ebenfalls lernen'),
+  ], { header: 'Algorithmus' })}
+
+  ${UI.group([
+    UI.toggle('sLogic', st.showLogic !== false, 'Prädikatenlogik anzeigen'),
+    UI.toggle('sType', !!st.typeAnswer, 'Notizfeld vor dem Aufdecken'),
+    UI.row('Erscheinungsbild', UI.select('sTheme', [['auto', 'Automatisch'], ['light', 'Hell'], ['dark', 'Dunkel']], st.theme)),
+  ], { header: 'Karten & Darstellung' })}
+
+  ${UI.group([
+    UI.action('Export kopieren', 'export'),
+    UI.action('Als Datei sichern', 'exportfile'),
+    `<label class="ir ia"><span class="ir-l">Datei importieren</span><input type="file" id="impFile" accept=".json,application/json" class="hide"></label>`,
+    UI.action('Export-Text einfügen', 'importpaste'),
+    UI.action('Lerndaten als CSV', 'csv'),
+  ], { header: 'Daten', footer: Sync.ok ? 'Dein Fortschritt wird automatisch gespeichert.' : 'Der Fortschritt liegt in deinem Konto bzw. in diesem Browser. Hier kannst du ihn zusätzlich sichern oder übertragen.' })}
+
+  ${Sync.ok ? '' : `<details class="adv ig"><summary class="ig-h">Erweitert: Abgleich über GitHub-Gist</summary><div class="ig-b ig-pad">${gistSettingsHTML()}</div></details>`}
+
+  ${UI.group([UI.action('Gesamten Fortschritt löschen', 'resetall', { danger: true })])}
+
+  <div class="ig-foot">LemmaLab ${APP_VERSION}<br><a href="#mehr" data-act="update">Nach Update suchen</a> · <a href="datenschutz.html">Datenschutz</a><br>Inoffizielle Lernhilfe, ohne Gewähr. Inhalte aus dem Vorlesungsskript (Kapitel 1–9). Prioritäten aus alten Prüfungen geschätzt. Algorithmus FSRS-5.</div>
+  </div>`;
 }
 
 /* ============================================================
@@ -1408,7 +1433,7 @@ function afterRender() {
   on('#sTheme', 'change', e => { S.settings.theme = e.target.value; touchSettings(); render(); });
   on('#impFile', 'change', e => { const f = e.target.files[0]; if (f) f.text().then(importJSON); });
 }
-function touchSettings() { S.settings.u = now(); save(['settings']); toast('Gespeichert'); }
+function touchSettings() { S.settings.u = now(); save(['settings']); }   // wie in iOS: Änderungen gelten sofort, ohne Meldung
 function rescheduleForExam() {
   for (const c of CARDS) { const x = S.cards[c.id]; if (x && x.st === 2) { x.due = capDue(c.id, x.due); } }
   save(['cards']);

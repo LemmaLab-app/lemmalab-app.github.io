@@ -205,19 +205,19 @@ function updateAccountUI() {
 function accountSettingsHTML() {
   if (Cloud.user) {
     const m = Cloud.user.user_metadata || {};
-    return `<div class="acc">
-      ${m.avatar_url ? `<img src="${esc(m.avatar_url)}" alt="" referrerpolicy="no-referrer">` : '<div class="accav">' + esc((Cloud.user.email || '?')[0].toUpperCase()) + '</div>'}
-      <div><b>${esc(m.full_name || m.name || 'Angemeldet')}</b><div class="muted small">${esc(Cloud.user.email || '')}</div></div></div>
-      <div class="small muted" id="cloudStatus" style="margin-top:8px">${esc(Cloud.status)}</div>
-      <div class="small" style="margin-top:6px">Dein Lernstand wird nach jeder Bewertung im Konto gespeichert und auf allen Geräten abgeglichen, auf denen du angemeldet bist.</div>
-      <div class="row" style="margin-top:12px">
-        <button class="btn" data-act="cloudsync">Jetzt abgleichen</button>
-        <button class="btn" data-act="logout">Abmelden</button>
-        <button class="btn" data-act="clouddelete" style="color:var(--again)">Konto-Daten löschen</button>
-      </div>${isAdmin() ? `<div class="row" style="margin-top:12px"><button class="btn primary" data-act="tab:admin">Admin-Bereich öffnen</button></div>` : ''}`;
+    const av = m.avatar_url ? `<img class="av" src="${esc(m.avatar_url)}" alt="" referrerpolicy="no-referrer">` : `<span class="av accav">${esc((Cloud.user.email || '?')[0].toUpperCase())}</span>`;
+    return UI.group([
+      `<div class="ir iprof">${av}<span class="ir-l"><b>${esc(m.full_name || m.name || 'Angemeldet')}</b><small>${esc(Cloud.user.email || '')}</small></span></div>`,
+      UI.action('Jetzt abgleichen', 'cloudsync'),
+      isAdmin() ? UI.action('Admin-Bereich', 'tab:admin', { chev: true }) : '',
+      UI.action('Abmelden', 'logout', { danger: true }),
+    ], { footer: `<span id="cloudStatus">${esc(Cloud.status || '')}</span>${Cloud.status ? ' · ' : ''}Dein Lernstand wird nach jeder Bewertung im Konto gespeichert und auf allen Geräten abgeglichen.` })
+    + UI.group([UI.action('Konto-Daten löschen', 'clouddelete', { danger: true })]);
   }
-  return `<div class="small">Du lernst ohne Konto – der Fortschritt bleibt nur auf diesem Gerät. Melde dich an, damit er auf allen Geräten gleich ist und nicht verloren geht.</div>
-    <div class="row" style="margin-top:12px"><button class="btn primary" data-act="login">Anmelden</button></div>`;
+  return UI.group([
+    `<div class="ir iprof"><span class="av accav"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="9" r="3.5"/><path d="M5.5 19c1.2-3 3.7-4.5 6.5-4.5s5.3 1.5 6.5 4.5"/></svg></span><span class="ir-l"><b>Anmelden</b><small>Fortschritt auf allen Geräten</small></span></div>`,
+    UI.action('Mit Konto anmelden', 'login', { chev: true }),
+  ], { footer: 'Ohne Konto bleibt der Fortschritt nur auf diesem Gerät.' });
 }
 
 document.addEventListener('click', e => {
