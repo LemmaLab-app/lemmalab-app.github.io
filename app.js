@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-19.8';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-19.9';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -104,6 +104,7 @@ function save(syncKeys = ['cards', 'settings', 'log']) {
   try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (e) { console.warn('localStorage', e); }
   Sync.schedule(syncKeys);
   Gist.schedule();
+  if (typeof Cloud !== 'undefined') Cloud.schedule();
 }
 function cs(id) {               // Lernzustand einer Karte
   return S.cards[id] || (S.cards[id] = { st: 0, u: 0 });
@@ -1244,7 +1245,7 @@ function lineChart(vals, o = {}) {
  * ============================================================ */
 function viewSettings() {
   const st = S.settings;
-  return `
+  return `${typeof accountSettingsHTML === 'function' ? `<h2 style="margin-top:4px">Konto</h2><div class="card">${accountSettingsHTML()}</div><h2>Lernen</h2>` : ''}
   <div class="card">
     <div class="field"><label for="sExam">Prüfungsdatum</label><input type="date" id="sExam" value="${esc(st.examDate)}">
       <span class="muted small">Steuert das Tempo der neuen Karten und sorgt dafür, dass alles kurz vor der Prüfung nochmals drankommt.</span></div>
@@ -1260,8 +1261,8 @@ function viewSettings() {
     <div class="field"><label><input type="checkbox" id="sType" ${st.typeAnswer ? 'checked' : ''}> Notizfeld zum Aufschreiben vor dem Aufdecken anzeigen</label></div>
     <div class="field"><label for="sTheme">Darstellung</label><select id="sTheme"><option value="auto" ${st.theme === 'auto' ? 'selected' : ''}>Wie System</option><option value="light" ${st.theme === 'light' ? 'selected' : ''}>Hell</option><option value="dark" ${st.theme === 'dark' ? 'selected' : ''}>Dunkel</option></select></div>
   </div>
-  ${Sync.ok ? '' : `<h2>Geräte abgleichen (GitHub)</h2>
-  <div class="card">${gistSettingsHTML()}</div>`}
+  ${Sync.ok ? '' : `<details class="adv"><summary>Erweitert: Abgleich über GitHub-Gist (alte Methode)</summary>
+  <div class="card" style="margin-top:8px">${gistSettingsHTML()}</div></details>`}
   <h2>Fortschritt sichern</h2>
   <div class="card">
     <div class="small" id="syncInfo">${Sync.ok ? '✓ Cloud-Sync aktiv: Dein Fortschritt wird in deinem claude.ai-Konto gespeichert und ist auf allen Geräten derselbe.' : 'Fortschritt wird in diesem Browser gespeichert (localStorage). Für ein anderes Gerät: unten exportieren und dort importieren.'}</div>
@@ -1275,7 +1276,7 @@ function viewSettings() {
   </div>
   <h2>Zurücksetzen</h2>
   <div class="card"><button class="btn" style="color:var(--again)" data-act="resetall">Gesamten Fortschritt löschen</button></div>
-  <div class="muted small" style="margin:18px 4px">Version ${APP_VERSION} · <a href="#mehr" data-act="update">Nach Update suchen</a><br>Private Lernhilfe, ohne Gewähr. Inhalte: Ausschnitte aus dem Skript «Analysis I und II» (Kapitel 1–9). Prioritäten & Beweis-Wahrscheinlichkeiten: eigene Schätzung aus alten Prüfungen. Algorithmus: FSRS-5.</div>`;
+  <div class="muted small" style="margin:18px 4px">Version ${APP_VERSION} · <a href="#mehr" data-act="update">Nach Update suchen</a><br>LemmaLab – inoffizielle Lernhilfe, ohne Gewähr. Inhalte: Ausschnitte aus dem Skript «Analysis I und II» (Kapitel 1–9). Prioritäten & Beweis-Wahrscheinlichkeiten: eigene Schätzung aus alten Prüfungen. Algorithmus: FSRS-5.</div>`;
 }
 
 /* ============================================================

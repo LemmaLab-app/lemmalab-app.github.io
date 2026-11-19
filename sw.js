@@ -1,13 +1,15 @@
 /* Service Worker: macht die Lern-App offline nutzbar.
  * Automatisch erzeugt aus tools/sw.template.js (tools/build_sw.py) – nicht von Hand ändern. */
-const CACHE = 'ana1-08a3886fd6';
+const CACHE = 'ana1-c2c02d6abf';
 const FILES = [
  "./",
  "index.html",
  "app.js",
  "data.js",
  "logic.js",
+ "account.js",
  "manifest.webmanifest",
+ "vendor/supabase/supabase.js",
  "vendor/katex/katex.min.js",
  "vendor/katex/katex.min.css",
  "vendor/katex/fonts/KaTeX_AMS-Regular.woff2",
@@ -265,7 +267,7 @@ const FILES = [
  "img/the-9-2.png",
  "img/the-9-46.png"
 ];
-const CORE = ['index.html', 'app.js', 'data.js', 'logic.js'];   // Netz zuerst (für Updates), sonst Cache
+const CORE = ['index.html', 'app.js', 'data.js', 'logic.js', 'account.js'];   // Netz zuerst (für Updates), sonst Cache
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));

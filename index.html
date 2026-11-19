@@ -5,14 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Analysis I">
+<meta name="apple-mobile-web-app-title" content="LemmaLab">
 <link rel="stylesheet" href="vendor/katex/katex.min.css">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
 <link rel="icon" type="image/svg+xml" href="icons/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Analysis I – Definitionen & Sätze lernen</title>
+<title>LemmaLab – Analysis I</title>
 <meta name="theme-color" content="#1f3a5f">
 <style>
 :root{
@@ -174,7 +174,7 @@ svg.chart{display:block;max-height:210px;margin:0 auto}
 @media (min-width:768px) and (min-height:560px){
   html,body{font-size:16px}
   nav.tabs{top:0;bottom:0;right:auto;width:210px;border-top:0;border-right:1px solid var(--line);flex-direction:column;justify-content:flex-start;padding:calc(20px + var(--safe-t)) 12px calc(16px + var(--safe-b))}
-  nav.tabs::before{content:"Analysis I";font-weight:750;font-size:18px;padding:4px 12px 18px;letter-spacing:-.01em}
+  nav.tabs::before{content:"LemmaLab";font-weight:750;font-size:18px;padding:4px 12px 18px;letter-spacing:-.01em}
   nav.tabs .in{flex-direction:column;gap:4px}
   nav.tabs button{flex:none;flex-direction:row;gap:12px;font-size:15px;padding:11px 12px;border-radius:10px;justify-content:flex-start}
   nav.tabs button.on{background:var(--accent-soft)}
@@ -283,14 +283,33 @@ ul.todo .tb i{display:block;height:100%;border-radius:9px;transition:width .6s e
 @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 canvas.confetti{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:100}
 @media (prefers-reduced-motion:reduce){.bigcheck,.bigcheck *,.donehero *,ul.todo *{animation:none!important;stroke-dashoffset:0!important}}
+
+/* Login */
+#login{position:fixed;inset:0;z-index:200;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:calc(20px + var(--safe-t)) calc(20px + var(--safe-r)) calc(20px + var(--safe-b)) calc(20px + var(--safe-l));overflow:auto;animation:rise .35s ease}
+#login .lbox{width:100%;max-width:380px;text-align:center}
+#login .llogo{width:84px;height:84px;border-radius:20px;box-shadow:0 8px 24px rgba(20,48,92,.25)}
+#login h1{font-size:28px;margin:14px 0 4px;letter-spacing:-.02em}
+#login p{margin:0 0 18px}
+#login input{width:100%;font-size:16px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel);margin-bottom:8px}
+#login .btn{width:100%;padding:12px}
+.gbtn{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:13px;border-radius:12px;border:1px solid var(--line);background:var(--panel);font-weight:650;font-size:16px;box-shadow:var(--shadow)}
+.lor{display:flex;align-items:center;gap:10px;margin:18px 0 12px;color:var(--muted);font-size:12.5px}
+.lor::before,.lor::after{content:"";flex:1;height:1px;background:var(--line)}
+.lnote{margin-top:16px!important}
+.linkbtn{background:none;border:0;color:var(--muted);text-decoration:underline;font-size:13px;margin-top:6px;padding:8px}
+.acc{display:flex;gap:12px;align-items:center}
+.acc img,.accav{width:44px;height:44px;border-radius:50%;flex:none}
+.accav{background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px}
+details.adv{margin-top:18px}
+details.adv summary{cursor:pointer;color:var(--muted);font-size:13.5px}
 </style>
 </head>
 <body>
 <div class="app">
   <header class="top">
     <div>
-      <h1>Analysis I · Definitionen & Sätze</h1>
-      <div class="sub" id="hdrSub">Kapitel 1–9 · Spaced Repetition</div>
+      <h1>LemmaLab</h1>
+      <div class="sub" id="hdrSub">Analysis I · Definitionen & Sätze · Kapitel 1–9</div>
     </div>
     <div class="grow"></div>
     <span class="pill gray sync" id="syncPill" title="Speicherort des Fortschritts">lokal</span>
@@ -300,8 +319,10 @@ canvas.confetti{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:n
 <nav class="tabs"><div class="in" id="tabs"></div></nav>
 <div class="toast" id="toast"></div>
 <script src="vendor/katex/katex.min.js"></script>
-<script src="data.js?v=2026-11-19.8"></script>
-<script src="logic.js?v=2026-11-19.8"></script>
-<script src="app.js?v=2026-11-19.8"></script>
+<script src="data.js?v=2026-11-19.9"></script>
+<script src="logic.js?v=2026-11-19.9"></script>
+<script src="app.js?v=2026-11-19.9"></script>
+<script src="vendor/supabase/supabase.js"></script>
+<script src="account.js?v=2026-11-19.9"></script>
 </body>
 </html>
