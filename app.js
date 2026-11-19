@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-19.21';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-19.22';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -481,10 +481,27 @@ const TABS = [['heute', 'Lernen'], ['quiz', 'Quiz & Test'], ['katalog', 'Katalog
 let tab = (location.hash || '#heute').slice(1);
 if (!TABS.some(t => t[0] === tab)) tab = 'heute';
 
+let _lens = null;   // letzte Position der Glas-Linse unter dem aktiven Tab
 function renderTabs() {
-  $('#tabs').innerHTML = TABS.map(([k, l]) =>
+  const el = $('#tabs');
+  el.innerHTML = `<span class="lens" aria-hidden="true"></span>` + TABS.map(([k, l]) =>
     `<button data-tab="${k}" class="${k === tab || (k === 'mehr' && tab === 'admin') ? 'on' : ''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[k]}</svg>${l}</button>`).join('');
+  placeLens();
 }
+/* Liquid-Glass-Linse gleitet zum aktiven Tab */
+function placeLens(instant) {
+  const el = $('#tabs'), lens = el && el.querySelector('.lens'), on = el && el.querySelector('button.on');
+  if (!lens) return;
+  if (!on) { lens.style.opacity = 0; return; }
+  const to = { x: on.offsetLeft, y: on.offsetTop, w: on.offsetWidth, h: on.offsetHeight };
+  const set = p => { lens.style.transform = `translate(${p.x}px,${p.y}px)`; lens.style.width = p.w + 'px'; lens.style.height = p.h + 'px'; };
+  if (_lens && !instant && (_lens.x !== to.x || _lens.y !== to.y)) {
+    lens.style.transition = 'none'; set(_lens); void lens.offsetWidth; lens.style.transition = '';
+    lens.classList.add('moving'); setTimeout(() => lens.classList.remove('moving'), 420);
+  }
+  set(to); _lens = to;
+}
+window.addEventListener('resize', () => placeLens(true));
 $('#tabs').addEventListener('click', e => {
   const b = e.target.closest('button[data-tab]'); if (!b) return;
   go(b.dataset.tab);

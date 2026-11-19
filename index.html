@@ -677,6 +677,102 @@ body.focus #navbar{display:none}
 @media (prefers-reduced-motion:reduce){
   #view *,#view,.modal,.modal *,.toast,#login *,#tabs *{animation:none!important;transition:none!important}
 }
+
+/* =====================================================================
+ * Liquid Glass (iOS 26 / macOS Tahoe): schwebende, lichtbrechende
+ * Flächen mit hellem Rand, Glanzlicht oben und weicher Tiefe.
+ * ===================================================================== */
+:root{
+  --glass-bg:rgba(255,255,255,.58);
+  --glass-strong:rgba(255,255,255,.74);
+  --glass-edge:rgba(255,255,255,.85);
+  --glass-hi:rgba(255,255,255,.9);
+  --glass-shadow:0 10px 34px rgba(16,18,40,.14),0 2px 6px rgba(16,18,40,.08);
+  --glass-blur:saturate(1.9) blur(22px) brightness(1.04);
+}
+:root.dark{--glass-bg:rgba(44,44,48,.52);--glass-strong:rgba(44,44,48,.7);--glass-edge:rgba(255,255,255,.22);--glass-hi:rgba(255,255,255,.28);--glass-shadow:0 10px 34px rgba(0,0,0,.5),0 2px 6px rgba(0,0,0,.35);--glass-blur:saturate(1.6) blur(22px) brightness(.95)}
+@media (prefers-color-scheme:dark){:root:not(.light){--glass-bg:rgba(44,44,48,.52);--glass-strong:rgba(44,44,48,.7);--glass-edge:rgba(255,255,255,.22);--glass-hi:rgba(255,255,255,.28);--glass-shadow:0 10px 34px rgba(0,0,0,.5),0 2px 6px rgba(0,0,0,.35);--glass-blur:saturate(1.6) blur(22px) brightness(.95)}}
+
+/* gemeinsame Glas-Optik */
+nav.tabs,#navbar,body.focus .actionbar,.toast,.modal .sheet,.study-head .btn.ghost,header.top .pill{
+  background:var(--glass-bg)!important;
+  backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);
+  box-shadow:var(--glass-shadow),inset 0 1px 0 var(--glass-hi),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 .5px var(--glass-edge);
+  border:0!important;
+}
+/* Glanzlicht: leichter Verlauf von oben links */
+nav.tabs::after,body.focus .actionbar::after,.modal .sheet::after{
+  content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:linear-gradient(160deg,rgba(255,255,255,.38) 0%,rgba(255,255,255,0) 38%,rgba(255,255,255,0) 70%,rgba(255,255,255,.14) 100%);
+  mix-blend-mode:soft-light;
+}
+
+/* Tab-Leiste schwebt als Kapsel über dem Inhalt (iPhone) */
+@media (max-width:767px),(max-height:559px){
+  nav.tabs{left:max(14px,var(--safe-l));right:max(14px,var(--safe-r));bottom:calc(10px + var(--safe-b));border-radius:999px;padding:5px!important;overflow:hidden}
+  nav.tabs .in{position:relative}
+  nav.tabs button{position:relative;z-index:1;padding:7px 2px 6px;border-radius:999px;transition:color .25s}
+  .app{padding-bottom:calc(104px + var(--safe-b))}
+  .toast{bottom:calc(92px + var(--safe-b))}
+  /* Lernleiste schwebt ebenfalls */
+  body.focus .actionbar{left:max(10px,var(--safe-l));right:max(10px,var(--safe-r));bottom:calc(8px + var(--safe-b));border-radius:28px;padding:10px!important}
+  body.focus .app{padding-bottom:calc(120px + var(--safe-b))}
+  #navbar{left:10px;right:10px;top:calc(6px + var(--safe-t));height:40px;padding-top:0;border-radius:999px;width:auto}
+  #navbar span{font-size:15px}
+}
+@media (orientation:landscape) and (max-height:559px){
+  nav.tabs{left:50%;right:auto;transform:translateX(-50%);width:min(560px,80vw);bottom:calc(6px + var(--safe-b))}
+  .app{padding-bottom:calc(70px + var(--safe-b))}
+  body.focus .actionbar{left:50%;right:auto;transform:translateX(-50%);width:min(620px,86vw);bottom:calc(6px + var(--safe-b));border-radius:24px;padding:7px!important}
+}
+
+/* Linse: Glas-Kapsel unter dem aktiven Tab, gleitet beim Wechsel */
+#tabs{position:relative}
+#tabs .lens{position:absolute;left:0;top:0;border-radius:999px;pointer-events:none;z-index:0;
+  background:color-mix(in srgb,var(--accent) 12%,rgba(255,255,255,.35));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.75),inset 0 0 0 .5px rgba(255,255,255,.55),0 2px 8px rgba(16,18,40,.08);
+  transition:transform .5s var(--spring),width .35s var(--ease),height .35s var(--ease)}
+#tabs .lens.moving{background:rgba(255,255,255,.55);box-shadow:inset 0 1px 0 #fff,inset 0 0 0 1px rgba(255,255,255,.8),0 6px 18px rgba(16,18,40,.16);scale:1.08 1.12}
+:root.dark #tabs .lens{background:color-mix(in srgb,var(--accent) 22%,rgba(255,255,255,.08));box-shadow:inset 0 1px 0 rgba(255,255,255,.22),inset 0 0 0 .5px rgba(255,255,255,.18)}
+@media (prefers-color-scheme:dark){:root:not(.light) #tabs .lens{background:color-mix(in srgb,var(--accent) 22%,rgba(255,255,255,.08));box-shadow:inset 0 1px 0 rgba(255,255,255,.22),inset 0 0 0 .5px rgba(255,255,255,.18)}}
+nav.tabs button.on{background:transparent!important;box-shadow:none!important}
+#tabs .lens{transition-property:transform,width,height,scale,background}
+
+/* Seitenleiste auf Mac/iPad: schwebendes Glas-Panel (wie macOS Tahoe) */
+@media (min-width:768px) and (min-height:560px){
+  nav.tabs{top:12px;bottom:12px;left:12px;width:212px;border-radius:24px;padding:calc(16px + var(--safe-t)) 10px 14px!important}
+  nav.tabs::after{border-radius:24px}
+  .app{margin-left:236px}
+  nav.tabs button{border-radius:12px}
+  #tabs .lens{border-radius:12px}
+  nav.tabs button:hover:not(.on){background:color-mix(in srgb,var(--ink) 5%,transparent)}
+  .toast{bottom:28px}
+}
+
+/* Knöpfe mit Glanz: Hauptknopf wie «prominent glass» */
+.btn.primary{background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 82%,#fff) 0%,var(--accent) 55%,color-mix(in srgb,var(--accent) 88%,#000) 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.35),inset 0 0 0 .5px rgba(255,255,255,.15),0 4px 14px color-mix(in srgb,var(--accent) 30%,transparent)}
+.btn.primary:hover:not(:disabled){background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 75%,#fff) 0%,var(--accent-ink) 60%)}
+/* Bewertungsknöpfe als getöntes Glas */
+.rate button{box-shadow:inset 0 1px 0 rgba(255,255,255,.55),inset 0 0 0 .5px color-mix(in srgb,var(--c) 25%,transparent)}
+body.focus .rate .r1,body.focus .rate .r2,body.focus .rate .r3,body.focus .rate .r4{background:color-mix(in srgb,var(--c) 16%,rgba(255,255,255,.5))}
+:root.dark body.focus .rate button{background:color-mix(in srgb,var(--c) 22%,rgba(255,255,255,.04))}
+/* Schliessen-Knopf in der Lernansicht: runde Glasperle */
+.study-head .btn.ghost{color:var(--ink)}
+
+/* Dialog-Blatt: schwebend mit grossem Radius */
+.modal .sheet{position:relative;background:var(--glass-strong)!important}
+@media (max-width:699px){.modal .sheet{margin:0 8px calc(8px + var(--safe-b));border-radius:34px;padding-bottom:20px}}
+@media (min-width:700px){.modal .sheet{border-radius:28px}}
+.modal .sheet>*{position:relative;z-index:1}
+
+/* Ohne Unterstützung für Unschärfe: deckend */
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  nav.tabs,#navbar,body.focus .actionbar,.toast,.modal .sheet{background:var(--panel)!important}
+}
+@media (prefers-reduced-transparency:reduce){
+  nav.tabs,#navbar,body.focus .actionbar,.toast,.modal .sheet{background:var(--panel)!important;backdrop-filter:none;-webkit-backdrop-filter:none}
+}
+@media (prefers-reduced-motion:reduce){#tabs .lens{transition:none}}
 </style>
 </head>
 <body>
@@ -696,10 +792,10 @@ body.focus #navbar{display:none}
 <div id="navbar" aria-hidden="true"><span id="navTitle"></span></div>
 <div class="toast" id="toast"></div>
 <script src="vendor/katex/katex.min.js"></script>
-<script src="data.js?v=2026-11-19.21"></script>
-<script src="logic.js?v=2026-11-19.21"></script>
-<script src="app.js?v=2026-11-19.21"></script>
+<script src="data.js?v=2026-11-19.22"></script>
+<script src="logic.js?v=2026-11-19.22"></script>
+<script src="app.js?v=2026-11-19.22"></script>
 <script src="vendor/supabase/supabase.js"></script>
-<script src="account.js?v=2026-11-19.21"></script>
+<script src="account.js?v=2026-11-19.22"></script>
 </body>
 </html>
