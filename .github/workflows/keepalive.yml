@@ -7,6 +7,8 @@ on:
   schedule:
     - cron: '17 5 */3 * *'
   workflow_dispatch:
+permissions:
+  contents: write
 jobs:
   ping:
     runs-on: ubuntu-latest
@@ -18,3 +20,19 @@ jobs:
             -H "apikey: sb_publishable_EfxVTJbVzdgbptp3osRacg_GY-tlheD")
           echo "HTTP $code"
           test "$code" = "200"
+      # GitHub schaltet zeitgesteuerte Abläufe nach 60 Tagen ohne Änderung im Repo ab.
+      # Darum: falls der letzte Commit älter als 45 Tage ist, einen leeren Commit machen.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Repo aktiv halten
+        run: |
+          last=$(git log -1 --format=%ct)
+          age=$(( ( $(date +%s) - last ) / 86400 ))
+          echo "Letzter Commit vor $age Tagen"
+          if [ "$age" -ge 45 ]; then
+            git config user.name "LemmaLab Bot"
+            git config user.email "lemmalab.app@gmail.com"
+            git commit --allow-empty -m "Automatisch: Repo aktiv halten"
+            git push
+          fi
