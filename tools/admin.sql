@@ -1,7 +1,7 @@
 -- LemmaLab – Admin-Statistik
 -- Einmal im Supabase SQL Editor ausführen (Run).
 -- Liefert nur zusammengefasste Zahlen, keine E-Mails oder Namen.
--- Nur das Konto lemmalab.app@gmail.com darf die Funktion aufrufen;
+-- Nur die Admin-Konten (unten in der Liste) dürfen die Funktion aufrufen;
 -- die Prüfung passiert in der Datenbank, nicht im Browser.
 
 create or replace function public.admin_stats()
@@ -19,7 +19,7 @@ begin
   if not exists (
     select 1 from auth.users u
     where u.id = auth.uid()
-      and lower(u.email) = 'lemmalab.app@gmail.com'
+      and lower(u.email) in ('lemmalab.app@gmail.com', 'martin.senn2@gmail.com')
       and u.email_confirmed_at is not null
   ) then
     raise exception 'not authorized' using errcode = '42501';

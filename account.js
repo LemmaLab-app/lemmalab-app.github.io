@@ -9,8 +9,8 @@
 const SUPA_URL = 'https://bcqbxwiniuiousnnrpbf.supabase.co';
 const SUPA_KEY = 'sb_publishable_EfxVTJbVzdgbptp3osRacg_GY-tlheD';
 const LOCAL_MODE_KEY = 'lemmalab-localmode';
-const ADMIN_EMAIL = 'lemmalab.app@gmail.com';   // nur Anzeige – die echte Prüfung macht die Datenbank (admin_stats)
-const isAdmin = () => !!(Cloud.user && (Cloud.user.email || '').toLowerCase() === ADMIN_EMAIL);
+const ADMIN_EMAILS = ['lemmalab.app@gmail.com', 'martin.senn2@gmail.com'];   // nur Anzeige – die echte Prüfung macht die Datenbank (admin_stats)
+const isAdmin = () => !!(Cloud.user && ADMIN_EMAILS.includes((Cloud.user.email || '').toLowerCase()));
 
 const Cloud = {
   sb: null, user: null, busy: false, dirty: false, timer: null, status: '', lastSync: 0, ready: false,
@@ -234,7 +234,7 @@ const Admin = {
       this.data = data; this.at = Date.now();
     } catch (e) {
       const m = (e && (e.message || e.code)) || String(e);
-      this.err = /not authorized|42501/.test(m) ? 'Kein Zugriff – nur für das Admin-Konto.'
+      this.err = /not authorized|42501/.test(m) ? 'Kein Zugriff – nur für Admin-Konten. (Falls du Admin bist: tools/admin.sql nochmals im Supabase SQL Editor ausführen.)'
         : /admin_stats|PGRST202|function/i.test(m) ? 'Die Datenbank-Funktion fehlt noch: tools/admin.sql im Supabase SQL Editor ausführen.'
         : navigator.onLine ? 'Laden fehlgeschlagen: ' + m : 'Offline – Admin-Statistik braucht Internet.';
     }
@@ -248,7 +248,7 @@ function viewAdmin() {
     <h2 style="margin:0">Admin</h2><div class="spacer"></div>
     <button class="btn" data-act="adminload" ${Admin.loading ? 'disabled' : ''}>${Admin.loading ? 'Lädt …' : '↻ Aktualisieren'}</button></div>`;
   if (!Cloud.ready) return head + `<div class="card muted">Anmeldung wird geprüft …</div>`;
-  if (!isAdmin()) return head + `<div class="card">Dieser Bereich ist nur für das Admin-Konto (${esc(ADMIN_EMAIL)}).</div>`;
+  if (!isAdmin()) return head + `<div class="card">Dieser Bereich ist nur für Admin-Konten.</div>`;
   if (!Admin.data && !Admin.loading && !Admin.err) setTimeout(() => Admin.load(), 0);
   if (Admin.err) return head + `<div class="card" style="color:var(--again)">${esc(Admin.err)}</div>`;
   const d = Admin.data;
