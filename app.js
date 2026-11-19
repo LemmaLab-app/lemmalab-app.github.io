@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-19.16';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-19.17';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -587,7 +587,7 @@ function viewHome() {
   const chap = groupStats(c => c.chap, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
   return `<div class="home"><div class="col">
   <div class="card hero">
-    <div class="row">${ringSVG(todayLog.length, todayLog.length + q.queue.length)}<h3 style="margin:0">Heute${ts.allDone ? ' ✓' : ''}</h3><div class="spacer"></div>
+    <div class="row" style="gap:14px;align-items:center">${ringSVG(todayLog.length, todayLog.length + q.queue.length, 64)}<div><div class="htitle">Heute</div><div class="muted small">${ts.allDone ? 'Alles erledigt' : `${todayLog.length} von ${todayLog.length + q.queue.length} Karten`}</div></div><div class="spacer"></div>
       <span class="pill gray">${dte > 0 ? `Prüfung in ${dte} Tagen` : dte === 0 ? 'Prüfung heute' : 'Prüfung vorbei'}</span></div>
     ${ts.allDone ? doneHeroHTML(ts) : todoHTML(ts)}
     <div style="margin-top:14px">
@@ -626,9 +626,9 @@ function viewHome() {
   </div>
   </div></div>`;
 }
-function ringSVG(done, total) {
-  const f = total ? done / total : 1, r = 15, C = 2 * Math.PI * r;
-  return `<svg width="38" height="38" viewBox="0 0 38 38" style="flex:none" aria-label="Tagesfortschritt"><circle cx="19" cy="19" r="${r}" fill="none" stroke="var(--line2)" stroke-width="4"/><circle cx="19" cy="19" r="${r}" fill="none" stroke="var(--accent)" stroke-width="4" stroke-linecap="round" stroke-dasharray="${(f * C).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 19 19)"/><text x="19" y="23" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--ink)">${Math.round(f * 100)}</text></svg>`;
+function ringSVG(done, total, size = 38) {
+  const f = total ? Math.min(1, done / total) : 1, sw = size > 50 ? 7 : 4, r = (size - sw) / 2 - 1, C = 2 * Math.PI * r, c = size / 2;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="flex:none" aria-label="Tagesfortschritt ${Math.round(f * 100)} Prozent"><circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="color-mix(in srgb,var(--accent) 16%,transparent)" stroke-width="${sw}"/><circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="var(--accent)" stroke-width="${sw}" stroke-linecap="round" stroke-dasharray="${(f * C).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 ${c} ${c})" style="transition:stroke-dasharray .6s ease"/><text x="${c}" y="${c + (size > 50 ? 5 : 3.5)}" text-anchor="middle" font-size="${size > 50 ? 15 : 10.5}" font-weight="700" fill="var(--ink)" style="font-family:var(--sfd)">${Math.round(f * 100)}%</text></svg>`;
 }
 /* Konfetti-Animation (abgeschaltet bei „Bewegung reduzieren“) */
 function celebrate() {

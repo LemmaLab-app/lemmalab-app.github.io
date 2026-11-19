@@ -5,7 +5,6 @@ files = ['./', 'index.html', 'app.js', 'data.js', 'logic.js', 'account.js', 'man
          'vendor/supabase/supabase.js',
          'vendor/katex/katex.min.js', 'vendor/katex/katex.min.css']
 files += ['vendor/katex/fonts/' + f for f in sorted(os.listdir(os.path.join(ROOT, 'vendor/katex/fonts')))]
-files += ['vendor/cmu/' + f for f in sorted(os.listdir(os.path.join(ROOT, 'vendor/cmu'))) if f.endswith('.woff2')]
 files += ['icons/' + f for f in sorted(os.listdir(os.path.join(ROOT, 'icons')))]
 files += ['img/' + f for f in sorted(os.listdir(os.path.join(ROOT, 'img')))]
 h = hashlib.sha1()
