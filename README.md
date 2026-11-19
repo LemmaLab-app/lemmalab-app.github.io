@@ -17,6 +17,9 @@ Die Aussagen sind exakt aus dem Skript ausgeschnitten (keine Abtippfehler).
 - **Quiz (Zuordnen):** Aussage ohne Titel, richtigen Namen wählen. Fehler kommen am selben Tag im Lernmodus zurück.
 - **Prüfungstest:** gewichtete Zufallsauswahl, Selbstbewertung fliesst in den Lernplan ein.
 - **Katalog:** Suche, Filter (Kapitel, Typ, Priorität, Status), Detailansicht mit Statistik, Priorität ändern, markieren, pausieren.
+- **Lernzeit-Messung:** pro Bewertung Denkzeit (bis Aufdecken) und Prüfzeit (bis Bewertung), nur bei sichtbarer Seite.
+  Auswertung nach Typ, Priorität, Ergebnis und Tageszeit, Zeitfresser, Sitzungen; optionales Tages-Zeitbudget;
+  Export aller Lerndaten als CSV (`zeitpunkt;karte;…;denkzeit_s;pruefzeit_s;gesamt_s`).
 - **Statistik:** Prüfungsbereitschaft, Fortschritt nach Priorität/Kapitel/Typ, Prognose, Aktivität, Problemkarten, Plan bis zur Prüfung.
 
 ## Benutzen

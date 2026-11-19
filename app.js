@@ -38,6 +38,7 @@ function dayKey(t = now()) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 function parseDate(s) { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d, 8).getTime(); }
+function fmtSec(sec) { sec = Math.round(sec); if (sec < 60) return sec + ' s'; if (sec < 3600) return Math.floor(sec / 60) + ' Min ' + String(sec % 60).padStart(2, '0') + ' s'; return Math.floor(sec / 3600) + ' Std ' + Math.round(sec % 3600 / 60) + ' Min'; }
 function fmtDate(t) { return new Date(t).toLocaleDateString('de-CH', { day: 'numeric', month: 'short' }); }
 function fmtIvl(ms) {
   if (ms < HOUR) return Math.max(1, Math.round(ms / MIN)) + ' Min';
@@ -78,7 +79,7 @@ const FSRS = (() => {
  * ============================================================ */
 const DEFAULT_SETTINGS = {
   examDate: '2027-01-25', newMode: 'auto', newPerDay: 15, maxReviews: 250,
-  includeRand: false, theme: 'auto', typeAnswer: false, u: 0,
+  includeRand: false, theme: 'auto', typeAnswer: false, budget: 0, u: 0,
 };
 let S = load();
 
@@ -135,6 +136,24 @@ function newIntroducedToday() {
   return CARDS.filter(c => { const x = S.cards[c.id]; return x && x.intro && x.intro >= ds; }).length;
 }
 
+/* Persönliche Durchschnittszeiten (Sekunden), aus deinen eigenen Lerndaten.
+ * Median der letzten 300 passenden Bewertungen; Standardwerte, solange Daten fehlen. */
+function median(a) { if (!a.length) return null; const b = a.slice().sort((x, y) => x - y); const m = b.length >> 1; return b.length % 2 ? b[m] : (b[m - 1] + b[m]) / 2; }
+let _ptCache = null, _ptLen = -1;
+function personalTimes() {
+  if (_ptLen === S.log.length && _ptCache) return _ptCache;
+  const srs = S.log.filter(l => modeOf(l) === 'l' && l[4] > 0);
+  const pick = f => srs.filter(f).slice(-300).map(l => l[4] / 10);
+  const review = median(pick(l => l[3] === 2)) ?? 25;
+  const fresh = median(pick(l => l[3] === 0)) ?? 45;
+  const learn = median(pick(l => l[3] === 1 || l[3] === 3)) ?? 20;
+  const nNew = srs.filter(l => l[3] === 0).length;
+  const nSteps = srs.filter(l => l[3] === 1).length;
+  const steps = nNew >= 10 ? nSteps / nNew : 1.5;
+  _ptLen = S.log.length;
+  return (_ptCache = { review, fresh, learn, steps, newCost: fresh + steps * learn, newFactor: 1, fromData: srs.length >= 20 });
+}
+
 function plannedNewPerDay() {
   if (S.settings.newMode === 'manual') return S.settings.newPerDay;
   // Ziel: alles spätestens 3 Wochen vor der Prüfung eingeführt, damit genug Zeit zum Festigen bleibt.
@@ -144,7 +163,15 @@ function plannedNewPerDay() {
   const days = Math.max(1, daysToExam() - 21);
   let n = Math.max(12, Math.ceil(remaining / days));
   if (dueReviews().length > 150) n = Math.ceil(n * 0.6);   // Überlastung vermeiden
-  return clamp(n, 1, 40);
+  n = clamp(n, 1, 40);
+  // Zeitbudget: neue Karten nur so viele, wie neben den Wiederholungen ins Budget passen
+  const b = +S.settings.budget || 0;
+  if (b > 0) {
+    const pt = personalTimes();
+    const free = b * 60 - dueReviews().length * pt.review;
+    n = Math.min(n, Math.max(3, Math.floor(free / pt.newCost)));
+  }
+  return n;
 }
 
 function dueReviews(until = dayStart() + DAY) {
@@ -216,6 +243,32 @@ function previewIvls(c) {
 }
 
 /* ============================================================
+ * Zeitmessung
+ * Gemessen wird nur, solange die Seite sichtbar ist (App im Hintergrund
+ * = Pause). Pro Bewertung: Denkzeit (bis Aufdecken) und Prüfzeit
+ * (Aufdecken bis Bewertung), je max. 5 Min (danach gilt man als abwesend).
+ * Log-Eintrag: [zeit, id, bewertung, vorZustand, gesamt_ds, modus, denk_ds, prüf_ds]
+ *   modus: 'l' Lernen, 't' Prüfungstest, 'q' Quiz (Zuordnen); ds = Zehntelsekunden
+ * ============================================================ */
+const IDLE_CAP = 300e3;
+const Timer = {
+  acc: 0, since: null, front: null,
+  start() { this.acc = 0; this.front = null; this.since = document.visibilityState === 'hidden' ? null : now(); },
+  read() { return this.acc + (this.since != null ? now() - this.since : 0); },
+  pause() { if (this.since != null) { this.acc += now() - this.since; this.since = null; } },
+  resume() { if (this.since == null) this.since = now(); },
+  markReveal() { if (this.front == null) this.front = this.read(); },
+  result() {
+    const total = this.read();
+    const f = this.front == null ? total : this.front;
+    const front = Math.min(f, IDLE_CAP), back = Math.min(Math.max(0, total - f), IDLE_CAP);
+    return { front: Math.round(front / 100), back: Math.round(back / 100), total: Math.round((front + back) / 100) };
+  },
+};
+const modeOf = l => l[5] || 'l';
+const isSrs = l => modeOf(l) !== 'q';          // Quiz-Einträge zählen nicht für Behaltensquote
+
+/* ============================================================
  * Lernsitzung
  * ============================================================ */
 let session = null;     // {queue:[id], cur, revealed, shownAt, done, newShown, undo:[]}
@@ -262,17 +315,20 @@ function nextCard() {
   }
   session.cur = session.queue.shift() || null;
   session.revealed = false;
-  session.shownAt = now();
+  Timer.start();
   render();
 }
+
+function reveal() { if (!session || !session.cur || session.revealed) return; Timer.markReveal(); session.revealed = true; render(); }
+function qReveal() { if (!quiz || quiz.revealed) return; Timer.markReveal(); quiz.revealed = true; render(); }
 
 function rate(g) {
   if (!session || !session.cur || !session.revealed) return;
   const id = session.cur, c = BY_ID[id], before = { ...cs(id) };
-  const ms = clamp(now() - session.shownAt, 0, 180e3);
+  const tm = Timer.result();
   const after = schedule(c, before, g);
   S.cards[id] = after;
-  S.log.push([now(), id, g, before.st || 0, Math.round(ms / 100)]);
+  S.log.push([now(), id, g, before.st || 0, tm.total, 'l', tm.front, tm.back]);
   session.undo.push({ id, before, queue: session.queue.slice(), later: session.later.slice(), done: session.done });
   session.done++;
   if (g === 1) session.again++;
@@ -288,7 +344,7 @@ function undo() {
   for (let i = S.log.length - 1; i >= 0; i--) { if (S.log[i][1] === u.id) { S.log.splice(i, 1); break; } }
   session.queue = u.queue; session.later = u.later; session.done = u.done;
   if (session.cur) session.queue.unshift(session.cur);
-  session.cur = u.id; session.revealed = true; session.shownAt = now();
+  session.cur = u.id; session.revealed = true; Timer.start(); Timer.front = 0;
   save();
   render();
   toast('Rückgängig gemacht');
@@ -357,7 +413,8 @@ function viewHome() {
   const introduced = CARDS.filter(c => S.cards[c.id] && S.cards[c.id].st).length;
   const todayLog = S.log.filter(l => l[0] >= dayStart());
   const minToday = Math.round(todayLog.reduce((a, l) => a + l[4], 0) / 600);
-  const estMin = Math.round((q.nRev * 25 + q.nNew * 70 + Math.max(0, learning) * 20) / 60);
+  const pt = personalTimes();
+  const estMin = Math.round((q.nRev * pt.review + q.nNew * pt.newCost + Math.max(0, learning) * pt.learn) / 60);
   const focus = nextFocus();
   return `
   <div class="card">
@@ -500,7 +557,8 @@ function startQuiz(type, scope, n) {
   const pool = quizPool(scope);
   if (pool.length < 4) { toast('Zu wenige Karten in dieser Auswahl'); return; }
   const items = pickWeighted(pool, Math.min(n, pool.length), weakness).map(c => c.id);
-  quiz = { type, scope, items, i: 0, answers: [], picked: null, revealed: false, shownAt: now() };
+  quiz = { type, scope, items, i: 0, answers: [], picked: null, revealed: false };
+  Timer.start();
   if (type === 'match') quiz.opts = makeOpts(items[0]);
   render();
 }
@@ -521,12 +579,15 @@ function makeOpts(id) {
 function quizAnswer(val) {
   const id = quiz.items[quiz.i], x = cs(id);
   let ok;
-  if (quiz.type === 'match') { if (quiz.picked) return; quiz.picked = val; ok = val === id; }
-  else {
+  const tm = Timer.result();
+  if (quiz.type === 'match') {
+    if (quiz.picked) return; quiz.picked = val; ok = val === id;
+    S.log.push([now(), id, ok ? 3 : 1, x.st || 0, tm.total, 'q', tm.total, 0]);
+  } else {
     ok = val >= 3;
     // Test-Bewertung fliesst ins Lernsystem ein
     S.cards[id] = schedule(BY_ID[id], x, val);
-    S.log.push([now(), id, val, x.st || 0, Math.round(clamp(now() - quiz.shownAt, 0, 180e3) / 100), 't']);
+    S.log.push([now(), id, val, x.st || 0, tm.total, 't', tm.front, tm.back]);
   }
   const y = cs(id);
   if (ok) y.qOk = (y.qOk || 0) + 1;
@@ -541,7 +602,7 @@ function quizAnswer(val) {
   if (quiz.type === 'test') quizNext(); else render();
 }
 function quizNext() {
-  quiz.i++; quiz.picked = null; quiz.revealed = false; quiz.shownAt = now();
+  quiz.i++; quiz.picked = null; quiz.revealed = false; Timer.start();
   if (quiz.i < quiz.items.length && quiz.type === 'match') quiz.opts = makeOpts(quiz.items[quiz.i]);
   render();
 }
@@ -679,6 +740,12 @@ function openCard(id) {
     rows.push(['Wiederholungen / Fehler', `${x.reps || 0} / ${x.lapses || 0}`]);
   } else rows.push(['Status', 'Noch nicht eingeführt']);
   if (x.qOk || x.qBad) rows.push(['Quiz richtig / falsch', `${x.qOk || 0} / ${x.qBad || 0}`]);
+  const tl = S.log.filter(l => l[1] === id && modeOf(l) !== 'q');
+  if (tl.length) {
+    const fr = tl.filter(l => l[6] != null), sum = tl.reduce((a, l) => a + l[4], 0) / 10;
+    rows.push(['Lernzeit gesamt', fmtSec(sum) + ` (${tl.length}×)`]);
+    if (fr.length) rows.push(['Ø Denkzeit / Ø Prüfzeit', `${fmtSec(fr.reduce((a, l) => a + l[6], 0) / 10 / fr.length)} / ${fmtSec(fr.reduce((a, l) => a + l[7], 0) / 10 / fr.length)}`]);
+  }
   if (c.proofP) rows.push(['Beweis-Prüfungschance (Modell)', `≈ ${Math.max(1, Math.round(c.proofP * 100))}%${c.proofH ? ` · ${c.proofH}× in alten Prüfungen` : ''}`]);
   modal(`
     <div class="row">${kindTag(c)}<div class="spacer"></div>${prioTag(c)}<button class="btn ghost" data-act="close">✕</button></div>
@@ -736,13 +803,13 @@ function viewStats() {
   const t = now();
   const logs = S.log;
   const days = {};
-  for (const l of logs) { const k = dayKey(l[0]); (days[k] = days[k] || { n: 0, ok: 0, ms: 0 }); days[k].n++; if (l[2] >= 2) days[k].ok++; days[k].ms += l[4] * 100; }
+  for (const l of logs) { const k = dayKey(l[0]); (days[k] = days[k] || { n: 0, ok: 0, ms: 0 }); days[k].n++; if (isSrs(l)) { days[k].s = (days[k].s || 0) + 1; if (l[2] >= 2) days[k].ok++; } days[k].ms += l[4] * 100; }
   // Streak
   let streak = 0, d0 = dayStart();
   if (!days[dayKey(d0 + HOUR)]) d0 -= DAY;            // heute noch nichts gemacht → ab gestern zählen
   for (let d = d0; days[dayKey(d + HOUR)] && streak < 999; d -= DAY) streak++;
   const totalMin = Math.round(logs.reduce((a, l) => a + l[4], 0) / 600);
-  const rev = logs.filter(l => l[3] === 2);
+  const rev = logs.filter(l => l[3] === 2 && isSrs(l));
   const retention = rev.length ? rev.filter(l => l[2] >= 2).length / rev.length : null;
   const sitzt = CARDS.filter(c => { const x = S.cards[c.id]; return x && x.st === 2 && x.S >= 21; }).length;
 
@@ -758,7 +825,7 @@ function viewStats() {
     heat += `<i title="${k}: ${n}" style="${n ? `background:color-mix(in srgb,var(--good) ${Math.round(a * 100)}%,var(--line))` : ''}${d > t ? ';opacity:.3' : ''}"></i>`;
   }
   // Genauigkeit letzte 21 Tage
-  const acc = []; for (let i = 20; i >= 0; i--) { const k = dayKey(dayStart() - i * DAY + HOUR); acc.push(days[k] ? days[k].ok / days[k].n : null); }
+  const acc = []; for (let i = 20; i >= 0; i--) { const k = dayKey(dayStart() - i * DAY + HOUR); acc.push(days[k] && days[k].s ? days[k].ok / days[k].s : null); }
 
   const byChap = groupStats(c => c.chap, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
   const byPrio = groupStats(c => prioOf(c), [5, 4, 3, 2, 1]);
@@ -789,8 +856,59 @@ function viewStats() {
   <h2>Aktivität</h2>
   <div class="card"><div class="heat">${heat}</div><div class="muted small" style="margin-top:6px">Letzte 18 Wochen, je dunkler desto mehr Bewertungen.</div>
     <h3 style="margin-top:14px">Anteil gewusst (≠ Nochmal), letzte 21 Tage</h3>${lineChart(acc)}</div>
+  ${timeStatsHTML()}
   <h2>Problemkarten</h2>
   <div class="card" style="padding:4px 12px">${problem.length ? `<div class="list">${problem.map(o => liHTML(o.c)).join('')}</div>` : '<div class="empty muted small">Noch keine – sehr gut.</div>'}</div>`;
+}
+function timeStatsHTML() {
+  const L = S.log.filter(l => modeOf(l) !== 'q');
+  if (!L.length) return `<h2>Lernzeit</h2><div class="card small muted">Noch keine Daten – ab der ersten Bewertung wird für jede Karte gemessen, wie lange du zum Erinnern (Denkzeit) und zum Kontrollieren (Prüfzeit) brauchst.</div>`;
+  const sec = arr => arr.reduce((a, l) => a + l[4], 0) / 10;
+  const d0 = dayStart();
+  const today = sec(S.log.filter(l => l[0] >= d0)), week = sec(S.log.filter(l => l[0] >= d0 - 6 * DAY)), all = sec(S.log);
+  const timed = L.filter(l => l[6] != null);
+  const avg = (arr, i) => arr.length ? arr.reduce((a, l) => a + l[i], 0) / 10 / arr.length : null;
+  // Minuten pro Tag, letzte 14 Tage
+  const mins = []; for (let i = 13; i >= 0; i--) { const a = d0 - i * DAY; mins.push(Math.round(sec(S.log.filter(l => l[0] >= a && l[0] < a + DAY)) / 60)); }
+  // Sitzungen (Pause > 10 Min trennt)
+  const sess = []; let cur = null;
+  for (const l of S.log) { if (!cur || l[0] - cur.end > 10 * MIN) { cur = { start: l[0] - l[4] * 100, end: l[0], n: 0, act: 0 }; sess.push(cur); } cur.end = l[0]; cur.n++; cur.act += l[4] / 10; }
+  const sess30 = sess.filter(x => x.end > now() - 30 * DAY);
+  // nach Typ / Priorität
+  const grp = (keyFn, keys, lbl) => keys.map(k => {
+    const a = timed.filter(l => BY_ID[l[1]] && keyFn(BY_ID[l[1]]) === k);
+    const srs = a.filter(l => l[3] === 2);
+    return a.length ? `<tr><td>${lbl(k)}</td><td class="num">${fmtSec(avg(a, 6))}</td><td class="num">${fmtSec(avg(a, 7))}</td><td class="num">${srs.length ? Math.round(srs.filter(l => l[2] >= 2).length / srs.length * 100) + '%' : '–'}</td><td class="num">${a.length}</td></tr>` : '';
+  }).join('');
+  const kindL = { Definition: 'Definitionen', Satz: 'Sätze/Theoreme', Lemma: 'Lemmata', Proposition: 'Propositionen', Korollar: 'Korollare' };
+  // Denkzeit nach Bewertung
+  const byRate = [1, 2, 3, 4].map(g => { const a = timed.filter(l => l[2] === g && l[3] === 2); return a.length ? `<tr><td>${['', 'Nochmal', 'Schwer', 'Gut', 'Einfach'][g]}</td><td class="num">${fmtSec(avg(a, 6))}</td><td class="num">${a.length}</td></tr>` : ''; }).join('');
+  // Tageszeit
+  const slots = [['Morgen (5–11)', 5, 11], ['Mittag (11–14)', 11, 14], ['Nachmittag (14–18)', 14, 18], ['Abend (18–22)', 18, 22], ['Nacht (22–5)', 22, 29]];
+  const bySlot = slots.map(([n, a, b]) => { const r = L.filter(l => { let h = new Date(l[0]).getHours(); if (h < 5) h += 24; return h >= a && h < b && l[3] === 2; }); return r.length >= 5 ? `<tr><td>${n}</td><td class="num">${Math.round(r.filter(l => l[2] >= 2).length / r.length * 100)}%</td><td class="num">${fmtSec(avg(r.filter(l => l[6] != null), 6) || 0)}</td><td class="num">${r.length}</td></tr>` : ''; }).join('');
+  // Zeitfresser
+  const per = {}; for (const l of L) { (per[l[1]] = per[l[1]] || { t: 0, n: 0 }); per[l[1]].t += l[4] / 10; per[l[1]].n++; }
+  const hogs = Object.entries(per).filter(([id]) => BY_ID[id]).sort((a, b) => b[1].t - a[1].t).slice(0, 8);
+  return `<h2>Lernzeit</h2>
+  <div class="grid g4">
+    <div class="card kpi"><div class="l">Heute</div><div class="v">${Math.round(today / 60)}<span class="muted" style="font-size:15px"> Min</span></div></div>
+    <div class="card kpi"><div class="l">Letzte 7 Tage</div><div class="v">${Math.round(week / 60)}<span class="muted" style="font-size:15px"> Min</span></div><div class="s">Ø ${Math.round(week / 60 / 7)} Min/Tag</div></div>
+    <div class="card kpi"><div class="l">Gesamt</div><div class="v">${(all / 3600).toFixed(1)}<span class="muted" style="font-size:15px"> Std</span></div></div>
+    <div class="card kpi"><div class="l">Ø pro Karte</div><div class="v" style="font-size:20px">${fmtSec(avg(timed, 6) || 0)} + ${fmtSec(avg(timed, 7) || 0)}</div><div class="s">Denkzeit + Prüfzeit</div></div>
+  </div>
+  <div class="card" style="margin-top:12px"><h3>Minuten pro Tag (14 Tage)</h3>${barChart(mins, i => i === 13 ? 'heute' : fmtDate(d0 - (13 - i) * DAY).replace('.', ''))}
+    <div class="muted small">${sess30.length} Lernsitzungen in 30 Tagen · Ø ${sess30.length ? Math.round(sess30.reduce((a, x) => a + x.act, 0) / sess30.length / 60) : 0} Min aktiv · Ø ${sess30.length ? Math.round(sess30.reduce((a, x) => a + x.n, 0) / sess30.length) : 0} Karten pro Sitzung. Gemessen wird nur, solange die Seite offen und sichtbar ist.</div></div>
+  <div class="card" style="margin-top:12px"><h3>Zeit nach Typ</h3>
+    <table class="t"><tr><th></th><th class="num">Ø Denken</th><th class="num">Ø Prüfen</th><th class="num">gewusst</th><th class="num">n</th></tr>${grp(c => c.kind === 'Theorem' ? 'Satz' : c.kind, Object.keys(kindL), k => kindL[k])}</table>
+    <h3 style="margin-top:14px">Zeit nach Priorität</h3>
+    <table class="t"><tr><th></th><th class="num">Ø Denken</th><th class="num">Ø Prüfen</th><th class="num">gewusst</th><th class="num">n</th></tr>${grp(c => prioOf(c), [5, 4, 3, 2, 1], k => PRIO[k].name)}</table>
+    <div class="muted small">„gewusst“ = Anteil nicht „Nochmal“ bei fälligen Wiederholungen.</div></div>
+  ${byRate ? `<div class="card" style="margin-top:12px"><h3>Denkzeit je nach Ergebnis (Wiederholungen)</h3><table class="t"><tr><th></th><th class="num">Ø Denkzeit</th><th class="num">n</th></tr>${byRate}</table>
+    <div class="muted small">Wenn du bei „Gut“ deutlich länger brauchst als bei „Einfach“, ist die Karte noch nicht automatisiert – genau das soll die Wiederholung festigen.</div></div>` : ''}
+  ${bySlot ? `<div class="card" style="margin-top:12px"><h3>Tageszeit</h3><table class="t"><tr><th></th><th class="num">gewusst</th><th class="num">Ø Denken</th><th class="num">n</th></tr>${bySlot}</table>
+    <div class="muted small">Zeigt, wann du am zuverlässigsten abrufst (ab 5 Wiederholungen pro Zeitfenster).</div></div>` : ''}
+  <div class="card" style="margin-top:12px;padding:4px 12px"><h3 style="margin:12px 0 4px">Zeitfresser (meiste Lernzeit)</h3>
+    <div class="list">${hogs.map(([id, v]) => { const c = BY_ID[id]; return `<div class="li" data-card="${id}">${kindTag(c)}<div class="t"><b>${esc(c.title)}</b><div class="m">${v.n}× · Ø ${fmtSec(v.t / v.n)}</div></div><span class="pill gray">${fmtSec(v.t)}</span></div>`; }).join('')}</div></div>`;
 }
 function planText() {
   const dte = daysToExam();
@@ -842,6 +960,8 @@ function viewSettings() {
     <div class="field"><label for="sNewMode">Neue Karten pro Tag</label>
       <div class="row"><select id="sNewMode"><option value="auto" ${st.newMode === 'auto' ? 'selected' : ''}>Automatisch (aktuell ${plannedNewPerDay()})</option><option value="manual" ${st.newMode === 'manual' ? 'selected' : ''}>Manuell</option></select>
       <input type="number" id="sNew" min="0" max="80" value="${st.newPerDay}" style="width:90px" ${st.newMode === 'auto' ? 'disabled' : ''}></div></div>
+    <div class="field"><label for="sBudget">Tägliches Zeitbudget (Minuten, 0 = aus)</label><input type="number" id="sBudget" min="0" max="300" value="${st.budget || 0}">
+      <span class="muted small">Begrenzt die neuen Karten so, dass der Tag ins Budget passt – gerechnet mit deinen gemessenen Zeiten (${personalTimes().fromData ? `Wiederholung ≈ ${Math.round(personalTimes().review)} s, neue Karte inkl. Lernschritte ≈ ${Math.round(personalTimes().newCost)} s` : 'noch Standardwerte, bis genug Daten da sind'}).</span></div>
     <div class="field"><label for="sMax">Maximal Wiederholungen pro Tag</label><input type="number" id="sMax" min="20" max="1000" value="${st.maxReviews}"></div>
     <div class="field"><label><input type="checkbox" id="sRand" ${st.includeRand ? 'checked' : ''}> Randstoff (Priorität „Rand“) ebenfalls lernen</label></div>
     <div class="field"><label><input type="checkbox" id="sType" ${st.typeAnswer ? 'checked' : ''}> Notizfeld zum Aufschreiben vor dem Aufdecken anzeigen</label></div>
@@ -857,6 +977,7 @@ function viewSettings() {
       <button class="btn" data-act="exportfile">Als Datei speichern</button>
       <label class="btn">Datei importieren<input type="file" id="impFile" accept=".json,application/json" class="hide"></label>
       <button class="btn" data-act="importpaste">Text einfügen</button>
+      <button class="btn" data-act="csv">Lerndaten als CSV</button>
     </div>
   </div>
   <h2>Zurücksetzen</h2>
@@ -894,6 +1015,7 @@ function afterRender() {
   on('#sExam', 'change', e => { if (e.target.value) { S.settings.examDate = e.target.value; touchSettings(); rescheduleForExam(); } });
   on('#sNewMode', 'change', e => { S.settings.newMode = e.target.value; touchSettings(); render(); });
   on('#sNew', 'change', e => { S.settings.newPerDay = clamp(+e.target.value || 0, 0, 80); touchSettings(); });
+  on('#sBudget', 'change', e => { S.settings.budget = clamp(+e.target.value || 0, 0, 300); touchSettings(); });
   on('#sMax', 'change', e => { S.settings.maxReviews = clamp(+e.target.value || 200, 20, 1000); touchSettings(); });
   on('#sRand', 'change', e => { S.settings.includeRand = e.target.checked; touchSettings(); });
   on('#sType', 'change', e => { S.settings.typeAnswer = e.target.checked; touchSettings(); });
@@ -931,17 +1053,18 @@ document.addEventListener('click', e => {
       startSession(ids); break;
     }
     case 'home': session = null; render(); break;
-    case 'reveal': session.revealed = true; render(); break;
+    case 'reveal': reveal(); break;
     case 'undo': undo(); break;
     case 'quizstart': startQuiz('match', $('#qScope').value, +$('#qN').value); break;
     case 'teststart': startQuiz('test', $('#tScope').value, +$('#tN').value); break;
     case 'quiznext': quizNext(); break;
-    case 'qreveal': quiz.revealed = true; render(); break;
+    case 'qreveal': qReveal(); break;
     case 'quizend': quiz = null; render(); break;
     case 'learnwrong': { const ids = quiz.answers.filter(a => !a.ok).map(a => a.id); quiz = null; tab = 'heute'; startSession(ids); break; }
     case 'learnfiltered': { const ids = filteredCatalog().slice(0, 50).map(c => c.id); tab = 'heute'; startSession(ids); break; }
     case 'close': closeModal(); break;
     case 'export': exportJSON(); break;
+    case 'csv': exportCSV(); break;
     case 'gistconnect': { const v = ($('#gistTok') || {}).value || ''; if (v.trim().length < 20) { toast('Bitte gültigen Token einfügen'); break; } Gist.connect(v); break; }
     case 'gistoff': confirmBox('Abgleich auf diesem Gerät trennen? Der Fortschritt bleibt lokal und im Gist erhalten.', () => Gist.disconnect()); break;
     case 'gistsync': Gist.pull().then(() => Gist.push()); break;
@@ -969,14 +1092,14 @@ function confirmBox(msg, fn) {
 document.addEventListener('keydown', e => {
   if (e.target.matches('input,textarea,select')) return;
   if (tab === 'heute' && session && session.cur) {
-    if ((e.key === ' ' || e.key === 'Enter') && !session.revealed) { e.preventDefault(); session.revealed = true; render(); }
+    if ((e.key === ' ' || e.key === 'Enter') && !session.revealed) { e.preventDefault(); reveal(); }
     else if (session.revealed && '1234'.includes(e.key)) rate(+e.key);
     else if (e.key === 'u' || e.key === 'U') undo();
   } else if (tab === 'quiz' && quiz && quiz.i < quiz.items.length) {
     if (quiz.type === 'match') {
       if (!quiz.picked && '1234'.includes(e.key)) quizAnswer(quiz.opts[+e.key - 1]);
       else if (quiz.picked && (e.key === ' ' || e.key === 'Enter')) { e.preventDefault(); quizNext(); }
-    } else if (!quiz.revealed && (e.key === ' ' || e.key === 'Enter')) { e.preventDefault(); quiz.revealed = true; render(); }
+    } else if (!quiz.revealed && (e.key === ' ' || e.key === 'Enter')) { e.preventDefault(); qReveal(); }
     else if (quiz.revealed && '123'.includes(e.key)) quizAnswer(+e.key);
   }
   if (e.key === 'Escape') closeModal();
@@ -998,6 +1121,20 @@ function exportFile() {
     document.body.appendChild(a); a.click(); a.remove();
     toast('Datei gespeichert');
   } catch (e) { showText(exportString()); }
+}
+function logCSV() {
+  const head = 'zeitpunkt;karte;typ;nummer;titel;kapitel;prioritaet;modus;bewertung;zustand_vorher;denkzeit_s;pruefzeit_s;gesamt_s';
+  const st = ['neu', 'lernend', 'wiederholung', 'neu-lernend'], md = { l: 'lernen', t: 'test', q: 'quiz' }, rt = ['', 'nochmal', 'schwer', 'gut', 'einfach'];
+  const q = v => '"' + String(v).replace(/"/g, '""') + '"';
+  return [head, ...S.log.map(l => { const c = BY_ID[l[1]] || {}; return [new Date(l[0]).toISOString(), l[1], c.kind, c.nr, q(c.title || ''), c.chap, c.prio, md[modeOf(l)], rt[l[2]] || l[2], st[l[3]] ?? l[3], l[6] != null ? (l[6] / 10).toFixed(1) : '', l[7] != null ? (l[7] / 10).toFixed(1) : '', (l[4] / 10).toFixed(1)].join(';'); })].join('\n');
+}
+function exportCSV() {
+  const csv = logCSV();
+  try {
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `analysis1-lerndaten-${dayKey()}.csv`;
+    document.body.appendChild(a); a.click(); a.remove(); toast('CSV gespeichert');
+  } catch (e) { showText(csv); }
 }
 function importPaste() {
   modal(`<h3>Fortschritt importieren</h3><p class="small muted">Export-Text einfügen. Die Daten werden mit dem aktuellen Stand zusammengeführt (pro Karte gilt der neuere Stand).</p><textarea class="note" id="impText" style="min-height:180px"></textarea><div class="row"><div class="spacer"></div><button class="btn" data-act="close">Abbrechen</button><button class="btn primary" id="impBtn">Importieren</button></div>`);
@@ -1097,6 +1234,7 @@ const Sync = {
 };
 function setPill(s) { const p = $('#syncPill'); if (p) p.textContent = s; }
 window.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') Timer.pause(); else Timer.resume();
   if (document.visibilityState === 'hidden') { if (Sync.pending.size) Sync.flush(); if (Gist.dirty) Gist.push(); }
   else if (Gist.cfg.token && !session) Gist.pull(true);   // beim Zurückkehren neuesten Stand holen
 });
