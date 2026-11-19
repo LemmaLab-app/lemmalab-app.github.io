@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-19.15';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-19.16';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -496,6 +496,7 @@ window.addEventListener('hashchange', () => { const t = location.hash.slice(1); 
 
 function render() {
   applyTheme();
+  { const h = $('#hdrTitle'); if (h) h.textContent = ({ heute: 'Lernen', quiz: 'Quiz & Test', katalog: 'Katalog', statistik: 'Statistik', mehr: 'Einstellungen', admin: 'Admin' })[tab] || 'LemmaLab'; }
   const focusMode = (tab === 'heute' && session && session.cur) || (tab === 'quiz' && quiz && quiz.i < quiz.items.length);
   document.body.classList.toggle('focus', !!focusMode);
   renderTabs();
@@ -509,7 +510,7 @@ function render() {
   afterRender();
 }
 
-function kindTag(c) { return `<span class="tag" style="background:${KIND_COLOR[c.kind]}">${KIND_SHORT[c.kind]} ${c.nr}</span>`; }
+function kindTag(c) { return `<span class="tag" style="--k:${KIND_COLOR[c.kind]}">${KIND_SHORT[c.kind]} ${c.nr}</span>`; }
 function prioTag(c) { const p = prioOf(c); return `<span class="pill" style="background:color-mix(in srgb,${PRIO[p].color} 14%,transparent);color:${PRIO[p].color}"><span class="dot" style="background:${PRIO[p].color}"></span>${PRIO[p].name}</span>`; }
 function statusOf(c) {
   const x = S.cards[c.id];
@@ -567,7 +568,7 @@ function doneHeroHTML(ts) {
   return `<div class="donehero">
     <svg class="bigcheck" viewBox="0 0 120 120"><circle class="c" cx="60" cy="60" r="52"/><path class="k" d="M36 62l16 16 33-35"/></svg>
     <div class="dt">Für heute geschafft!</div>
-    <div class="ds">${L.length ? `${L.length} Bewertungen in ${mins} Min` : 'Heute war nichts fällig'}${st ? ` · 🔥 ${st} Tag${st === 1 ? '' : 'e'} in Folge` : ''}</div>
+    <div class="ds">${L.length ? `${L.length} Bewertungen in ${mins} Min` : 'Heute war nichts fällig'}${st ? ` · ${st} Tag${st === 1 ? '' : 'e'} in Folge` : ''}</div>
     <div class="dn">Morgen fällig: <b>${tomorrow}</b> Karte${tomorrow === 1 ? '' : 'n'}</div>
   </div>`;
 }
@@ -627,10 +628,11 @@ function viewHome() {
 }
 function ringSVG(done, total) {
   const f = total ? done / total : 1, r = 15, C = 2 * Math.PI * r;
-  return `<svg width="38" height="38" viewBox="0 0 38 38" style="flex:none" aria-label="Tagesfortschritt"><circle cx="19" cy="19" r="${r}" fill="none" stroke="var(--line)" stroke-width="5"/><circle cx="19" cy="19" r="${r}" fill="none" stroke="var(--good)" stroke-width="5" stroke-linecap="round" stroke-dasharray="${(f * C).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 19 19)"/><text x="19" y="23" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--ink)">${Math.round(f * 100)}</text></svg>`;
+  return `<svg width="38" height="38" viewBox="0 0 38 38" style="flex:none" aria-label="Tagesfortschritt"><circle cx="19" cy="19" r="${r}" fill="none" stroke="var(--line2)" stroke-width="4"/><circle cx="19" cy="19" r="${r}" fill="none" stroke="var(--accent)" stroke-width="4" stroke-linecap="round" stroke-dasharray="${(f * C).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 19 19)"/><text x="19" y="23" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--ink)">${Math.round(f * 100)}</text></svg>`;
 }
 /* Konfetti-Animation (abgeschaltet bei „Bewegung reduzieren“) */
 function celebrate() {
+  return;   // bewusst ruhig: kein Konfetti mehr (nur das Häkchen wird animiert)
   if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const cv = document.createElement('canvas');
   cv.className = 'confetti';
@@ -723,7 +725,7 @@ function viewStudy() {
     const lapsed = [...new Set(rev.filter(l => l[2] === 1).map(l => l[1]))].map(id => BY_ID[id]);
     const ts = todayStatus();
     if (ts.allDone && !s.celebrated) { s.celebrated = true; setTimeout(() => celebrate(), 60); }
-    return `<div class="card">${ts.allDone ? doneHeroHTML(ts) : `<div class="center"><div class="big" style="font-size:40px">👍</div><h3>Sitzung abgeschlossen</h3><div class="muted small">Für heute ist noch etwas offen – siehe Übersicht.</div></div>`}
+    return `<div class="card">${ts.allDone ? doneHeroHTML(ts) : `<div class="center"><h3>Sitzung abgeschlossen</h3><div class="muted small">Für heute ist noch etwas offen – siehe Übersicht.</div></div>`}
       <div class="grid g4" style="margin-top:12px">
         <div class="kpi center"><div class="v">${L.length}</div><div class="l">Bewertungen</div></div>
         <div class="kpi center"><div class="v">${fresh.length}</div><div class="l">neu gelernt</div></div>
@@ -1245,7 +1247,7 @@ function lineChart(vals, o = {}) {
   let path = '', open = false;
   pts.forEach(p => { if (!p) { open = false; return; } path += (open ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1); open = true; });
   const grid = (o.min === 0 ? [1, 0.75, 0.5, 0.25, 0] : [1, 0.75, 0.5]).map(g => `<line x1="${pad}" x2="${W}" y1="${10 + (1 - g) * (H - 30)}" y2="${10 + (1 - g) * (H - 30)}" stroke="var(--line)"/><text x="2" y="${13 + (1 - g) * (H - 30)}">${g * 100}%</text>`).join('');
-  return `<svg class="chart" viewBox="0 0 ${W} ${H}" width="100%">${grid}<path d="${path}" fill="none" stroke="var(--good)" stroke-width="2.5"/>${pts.map(p => p ? `<circle cx="${p[0]}" cy="${p[1]}" r="3" fill="var(--good)"/>` : '').join('')}<text x="${pad}" y="${H - 4}">${o.label0 || 'vor 20 T'}</text><text x="${W - 30}" y="${H - 4}">heute</text></svg>`;
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" width="100%">${grid}<path d="${path}" fill="none" stroke="var(--accent)" stroke-width="2"/>${pts.map(p => p ? `<circle cx="${p[0]}" cy="${p[1]}" r="2.5" fill="var(--accent)"/>` : '').join('')}<text x="${pad}" y="${H - 4}">${o.label0 || 'vor 20 T'}</text><text x="${W - 30}" y="${H - 4}">heute</text></svg>`;
 }
 
 /* ============================================================

@@ -13,23 +13,25 @@
 <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
 <meta name="mobile-web-app-capable" content="yes">
 <title>LemmaLab</title>
-<meta name="theme-color" content="#3f2bc4">
+<meta name="theme-color" content="#f1f2f5" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#101217" media="(prefers-color-scheme: dark)">
+<link rel="preload" href="vendor/cmu/cmu-serif-700-roman.woff2" as="font" type="font/woff2" crossorigin>
 <style>
 :root{
-  --bg:#f4f5f8; --panel:#ffffff; --ink:#1b2230; --muted:#667085; --line:#e3e6ec;
-  --accent:#1f5fbf; --accent-soft:#e7effb;
-  --again:#d64545; --hard:#d98a1c; --good:#2f9e5b; --easy:#2b7bd6;
-  --p5:#c2410c; --p4:#d97706; --p3:#2563eb; --p2:#64748b; --p1:#a3a3a3;
-  --def:#1f6feb; --satz:#7c3aed; --lem:#0f8b8d; --prop:#4f46e5; --kor:#16a34a;
-  --shadow:0 1px 2px rgba(16,24,40,.06),0 4px 14px rgba(16,24,40,.06);
-  --r:14px;
+  --bg:#f1f2f5; --panel:#ffffff; --ink:#161a23; --muted:#5b6372; --line:#dcdfe5; --line2:#eceef2;
+  --accent:#3a2bb5; --accent-ink:#2c2093; --accent-soft:#ecebfa;
+  --again:#b5403d; --hard:#b9822b; --good:#2f7a55; --easy:#4469ad;
+  --p5:#a8432a; --p4:#b9822b; --p3:#4469ad; --p2:#6b7280; --p1:#a3a7b0;
+  --def:#2d5a9b; --satz:#6a3c9c; --lem:#1d7472; --prop:#4b4f9c; --kor:#3a7a48;
+  --shadow:none;
+  --r:12px;
   --safe-b:env(safe-area-inset-bottom,0px); --safe-t:env(safe-area-inset-top,0px); --safe-l:env(safe-area-inset-left,0px); --safe-r:env(safe-area-inset-right,0px);
 }
 @media (prefers-color-scheme:dark){
-  :root:not(.light){--bg:#0f1115;--panel:#181b22;--ink:#e7e9ee;--muted:#98a2b3;--line:#2a2f3a;--accent:#6aa3ff;--accent-soft:#1c2a42;--shadow:none}
+  :root:not(.light){--bg:#101217;--panel:#171a21;--ink:#e6e8ee;--muted:#9aa3b2;--line:#2a2f3a;--line2:#21252e;--accent:#8f86f0;--accent-ink:#b3adf6;--accent-soft:#232044;--good:#5aa982;--easy:#7e9fdc;--hard:#d6a456;--again:#dc6f6b;--def:#7ea4dd;--satz:#b18ee0;--lem:#5fb7b4;--prop:#9497e0;--kor:#7cbf89;--p5:#e0806a;--p4:#d6a456;--p3:#7e9fdc}
   :root:not(.light) .scan{filter:invert(.92) hue-rotate(180deg)}
 }
-:root.dark{--bg:#0f1115;--panel:#181b22;--ink:#e7e9ee;--muted:#98a2b3;--line:#2a2f3a;--accent:#6aa3ff;--accent-soft:#1c2a42;--shadow:none}
+:root.dark{--bg:#101217;--panel:#171a21;--ink:#e6e8ee;--muted:#9aa3b2;--line:#2a2f3a;--line2:#21252e;--accent:#8f86f0;--accent-ink:#b3adf6;--accent-soft:#232044;--good:#5aa982;--easy:#7e9fdc;--hard:#d6a456;--again:#dc6f6b;--def:#7ea4dd;--satz:#b18ee0;--lem:#5fb7b4;--prop:#9497e0;--kor:#7cbf89;--p5:#e0806a;--p4:#d6a456;--p3:#7e9fdc}
 :root.dark .scan{filter:invert(.92) hue-rotate(180deg)}
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-text-size-adjust:100%}
@@ -174,7 +176,6 @@ svg.chart{display:block;max-height:210px;margin:0 auto}
 @media (min-width:768px) and (min-height:560px){
   html,body{font-size:16px}
   nav.tabs{top:0;bottom:0;right:auto;width:210px;border-top:0;border-right:1px solid var(--line);flex-direction:column;justify-content:flex-start;padding:calc(20px + var(--safe-t)) 12px calc(16px + var(--safe-b))}
-  nav.tabs::before{content:"LemmaLab";font-weight:750;font-size:18px;padding:4px 12px 18px;letter-spacing:-.01em}
   nav.tabs .in{flex-direction:column;gap:4px}
   nav.tabs button{flex:none;flex-direction:row;gap:12px;font-size:15px;padding:11px 12px;border-radius:10px;justify-content:flex-start}
   nav.tabs button.on{background:var(--accent-soft)}
@@ -302,27 +303,173 @@ canvas.confetti{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:n
 .accav{background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px}
 details.adv{margin-top:18px}
 details.adv summary{cursor:pointer;color:var(--muted);font-size:13.5px}
+
+/* =====================================================================
+ * Gestaltung 2026-11: ruhig und sachlich, angelehnt an das Skript.
+ * Sätze, Titel und Kennzahlen in Computer Modern (CMU Serif) – derselben
+ * Schrift wie die Skript-Ausschnitte –, Bedienelemente in der Systemschrift.
+ * Eine Akzentfarbe (Indigo aus dem Logo), flache Flächen mit feinen Linien.
+ * ===================================================================== */
+@font-face{font-family:"CMU Serif";font-style:normal;font-weight:400 600;font-display:swap;src:url("vendor/cmu/cmu-serif-500-roman.woff2") format("woff2")}
+@font-face{font-family:"CMU Serif";font-style:normal;font-weight:700 900;font-display:swap;src:url("vendor/cmu/cmu-serif-700-roman.woff2") format("woff2")}
+@font-face{font-family:"CMU Serif";font-style:italic;font-weight:400 900;font-display:swap;src:url("vendor/cmu/cmu-serif-500-italic.woff2") format("woff2")}
+:root{--serif:"CMU Serif","Latin Modern Roman","Computer Modern",Georgia,serif}
+
+html,body{font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-feature-settings:"tnum" 0}
+::selection{background:color-mix(in srgb,var(--accent) 22%,transparent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button:focus:not(:focus-visible){outline:none}
+a{color:var(--accent);text-underline-offset:2px}
+
+/* Kopfzeile */
+header.top{gap:12px;margin:6px 2px 16px}
+header.top .mark{width:30px;height:30px;border-radius:8px;flex:none}
+header.top h1{font-family:var(--serif);font-weight:700;font-size:21px;letter-spacing:0;line-height:1.15}
+header.top .sub{font-size:12px;color:var(--muted)}
+.pill{border-radius:6px;padding:2px 8px;font-weight:550;font-size:12px}
+.pill.gray{background:var(--line2);color:var(--muted)}
+
+/* Navigation */
+nav.tabs .brand{display:none}
+nav.tabs{background:color-mix(in srgb,var(--panel) 92%,transparent);backdrop-filter:saturate(1.4) blur(10px);-webkit-backdrop-filter:saturate(1.4) blur(10px)}
+nav.tabs button{color:var(--muted);font-weight:500}
+nav.tabs button.on{color:var(--accent);font-weight:600}
+nav.tabs button svg{stroke-width:1.6}
+
+/* Flächen */
+.card{border-radius:var(--r);border:1px solid var(--line);box-shadow:none;padding:18px}
+h2{font-family:var(--serif);font-weight:700;font-size:18.5px;letter-spacing:0;margin:28px 2px 10px;line-height:1.25}
+h3{font-size:14.5px;font-weight:650;margin:0 0 8px}
+.kpi .v{font-family:var(--serif);font-weight:700;font-size:30px;letter-spacing:0;line-height:1.1;font-variant-numeric:lining-nums}
+.kpi .l{font-size:12.5px;margin-top:2px}
+
+/* Knöpfe & Eingaben */
+.btn{border-radius:9px;padding:9px 14px;font-weight:600;border:1px solid var(--line);background:var(--panel);transition:background .15s,border-color .15s}
+.btn:hover:not(:disabled){background:var(--line2)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover:not(:disabled){background:var(--accent-ink);border-color:var(--accent-ink)}
+.btn.big{border-radius:11px;padding:14px;font-size:15.5px;letter-spacing:.005em}
+.btn.ghost{border-color:transparent;background:transparent}
+.btn.ghost:hover:not(:disabled){background:var(--line2)}
+.filters select,.filters input,.field input,.field select,.field textarea,textarea.note{border-radius:9px;border:1px solid var(--line);background:var(--panel)}
+.filters select{-webkit-appearance:none;appearance:none;padding-right:30px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5l3 3 3-3' fill='none' stroke='%235b6372' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center}
+
+/* Typ-Kennzeichen (Def. 1.14, Satz 2.22 …) */
+.tag{font-family:var(--serif);font-weight:700;font-size:12.5px;line-height:1.35;border-radius:5px;padding:1px 6px;color:var(--k,var(--ink));background:color-mix(in srgb,var(--k,var(--ink)) 9%,transparent);border:1px solid color-mix(in srgb,var(--k,var(--ink)) 24%,transparent)}
+.li{padding:11px 4px}
+.li .t b{font-weight:600}
+.li:hover{background:color-mix(in srgb,var(--line2) 60%,transparent)}
+
+/* Lernkarte: Kopf wie im Skript – «Satz 2.22» fett, darunter der Name */
+.progress{height:4px;background:var(--line2)}
+.fc{padding:22px 20px}
+.fc .kind{font-family:var(--serif);font-size:16px;font-weight:700;text-transform:none;letter-spacing:0}
+.fc .ttl{font-family:var(--serif);font-weight:500;font-size:27px;letter-spacing:0;line-height:1.2;margin:6px 0 6px}
+.fc .meta{font-size:12.5px}
+.fc .prompt{margin-top:20px;border-radius:0 8px 8px 0;background:var(--line2);border-left:3px solid var(--accent);padding:12px 14px;font-size:14.5px}
+.scanwrap{border-radius:8px;border-color:var(--line)}
+.mask{background:#dfe2e8;border-radius:3px}
+.tip{border-left:3px solid var(--hard);border-radius:0 8px 8px 0;background:color-mix(in srgb,var(--hard) 7%,transparent)}
+details.logic{border-left-width:3px;border-radius:0 8px 8px 0;background:color-mix(in srgb,var(--prop) 4%,var(--panel))}
+details.logic summary{font-weight:650}
+
+/* Bewertung: ruhige Knöpfe, Farbe nur als Kante und Schrift */
+.rate{gap:8px}
+.rate button{background:var(--panel);border:1px solid var(--line);border-radius:10px;color:var(--c);font-weight:650;box-shadow:inset 0 3px 0 var(--c);padding:12px 4px 10px;transition:background .15s}
+.rate button small{color:var(--muted);font-weight:500;opacity:1}
+.rate button:hover{background:color-mix(in srgb,var(--c) 7%,var(--panel))}
+.rate .r1{--c:var(--again);background:var(--panel)} .rate .r2{--c:var(--hard);background:var(--panel)} .rate .r3{--c:var(--good);background:var(--panel)} .rate .r4{--c:var(--easy);background:var(--panel)}
+.rate .r1:hover,.rate .r2:hover,.rate .r3:hover,.rate .r4:hover{background:color-mix(in srgb,var(--c) 7%,var(--panel))}
+.opt{border:1px solid var(--line);border-radius:10px;font-weight:550}
+.opt:hover:not(:disabled){border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
+
+/* Listen, Tabellen, Diagramme */
+table.t th{font-weight:600;color:var(--muted)}
+.bar{height:8px;background:var(--line2)}
+.legend i{border-radius:2px}
+.heat i{border-radius:2px}
+ul.todo .cb{border-radius:6px;border-width:1.5px}
+ul.todo .tb{height:4px;background:var(--line2)}
+ul.todo .tl{font-weight:600}
+
+/* Abschluss des Tages */
+.donehero .dt{font-family:var(--serif);font-weight:700;font-size:24px;letter-spacing:0}
+.bigcheck{width:84px;height:84px}
+
+/* Dialoge, Meldungen */
+.modal{background:rgba(16,18,24,.45)}
+.modal .sheet{border-radius:14px 14px 0 0}
+@media(min-width:700px){.modal .sheet{border-radius:14px}}
+.toast{background:var(--ink);color:var(--panel);border-radius:8px}
+
+/* Anmeldung */
+#login .llogo{width:72px;height:72px;border-radius:17px;box-shadow:none}
+#login h1{font-family:var(--serif);font-weight:700;font-size:34px;letter-spacing:0;margin:16px 0 6px}
+#login p{line-height:1.5}
+.gbtn{border-radius:10px;box-shadow:none;font-weight:600;font-size:15.5px}
+.gbtn:hover{background:var(--line2)}
+#login input{border-radius:10px}
+.accav{background:var(--accent)}
+
+
+.card h3{font-family:var(--serif);font-weight:700;font-size:17px;letter-spacing:0}
+.li .tag{min-width:4.9em;text-align:center;flex:none}
+select{color:var(--ink)}
+svg.chart text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+/* Tablet / Desktop */
+@media (min-width:768px) and (min-height:560px){
+  nav.tabs{background:var(--bg);backdrop-filter:none;-webkit-backdrop-filter:none;border-right:1px solid var(--line)}
+  nav.tabs .brand{display:flex;align-items:center;gap:10px;padding:2px 12px 22px}
+  nav.tabs .brand img{width:30px;height:30px;border-radius:8px}
+  nav.tabs .brand span{font-family:var(--serif);font-weight:700;font-size:20px;color:var(--ink)}
+  nav.tabs button{border-radius:8px;padding:9px 12px;font-size:14.5px;color:var(--muted)}
+  nav.tabs button:hover{background:var(--line2);color:var(--ink)}
+  nav.tabs button.on{background:var(--panel);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line)}
+  nav.tabs button.on svg{color:var(--accent)}
+  header.top{margin:4px 0 22px}
+  header.top .mark,header.top .sub{display:none}
+  header.top h1{font-size:30px}
+  .card{padding:22px}
+  h2{font-size:21px;margin-top:32px}
+  .kpi .v{font-size:36px}
+  .fc{padding:30px 34px}
+  .fc .ttl{font-size:34px}
+  .fc .kind{font-size:17px}
+  .rate button{padding:14px 4px 12px;font-size:16px}
+}
+@media (min-width:1000px){
+  .home .hero .kpi .v{font-size:46px}
+}
+@media (orientation:landscape) and (max-height:559px){
+  body.focus .fc .ttl{font-size:20px}
+  body.focus .rate button{box-shadow:inset 0 2px 0 var(--c)}
+}
+@media (max-width:767px), (max-height:559px){
+  body.focus .fc .ttl{font-size:23px}
+  body.focus .actionbar{background:color-mix(in srgb,var(--bg) 92%,transparent)}
+}
 </style>
 </head>
 <body>
 <div class="app">
   <header class="top">
+    <img class="mark" src="icons/favicon.svg" alt="">
     <div>
-      <h1>LemmaLab</h1>
-      <div class="sub" id="hdrSub">Definitionen, Sätze & Korollare lernen</div>
+      <h1 id="hdrTitle">Lernen</h1>
+      <div class="sub" id="hdrSub">LemmaLab</div>
     </div>
     <div class="grow"></div>
     <span class="pill gray sync" id="syncPill" title="Speicherort des Fortschritts">lokal</span>
   </header>
   <main id="view"></main>
 </div>
-<nav class="tabs"><div class="in" id="tabs"></div></nav>
+<nav class="tabs"><div class="brand"><img src="icons/favicon.svg" alt=""><span>LemmaLab</span></div><div class="in" id="tabs"></div></nav>
 <div class="toast" id="toast"></div>
 <script src="vendor/katex/katex.min.js"></script>
-<script src="data.js?v=2026-11-19.15"></script>
-<script src="logic.js?v=2026-11-19.15"></script>
-<script src="app.js?v=2026-11-19.15"></script>
+<script src="data.js?v=2026-11-19.16"></script>
+<script src="logic.js?v=2026-11-19.16"></script>
+<script src="app.js?v=2026-11-19.16"></script>
 <script src="vendor/supabase/supabase.js"></script>
-<script src="account.js?v=2026-11-19.15"></script>
+<script src="account.js?v=2026-11-19.16"></script>
 </body>
 </html>

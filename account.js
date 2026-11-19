@@ -214,7 +214,7 @@ function accountSettingsHTML() {
         <button class="btn" data-act="cloudsync">Jetzt abgleichen</button>
         <button class="btn" data-act="logout">Abmelden</button>
         <button class="btn" data-act="clouddelete" style="color:var(--again)">Konto-Daten löschen</button>
-      </div>${isAdmin() ? `<div class="row" style="margin-top:12px"><button class="btn primary" data-act="tab:admin">📊 Admin-Bereich öffnen</button></div>` : ''}`;
+      </div>${isAdmin() ? `<div class="row" style="margin-top:12px"><button class="btn primary" data-act="tab:admin">Admin-Bereich öffnen</button></div>` : ''}`;
   }
   return `<div class="small">Du lernst ohne Konto – der Fortschritt bleibt nur auf diesem Gerät. Melde dich an, damit er auf allen Geräten gleich ist und nicht verloren geht.</div>
     <div class="row" style="margin-top:12px"><button class="btn primary" data-act="login">Anmelden</button></div>`;

@@ -1,6 +1,6 @@
 /* Service Worker: macht die Lern-App offline nutzbar.
  * Automatisch erzeugt aus tools/sw.template.js (tools/build_sw.py) – nicht von Hand ändern. */
-const CACHE = 'lemmalab-275d42c76d';
+const CACHE = 'lemmalab-2d7aa25192';
 const FILES = [
  "./",
  "index.html",
@@ -32,6 +32,9 @@ const FILES = [
  "vendor/katex/fonts/KaTeX_Size3-Regular.woff2",
  "vendor/katex/fonts/KaTeX_Size4-Regular.woff2",
  "vendor/katex/fonts/KaTeX_Typewriter-Regular.woff2",
+ "vendor/cmu/cmu-serif-500-italic.woff2",
+ "vendor/cmu/cmu-serif-500-roman.woff2",
+ "vendor/cmu/cmu-serif-700-roman.woff2",
  "icons/apple-touch-icon.png",
  "icons/favicon-32.png",
  "icons/favicon.svg",
