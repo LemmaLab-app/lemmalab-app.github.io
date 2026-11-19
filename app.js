@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-19.22';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-19.23';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -87,8 +87,9 @@ const FSRS = (() => {
  * ============================================================ */
 const DEFAULT_SETTINGS = {
   examDate: '2027-01-25', newMode: 'auto', newPerDay: 15, maxReviews: 250,
-  includeRand: false, theme: 'auto', typeAnswer: false, budget: 0, u: 0,
+  includeRand: false, theme: 'auto', typeAnswer: false, budget: 0, u: 0, fourButtons: false,
 };
+const swipeMode = () => !S.settings.fourButtons;
 let S = load();
 
 function blankState() {
@@ -438,8 +439,9 @@ function nextCard() {
 function reveal() { if (!session || !session.cur || session.revealed || Motion.busy) return; Timer.markReveal(); session.revealed = true; Motion.set('reveal'); render(); }
 function qReveal() { if (!quiz || quiz.revealed) return; Timer.markReveal(); quiz.revealed = true; Motion.set('reveal'); render(); }
 
-function rate(g) {
+function rate(g, o = {}) {
   if (!session || !session.cur || !session.revealed || Motion.busy) return;
+  if (swipeMode() && !o.flown) return Swipe.fly(g);
   const id = session.cur, c = BY_ID[id], before = { ...cs(id) };
   const tm = Timer.result();
   const after = schedule(c, before, g);
@@ -450,7 +452,8 @@ function rate(g) {
   if (g === 1) session.again++;
   if (after.st === 1 || after.st === 3) session.later.push(id);
   save();
-  Motion.leave(g === 1 ? 'leave-again' : 'leave', nextCard);
+  if (o.flown) nextCard();
+  else Motion.leave(g === 1 ? 'leave-again' : 'leave', nextCard);
 }
 
 function undo() {
@@ -705,8 +708,8 @@ function viewHome() {
     UI.item('stack', '#ff9f0a', 'Wichtiges zuerst', 'Erst Kern, dann Wichtig, dann der Rest.'),
     UI.item('brain', '#5e5ce6', 'Kurz vor dem Vergessen', 'Jede Karte kommt genau dann wieder, wenn es nötig ist.'),
     UI.item('calendar', '#ff375f', 'Bis zur Prüfung', 'Vor dem Prüfungstag kommt alles nochmals dran.'),
-    UI.item('pencil', '#30a46c', 'Ehrlich bewerten', 'Aussage vollständig formulieren, dann aufdecken.'),
-    `<div class="ir ii hide-touch">${icon('keyboard', '#8e8e93')}<span class="ir-l"><b>Tastatur</b><small><span class="k">Leertaste</span> aufdecken · <span class="k">1</span>–<span class="k">4</span> bewerten · <span class="k">U</span> rückgängig</small></span></div>`,
+    UI.item('pencil', '#30a46c', 'Ehrlich bewerten', 'Nur nach rechts wischen, wenn alles stimmte.'),
+    `<div class="ir ii hide-touch">${icon('keyboard', '#8e8e93')}<span class="ir-l"><b>Tastatur</b><small><span class="k">Leertaste</span> aufdecken · <span class="k">←</span> <span class="k">→</span> bewerten · <span class="k">U</span> rückgängig</small></span></div>`,
   ])}
   </div></div>`;
 }
@@ -834,7 +837,8 @@ function viewStudy() {
     <span class="small muted">${left} übrig</span>
     ${s.undo.length ? '<button class="btn ghost small" data-act="undo" title="Rückgängig (U)">↶</button>' : ''}
   </div>
-  <div class="card fc">
+  <div class="card fc${s.revealed && swipeMode() ? ' swipeable' : ''}">
+    ${s.revealed && swipeMode() ? '<span class="sbadge no" aria-hidden="true">Nicht gewusst</span><span class="sbadge ok" aria-hidden="true">Gewusst</span>' : ''}
     <div class="row">
       <span class="kind" style="color:${KIND_COLOR[c.kind]}">${esc(c.kind)} ${c.nr}</span>
       ${isNew ? '<span class="pill" style="background:color-mix(in srgb,var(--good) 15%,transparent);color:var(--good)">neu</span>' : ''}
@@ -853,16 +857,75 @@ function viewStudy() {
       ${logicHTML(c)}
       ${c.tip ? `<div class="tip"><b>Worauf achten:</b> ${esc(c.tip)}</div>` : ''}
       ${historyLine(c)}
-      <div class="actionbar"><div class="rate">
+      ${swipeMode() ? '' : `<div class="actionbar"><div class="rate">
         <button class="r1" data-rate="1">Nochmal<small>${ivls[0]}</small></button>
         <button class="r2" data-rate="2">Schwer<small>${ivls[1]}</small></button>
         <button class="r3" data-rate="3">Gut<small>${ivls[2]}</small></button>
         <button class="r4" data-rate="4">Einfach<small>${ivls[3]}</small></button>
       </div></div>
-      <div class="kbd center ratehelp" style="margin-top:8px">Nochmal = wesentlicher Teil fehlte · Schwer = mit Mühe/kleine Lücke · Gut = vollständig · Einfach = sofort und sicher</div>
+      <div class="kbd center ratehelp" style="margin-top:8px">Nochmal = wesentlicher Teil fehlte · Schwer = mit Mühe/kleine Lücke · Gut = vollständig · Einfach = sofort und sicher</div>`}
     `}
-  </div>`;
+  </div>
+  ${s.revealed && swipeMode() ? `<div class="actionbar swipeact">
+    ${S.log.filter(l => modeOf(l) === 'l').length < 20 ? '<div class="swipehint">Nach rechts wischen, wenn du es vollständig wusstest, sonst nach links.</div>' : ''}
+    <div class="swipebar">
+      <button class="sb no" data-rate="1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg><span>Nicht gewusst<small>${ivls[0]}</small></span></button>
+      <button class="sb ok" data-rate="3"><span>Gewusst<small>${ivls[2]}</small></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+    </div></div>` : ''}`;
 }
+
+/* ---------- Wischen: rechts = gewusst, links = nicht gewusst ---------- */
+const Swipe = {
+  attach() {
+    const fc = $('.fc.swipeable'); if (!fc || fc._sw) return; fc._sw = true;
+    let st = null;
+    const W = () => fc.offsetWidth || innerWidth;
+    const setP = dx => { const p = clamp(dx / (W() * .32), -1, 1); fc.style.setProperty('--pos', Math.max(0, p)); fc.style.setProperty('--neg', Math.max(0, -p)); };
+    fc.addEventListener('pointerdown', e => {
+      if (e.button || Motion.busy || e.target.closest('button,a,summary,input,textarea,.lf')) return;
+      st = { x: e.clientX, y: e.clientY, t: performance.now(), drag: false, id: e.pointerId };
+    });
+    fc.addEventListener('pointermove', e => {
+      if (!st || e.pointerId !== st.id) return;
+      const dx = e.clientX - st.x, dy = e.clientY - st.y;
+      if (!st.drag) {
+        if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.2) { st.drag = true; try { fc.setPointerCapture(e.pointerId); } catch (_) { } fc.classList.add('dragging'); }
+        else if (Math.abs(dy) > 12) { st = null; return; }
+        else return;
+      }
+      e.preventDefault();
+      st.dx = dx; st.dy = dy;
+      fc.style.transform = `translate(${dx}px,${dy * .12}px) rotate(${dx * .035}deg)`;
+      setP(dx);
+    });
+    const end = e => {
+      if (!st) return;
+      const o = st; st = null;
+      if (!o.drag) return;
+      fc.classList.remove('dragging');
+      fc._noclick = true; setTimeout(() => { fc._noclick = false; }, 60);
+      const v = (o.dx || 0) / Math.max(1, performance.now() - o.t);
+      if (Math.abs(o.dx || 0) > W() * .3 || (Math.abs(v) > .55 && Math.abs(o.dx) > 40)) this.fly(o.dx > 0 ? 3 : 1, o.dy || 0);
+      else { fc.style.transform = ''; setP(0); }
+    };
+    fc.addEventListener('pointerup', end);
+    fc.addEventListener('pointercancel', end);
+    fc.addEventListener('click', e => { if (fc._noclick) { e.stopPropagation(); e.preventDefault(); } }, true);
+  },
+  /* Karte hinausfliegen lassen, dann bewerten */
+  fly(g, dy = 0) {
+    if (Motion.busy) return;
+    const fc = $('.fc');
+    if (!fc || Motion.reduced()) return rate(g, { flown: true });
+    Motion.busy = true;
+    const dir = g === 1 ? -1 : 1;
+    fc.classList.add('fly');
+    fc.style.setProperty('--pos', dir > 0 ? 1 : 0); fc.style.setProperty('--neg', dir < 0 ? 1 : 0);
+    fc.style.transform = `translate(${dir * (innerWidth + 120)}px,${dy * .12 + 30}px) rotate(${dir * 16}deg)`;
+    const b = document.querySelector(`.swipebar .sb.${dir > 0 ? 'ok' : 'no'}`); if (b) b.classList.add('hit');
+    setTimeout(() => { Motion.busy = false; rate(g, { flown: true }); }, 240);
+  },
+};
 
 /* ============================================================
  * Quiz (Zuordnen) & Prüfungstest
@@ -1389,7 +1452,8 @@ function viewSettings() {
   ${UI.group([
     UI.toggle('sCalib', st.calib !== false, 'An mein Gedächtnis anpassen', `Persönlicher Faktor ${Calib.k().toFixed(2)}`),
     UI.toggle('sRand', !!st.includeRand, 'Randstoff ebenfalls lernen'),
-  ], { header: 'Algorithmus' })}
+    UI.toggle('sFour', !!st.fourButtons, 'Vier Bewertungsstufen', 'Nochmal · Schwer · Gut · Einfach statt Wischen'),
+  ], { header: 'Algorithmus', footer: 'Standard ist Wischen: rechts gewusst, links nicht gewusst. Der Algorithmus erkennt den Lernstand aus der Abfolge und den Abständen.' })}
 
   ${UI.group([
     UI.toggle('sLogic', st.showLogic !== false, 'Prädikatenlogik anzeigen'),
@@ -1443,6 +1507,7 @@ function applyTheme() {
  * Events
  * ============================================================ */
 function afterRender() {
+  if (tab === 'heute' && session && session.revealed && swipeMode()) Swipe.attach();
   if (tab === 'heute' && !session) {
     const idle = window.requestIdleCallback || (f => setTimeout(f, 300));
     idle(() => { try { Pre.ids(buildQueue().queue.slice(0, 6)); } catch (e) { } });
@@ -1458,6 +1523,7 @@ function afterRender() {
   on('#sRand', 'change', e => { S.settings.includeRand = e.target.checked; touchSettings(); });
   on('#sCalib', 'change', e => { S.settings.calib = e.target.checked; Calib._len = -1; touchSettings(); });
   on('#sLogic', 'change', e => { S.settings.showLogic = e.target.checked; touchSettings(); });
+  on('#sFour', 'change', e => { S.settings.fourButtons = e.target.checked; touchSettings(); });
   on('#sType', 'change', e => { S.settings.typeAnswer = e.target.checked; touchSettings(); });
   on('#sTheme', 'change', e => { S.settings.theme = e.target.value; touchSettings(); render(); });
   on('#impFile', 'change', e => { const f = e.target.files[0]; if (f) f.text().then(importJSON); });
@@ -1540,6 +1606,8 @@ document.addEventListener('keydown', e => {
   if (e.target.matches('input,textarea,select')) return;
   if (tab === 'heute' && session && session.cur) {
     if ((e.key === ' ' || e.key === 'Enter') && !session.revealed) { e.preventDefault(); reveal(); }
+    else if (session.revealed && swipeMode() && (e.key === 'ArrowRight' || '234'.includes(e.key))) { e.preventDefault(); rate(3); }
+    else if (session.revealed && swipeMode() && (e.key === 'ArrowLeft' || e.key === '1')) { e.preventDefault(); rate(1); }
     else if (session.revealed && '1234'.includes(e.key)) rate(+e.key);
     else if (e.key === 'u' || e.key === 'U') undo();
   } else if (tab === 'quiz' && quiz && quiz.i < quiz.items.length) {
