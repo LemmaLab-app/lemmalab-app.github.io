@@ -1,7 +1,7 @@
 /* LemmaLab – Fächer
  * Jedes Fach hat eigene Karten, eigenen Lernstand (eigener localStorage-Schlüssel),
  * eigenes Prüfungsdatum und eigene Statistik. Gewechselt wird per Neuladen,
- * damit sich die beiden Fächer nie vermischen.
+ * damit sich die Fächer nie vermischen.
  * Diese Datei muss vor app.js geladen werden: sie lädt die Kartendaten des aktiven Fachs.
  */
 'use strict';
@@ -17,6 +17,12 @@ window.FAECHER = {
     ls: 'lemmalab-phy1-v1',
     scripts: ['physik.js'],
     gist: 'lemmalab-physik1.json', syncPrefix: 'phy1-', examDate: '2027-02-01', accent: 'phy',
+  },
+  inf1: {
+    name: 'Informatik', short: 'Informatik', sub: 'C++: Konzepte & Code-Tracing',
+    ls: 'lemmalab-inf1-v1',
+    scripts: ['informatik.js'],
+    gist: 'lemmalab-informatik.json', syncPrefix: 'inf1-', examDate: '2027-02-08', accent: 'inf',
   },
 };
 window.FACH_KEY = 'lemmalab-fach';

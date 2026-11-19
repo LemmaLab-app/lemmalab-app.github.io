@@ -36,6 +36,19 @@
 :root[data-fach=phy]{--accent:#b4531f;--accent-ink:#8f3f14;--accent-soft:#f8ebe2}
 @media (prefers-color-scheme:dark){:root[data-fach=phy]:not(.light){--accent:#e8925e;--accent-ink:#f2b48d;--accent-soft:#3a271c}}
 :root.dark[data-fach=phy]{--accent:#e8925e;--accent-ink:#f2b48d;--accent-soft:#3a271c}
+/* Fach Informatik */
+:root[data-fach=inf]{--accent:#1f7a5a;--accent-ink:#165c43;--accent-soft:#e2f2ea}
+@media (prefers-color-scheme:dark){:root[data-fach=inf]:not(.light){--accent:#5cc49a;--accent-ink:#8fd9b9;--accent-soft:#1a3329}}
+:root.dark[data-fach=inf]{--accent:#5cc49a;--accent-ink:#8fd9b9;--accent-soft:#1a3329}
+/* Code (Informatik): Block mit Syntax-Hervorhebung, Inline-Code */
+pre.cpp{margin:10px 0;padding:11px 13px;border:1px solid var(--line);border-radius:10px;background:var(--panel);overflow-x:auto;text-align:left;
+  font:13.5px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre;-webkit-text-size-adjust:100%}
+.qcode pre.cpp{margin-top:14px;font-size:14.5px}
+.rich pre.cpp{background:var(--bg)}
+pre.cpp .hk{color:var(--satz);font-weight:600}pre.cpp .ht{color:var(--def)}pre.cpp .hs{color:var(--kor)}pre.cpp .hn{color:var(--p4)}
+pre.cpp .hc{color:var(--muted);font-style:italic}pre.cpp .hp{color:var(--lem)}
+.rich code{font:.92em ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--line2);padding:1px 5px;border-radius:5px;white-space:pre-wrap}
+@media (max-width:480px){pre.cpp{font-size:12.5px;padding:9px 10px}.qcode pre.cpp{font-size:13px}}
 /* Textkarten (Physik): Formeln mit KaTeX statt Skript-Ausschnitt */
 .rich{margin-top:14px;border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--panel);font-size:15.5px;line-height:1.5}
 .rich p{margin:6px 0}.rich ol,.rich ul{margin:6px 0;padding-left:20px}.rich li{margin:3px 0}
@@ -1088,9 +1101,9 @@ details.adv2+.ig,details.adv2+details{margin-top:30px}
 <div id="navbar" aria-hidden="true"><span id="navTitle"></span></div>
 <div class="toast" id="toast"></div>
 <script src="vendor/katex/katex.min.js"></script>
-<script src="fach.js?v=2026-11-19.39"></script>
-<script src="app.js?v=2026-11-19.39"></script>
+<script src="fach.js?v=2026-11-19.40"></script>
+<script src="app.js?v=2026-11-19.40"></script>
 <script src="vendor/supabase/supabase.js"></script>
-<script src="account.js?v=2026-11-19.39"></script>
+<script src="account.js?v=2026-11-19.40"></script>
 </body>
 </html>
