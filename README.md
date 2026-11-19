@@ -20,6 +20,8 @@ Die Aussagen sind exakt aus dem Skript ausgeschnitten (keine Abtippfehler).
 - **Lernzeit-Messung:** pro Bewertung Denkzeit (bis Aufdecken) und Prüfzeit (bis Bewertung), nur bei sichtbarer Seite.
   Auswertung nach Typ, Priorität, Ergebnis und Tageszeit, Zeitfresser, Sitzungen; optionales Tages-Zeitbudget;
   Export aller Lerndaten als CSV (`zeitpunkt;karte;…;denkzeit_s;pruefzeit_s;gesamt_s`).
+- **Prädikatenlogik:** zu 198 Einträgen eine Formulierung mit Quantoren (∀, ∃, ⇒ …), nach dem Aufdecken unter dem Skript-Ausschnitt
+  (Quelle: `tools/logic.py`, gerendert mit KaTeX aus `vendor/katex`). Bei den übrigen steht die formale Version schon im Skript.
 - **Statistik:** Prüfungsbereitschaft, Fortschritt nach Priorität/Kapitel/Typ, Prognose, Aktivität, Problemkarten, Plan bis zur Prüfung.
 
 ## Benutzen

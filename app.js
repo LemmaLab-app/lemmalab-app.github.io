@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-19.4';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-19.5';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -581,6 +581,20 @@ function scanHTML(c, masked) {
   const m = masked && c.mask ? `<div class="mask" style="left:${c.mask[0] / c.w * 100}%;top:${c.mask[1] / c.h * 100}%;width:${(c.mask[2] - c.mask[0]) / c.w * 100}%;height:${(c.mask[3] - c.mask[1]) / c.h * 100}%"></div>` : '';
   return `<div class="scanwrap" ${masked ? '' : `data-zoom="${c.id}" title="Antippen zum Vergrössern"`}><img class="scan" src="img/${c.img}" width="${c.w}" height="${c.h}" alt="${esc(c.kind + ' ' + c.nr)}" loading="lazy">${m}${masked ? '' : '<span class="zoomchip">⤢ Vergrössern</span>'}</div>`;
 }
+/* Prädikatenlogische Formulierung (KaTeX), falls vorhanden */
+const _texCache = {};
+function tex(t) {
+  if (_texCache[t]) return _texCache[t];
+  try { return (_texCache[t] = window.katex.renderToString('\\displaystyle ' + t, { displayMode: false, throwOnError: false, strict: false })); }   // Inline-Modus: KaTeX bricht lange Formeln an Relationen (⇒, =, ≤ …) um
+  catch (e) { return `<code>${esc(t)}</code>`; }
+}
+function logicHTML(c) {
+  const rows = (window.LOGIC || {})[c.id];
+  if (!rows) return '';
+  if (S.settings.showLogic === false) return '';
+  return `<details class="logic" ${S.settings.logicOpen === false ? '' : 'open'}><summary>Prädikatenlogisch</summary>${rows.map(([lab, t]) =>
+    `<div class="lrow">${lab ? `<div class="llab">${esc(lab)}</div>` : ''}<div class="lf">${window.katex ? tex(t) : `<code>${esc(t)}</code>`}</div></div>`).join('')}</details>`;
+}
 function historyLine(c) {
   const x = S.cards[c.id];
   if (!x || !x.st) return '';
@@ -638,6 +652,7 @@ function viewStudy() {
       <div class="actionbar"><button class="btn primary big" data-act="reveal">Aufdecken <span class="kbd hide-touch" style="color:#fff;opacity:.8">␣</span></button></div>
     ` : `
       ${scanHTML(c, false)}
+      ${logicHTML(c)}
       ${c.tip ? `<div class="tip"><b>Worauf achten:</b> ${esc(c.tip)}</div>` : ''}
       ${historyLine(c)}
       <div class="actionbar"><div class="rate">
@@ -752,7 +767,7 @@ function viewQuiz() {
       <div class="meta">Kap. ${c.chap} · ${esc(c.sec)}</div>
       ${!quiz.revealed ? `<div class="prompt">Prüfungssituation: Schreibe die ${c.kind === 'Definition' ? 'Definition' : 'Aussage'} so auf, wie du sie in der Prüfung hinschreiben würdest. Erst dann aufdecken.</div>
         <div class="spacer"></div><div class="actionbar"><button class="btn primary big" data-act="qreveal">Aufdecken</button></div>`
-      : `${scanHTML(c, false)}
+      : `${scanHTML(c, false)}${logicHTML(c)}
         <div class="actionbar"><div class="rate three">
           <button class="r1" data-trate="1">Nicht gewusst</button>
           <button class="r2" data-trate="2">Lückenhaft</button>
@@ -873,6 +888,7 @@ function openCard(id) {
     <h3 style="font-size:19px;margin:10px 0 2px">${esc(c.title)}</h3>
     <div class="muted small">Kap. ${c.chap} ${esc(c.chapTitle)} · ${esc(c.sec)} · Skript S. ${c.page}${!c.titled ? ' · Titel ergänzt (im Skript ohne Namen)' : ''}</div>
     ${scanHTML(c, false)}
+    ${logicHTML(c)}
     ${c.tip ? `<div class="tip"><b>Worauf achten:</b> ${esc(c.tip)}</div>` : ''}
     <table class="t" style="margin-top:12px">${rows.map(r => `<tr><td class="muted">${r[0]}</td><td class="num">${r[1]}</td></tr>`).join('')}</table>
     <div class="row" style="margin-top:14px">
@@ -1135,6 +1151,7 @@ function viewSettings() {
     <div class="field"><label for="sMax">Maximal Wiederholungen pro Tag</label><input type="number" id="sMax" min="20" max="1000" value="${st.maxReviews}"></div>
     <div class="field"><label><input type="checkbox" id="sRand" ${st.includeRand ? 'checked' : ''}> Randstoff (Priorität „Rand“) ebenfalls lernen</label></div>
     <div class="field"><label><input type="checkbox" id="sCalib" ${st.calib !== false ? 'checked' : ''}> Abstände an mein Gedächtnis anpassen (persönliche Kalibrierung, aktuell Faktor ${Calib.k().toFixed(2)})</label></div>
+    <div class="field"><label><input type="checkbox" id="sLogic" ${st.showLogic !== false ? 'checked' : ''}> Prädikatenlogische Formulierung nach dem Aufdecken anzeigen</label></div>
     <div class="field"><label><input type="checkbox" id="sType" ${st.typeAnswer ? 'checked' : ''}> Notizfeld zum Aufschreiben vor dem Aufdecken anzeigen</label></div>
     <div class="field"><label for="sTheme">Darstellung</label><select id="sTheme"><option value="auto" ${st.theme === 'auto' ? 'selected' : ''}>Wie System</option><option value="light" ${st.theme === 'light' ? 'selected' : ''}>Hell</option><option value="dark" ${st.theme === 'dark' ? 'selected' : ''}>Dunkel</option></select></div>
   </div>
@@ -1191,6 +1208,7 @@ function afterRender() {
   on('#sMax', 'change', e => { S.settings.maxReviews = clamp(+e.target.value || 200, 20, 1000); touchSettings(); });
   on('#sRand', 'change', e => { S.settings.includeRand = e.target.checked; touchSettings(); });
   on('#sCalib', 'change', e => { S.settings.calib = e.target.checked; Calib._len = -1; touchSettings(); });
+  on('#sLogic', 'change', e => { S.settings.showLogic = e.target.checked; touchSettings(); });
   on('#sType', 'change', e => { S.settings.typeAnswer = e.target.checked; touchSettings(); });
   on('#sTheme', 'change', e => { S.settings.theme = e.target.value; touchSettings(); render(); });
   on('#impFile', 'change', e => { const f = e.target.files[0]; if (f) f.text().then(importJSON); });
@@ -1249,6 +1267,9 @@ document.addEventListener('click', e => {
     case 'resetall': confirmBox('Wirklich den gesamten Fortschritt löschen? Das kann nicht rückgängig gemacht werden.', () => { const st = S.settings; S = blankState(); S.settings = st; S.settings.u = now(); S.settings.resetAt = now(); Sync.wroteOnce = false; save(); render(); toast('Zurückgesetzt'); }); break;
   }
 });
+document.addEventListener('toggle', e => {
+  if (e.target.matches && e.target.matches('details.logic')) { const o = e.target.open; if ((S.settings.logicOpen !== false) !== o) { S.settings.logicOpen = o; S.settings.u = now(); save(['settings']); } }
+}, true);
 document.addEventListener('change', e => {
   const ca = e.target.closest('[data-cardact="prio"]');
   if (ca) { const x = cs(ca.dataset.id); const p = +ca.value; x.prio = p === BY_ID[ca.dataset.id].prio ? undefined : p; x.u = now(); save(['cards']); openCard(ca.dataset.id); render(); }
