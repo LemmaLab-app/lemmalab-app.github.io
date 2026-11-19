@@ -28,6 +28,8 @@ Die Aussagen sind exakt aus dem Skript ausgeschnitten (keine Abtippfehler).
 - **GitHub Pages:** https://teddy8002.github.io/Analysis-1-Definitionen-und-S-tze-lernen/ – unter *Einstellungen → Geräte abgleichen*
   einmal pro Gerät einen GitHub-Token (nur Recht `gist`) eintragen; der Fortschritt wird dann in einem privaten Gist gespeichert
   und ist auf iPhone und Mac derselbe.
+- **Offline:** Ein Service Worker (`sw.js`) speichert beim ersten Öffnen alle Dateien (inkl. Bilder) auf dem Gerät.
+  Nach Änderungen an Dateien `python3 tools/build_sw.py` ausführen, damit Geräte die neue Version holen.
 - **Lokal:** `index.html` im Browser öffnen (funktioniert offline). Fortschritt liegt im `localStorage` des Browsers;
   Export/Import unter *Einstellungen*.
 - **Als claude.ai-Artifact:** Fortschritt wird zusätzlich im claude.ai-Konto gespeichert und ist auf iPhone und Mac derselbe.

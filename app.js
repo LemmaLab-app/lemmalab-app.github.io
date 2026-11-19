@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-19.5';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-19.6';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -1566,5 +1566,9 @@ render();
 Sync.init();
 Gist.init();
 checkUpdate();
+// Offline-Modus: Service Worker speichert alle Dateien (inkl. Bilder) auf dem Gerät
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  navigator.serviceWorker.register('sw.js').catch(e => console.warn('Service Worker', e));
+}
 // Neuer Tag während die Seite offen ist → Übersicht aktualisieren
 setInterval(() => { if (tab === 'heute' && !session) render(); }, 5 * 60e3);
