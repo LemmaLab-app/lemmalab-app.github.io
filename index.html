@@ -842,6 +842,46 @@ nav.tabs button.on svg{color:var(--accent)}
   nav.tabs button:hover:not(.on){background:rgba(255,255,255,.35)}
   :root.dark nav.tabs button:hover:not(.on){background:rgba(255,255,255,.06)}
 }
+
+/* ---------- Liquid Glass, Version 3: klarer, ruhiger, näher an iOS 26 ----------
+ * Kein Glanz-Verlauf mehr (wirkte billig). Glas = starke Unschärfe + Sättigung,
+ * hauchdünne helle Innenkante, feine dunkle Aussenkante, weicher Schatten. */
+:root{
+  --glass-bg:rgba(250,250,252,.62);
+  --glass-strong:rgba(250,250,252,.8);
+  --glass-blur:blur(26px) saturate(1.9);
+  --glass-ring:inset 0 0 0 .5px rgba(255,255,255,.75),0 0 0 .5px rgba(0,0,0,.07);
+  --glass-shadow:0 6px 24px rgba(0,0,0,.08),0 1px 3px rgba(0,0,0,.05);
+}
+:root.dark{--glass-bg:rgba(30,30,32,.58);--glass-strong:rgba(36,36,40,.82);--glass-ring:inset 0 0 0 .5px rgba(255,255,255,.14),0 0 0 .5px rgba(0,0,0,.6);--glass-shadow:0 8px 28px rgba(0,0,0,.45)}
+@media (prefers-color-scheme:dark){:root:not(.light){--glass-bg:rgba(30,30,32,.58);--glass-strong:rgba(36,36,40,.82);--glass-ring:inset 0 0 0 .5px rgba(255,255,255,.14),0 0 0 .5px rgba(0,0,0,.6);--glass-shadow:0 8px 28px rgba(0,0,0,.45)}}
+
+nav.tabs,#navbar,.toast,.modal .sheet,.study-head .btn.ghost,header.top .pill{
+  background:var(--glass-bg)!important;backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);
+  box-shadow:var(--glass-ring),var(--glass-shadow)!important}
+nav.tabs::after,.modal .sheet::after,body.focus .actionbar::after{display:none!important}
+.modal .sheet{background:var(--glass-strong)!important}
+
+@media (max-width:767px),(max-height:559px){
+  /* Tab-Leiste: kompakt, schwebend knapp über dem Home-Balken */
+  nav.tabs{left:max(16px,var(--safe-l));right:max(16px,var(--safe-r));bottom:calc(max(var(--safe-b),12px) + 4px);padding:4px!important;border-radius:999px}
+  nav.tabs button{padding:6px 0 5px;gap:1px;font-size:10px;font-weight:500;letter-spacing:-.01em;color:var(--ink)}
+  nav.tabs button svg{width:23px;height:23px;stroke-width:1.6}
+  nav.tabs button.on,nav.tabs button.on svg{color:var(--accent)!important;font-weight:600}
+  #tabs .lens{background:color-mix(in srgb,var(--ink) 7%,transparent)!important;box-shadow:none!important}
+  #tabs .lens.moving{background:color-mix(in srgb,var(--ink) 11%,transparent)!important;scale:1.06 1.1}
+  .app{padding-bottom:calc(max(var(--safe-b),12px) + 84px)}
+  .toast{bottom:calc(max(var(--safe-b),12px) + 76px)}
+  #navbar{background:var(--glass-bg)!important;height:38px;top:calc(var(--safe-t) + 4px);left:56px;right:56px}
+  #navbar span{font-size:15px;font-weight:600}
+  body.focus .actionbar{box-shadow:var(--glass-ring),var(--glass-shadow)!important;background:var(--glass-bg)!important;bottom:calc(max(var(--safe-b),12px) + 4px)}
+}
+/* Mac: Linse dezent wie die Auswahl in der macOS-Seitenleiste */
+@media (min-width:768px) and (min-height:560px){
+  #tabs .lens{background:color-mix(in srgb,var(--ink) 8%,transparent)!important;box-shadow:none!important}
+  #tabs .lens.moving{background:color-mix(in srgb,var(--ink) 12%,transparent)!important}
+  nav.tabs button:hover:not(.on){background:color-mix(in srgb,var(--ink) 4%,transparent)!important}
+}
 </style>
 </head>
 <body>
@@ -861,10 +901,10 @@ nav.tabs button.on svg{color:var(--accent)}
 <div id="navbar" aria-hidden="true"><span id="navTitle"></span></div>
 <div class="toast" id="toast"></div>
 <script src="vendor/katex/katex.min.js"></script>
-<script src="data.js?v=2026-11-19.27"></script>
-<script src="logic.js?v=2026-11-19.27"></script>
-<script src="app.js?v=2026-11-19.27"></script>
+<script src="data.js?v=2026-11-19.28"></script>
+<script src="logic.js?v=2026-11-19.28"></script>
+<script src="app.js?v=2026-11-19.28"></script>
 <script src="vendor/supabase/supabase.js"></script>
-<script src="account.js?v=2026-11-19.27"></script>
+<script src="account.js?v=2026-11-19.28"></script>
 </body>
 </html>
