@@ -1,6 +1,6 @@
 /* Service Worker: macht die Lern-App offline nutzbar.
  * Automatisch erzeugt aus tools/sw.template.js (tools/build_sw.py) – nicht von Hand ändern. */
-const CACHE = 'ana1-8c0031aec4';
+const CACHE = 'ana1-87f7e6c741';
 const FILES = [
  "./",
  "index.html",
