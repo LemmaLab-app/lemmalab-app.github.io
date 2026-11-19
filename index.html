@@ -482,6 +482,106 @@ ul.todo .tl{font-weight:600}
   .kpi .v{font-size:30px}
 }
 @media (prefers-reduced-motion:reduce){.btn,.rate button{transition:none}.btn:active,.rate button:active{transform:none}}
+
+/* =====================================================================
+ * Bewegung – Kurven wie in iOS (schnell an, sanft aus; Federn mit leichtem
+ * Überschwingen nur bei Dingen, die «ankommen»).
+ * ===================================================================== */
+:root{
+  --ease:cubic-bezier(.22,1,.36,1);
+  --ease-sheet:cubic-bezier(.32,.72,0,1);
+  --spring:cubic-bezier(.34,1.45,.64,1);
+}
+@supports (transition-timing-function:linear(0,1)){
+  :root{--spring:linear(0,.006,.025 2.8%,.101 6.1%,.539 18.9%,.721 25.3%,.849 31.5%,.937 38.1%,.968 41.8%,.991 45.7%,1.006 50.1%,1.015 55%,1.017 63.9%,1.001 85.9%,1)}
+}
+
+/* Seitenwechsel: weiches Einblenden */
+#view.a-tab{animation:vIn .38s var(--ease) both}
+@keyframes vIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+body.focus #view.a-tab{animation-name:vFade}
+@keyframes vFade{from{opacity:0}}
+/* Ringe, Balken: füllen sich */
+#view.a-tab .ringp{animation:ringIn 1s var(--ease) .08s both}
+@keyframes ringIn{from{stroke-dasharray:0 999}}
+#view.a-tab .bar,#view.a-tab ul.todo .tb i,#view.a-tab .progress>div{animation:barIn .9s var(--ease) .1s both}
+@keyframes barIn{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
+#view.a-tab svg.chart rect{animation:colIn .7s var(--ease) both;transform-box:fill-box;transform-origin:bottom}
+@keyframes colIn{from{transform:scaleY(0)}}
+
+/* Lernkarte: nächste Karte gleitet von rechts herein, alte nach links hinaus */
+#view.a-next .fc>:not(.actionbar),#view.a-next .study-head .progress{animation:cardIn .36s var(--ease) both}
+#view.a-next .fc{animation:cardFade .3s ease both}
+@keyframes cardIn{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:none}}
+@keyframes cardFade{from{opacity:.4}to{opacity:1}}
+#view.a-back .fc>:not(.actionbar){animation:cardBack .36s var(--ease) both}
+@keyframes cardBack{from{opacity:0;transform:translateX(-28px)}to{opacity:1;transform:none}}
+.fc.leave>:not(.actionbar){animation:cardOut .17s ease-in forwards}
+.fc.leave-again>:not(.actionbar){animation:cardOutDown .17s ease-in forwards}
+.fc.leave .actionbar button,.fc.leave-again .actionbar button{pointer-events:none}
+@keyframes cardOut{to{opacity:0;transform:translateX(-36px)}}
+@keyframes cardOutDown{to{opacity:0;transform:translateY(14px) scale(.98)}}
+
+/* Aufdecken: Aussage klappt auf, Bewertungsknöpfe federn hoch */
+#view.a-reveal .scanwrap{animation:unfold .42s var(--ease) both}
+@keyframes unfold{from{opacity:0;clip-path:inset(0 0 100% 0);transform:translateY(-4px)}to{opacity:1;clip-path:inset(0 0 0 0);transform:none}}
+#view.a-reveal details.logic,#view.a-reveal .tip,#view.a-reveal .hist{animation:vIn .4s var(--ease) .12s both}
+#view.a-reveal .rate button{animation:rise .5s var(--spring) both}
+#view.a-reveal .rate button:nth-child(2){animation-delay:.03s}
+#view.a-reveal .rate button:nth-child(3){animation-delay:.06s}
+#view.a-reveal .rate button:nth-child(4){animation-delay:.09s}
+#view.a-reveal .opts .opt{animation:vIn .35s var(--ease) both}
+@keyframes rise{from{opacity:0;transform:translateY(14px) scale(.96)}to{opacity:1;transform:none}}
+
+/* Druck-Rückmeldung */
+.li{transition:background .2s}
+.li:active{background:var(--line2)}
+.opt{transition:background .2s,transform .12s}
+.opt:active:not(:disabled){transform:scale(.985)}
+.gbtn{transition:background .2s,transform .12s}
+.gbtn:active{transform:scale(.98)}
+
+/* Tab-Symbol hüpft kurz beim Wechsel (wie SF Symbols) */
+#tabs button.bounce svg{animation:symBounce .5s var(--spring)}
+@keyframes symBounce{0%{transform:scale(1)}30%{transform:scale(.82)}100%{transform:scale(1)}}
+
+/* Blätter (Dialoge) gleiten von unten herein */
+.modal{animation:fadeIn .25s ease both}
+.modal .sheet{animation:sheetUp .5s var(--ease-sheet) both}
+.modal.closing{animation:fadeOut .26s ease forwards;pointer-events:none}
+.modal.closing .sheet{animation:sheetDown .26s ease-in forwards}
+@media(min-width:700px){
+  .modal .sheet{animation:sheetPop .36s var(--spring) both}
+  .modal.closing .sheet{animation:sheetFade .2s ease-in forwards}
+}
+@keyframes fadeIn{from{opacity:0}}
+@keyframes fadeOut{to{opacity:0}}
+@keyframes sheetUp{from{transform:translateY(100%)}}
+@keyframes sheetDown{to{transform:translateY(100%)}}
+@keyframes sheetPop{from{opacity:0;transform:scale(.94)}}
+@keyframes sheetFade{to{opacity:0;transform:scale(.97)}}
+
+/* Meldung federt herein */
+.toast{transform:translateX(-50%) translateY(18px) scale(.95);transition:opacity .25s ease,transform .5s var(--spring)}
+.toast.on{transform:translateX(-50%) translateY(0) scale(1)}
+
+/* Kompakter Titel beim Scrollen (iPhone) */
+#navbar{position:fixed;left:0;right:0;top:0;z-index:25;height:calc(44px + var(--safe-t));padding-top:var(--safe-t);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:16px;letter-spacing:-.01em;background:color-mix(in srgb,var(--bg) 78%,transparent);backdrop-filter:saturate(1.8) blur(20px);-webkit-backdrop-filter:saturate(1.8) blur(20px);border-bottom:.5px solid color-mix(in srgb,var(--ink) 14%,transparent);opacity:0;pointer-events:none;transition:opacity .2s ease}
+#navbar span{transform:translateY(6px);transition:transform .3s var(--ease)}
+#navbar.on{opacity:1}
+#navbar.on span{transform:none}
+body.focus #navbar{display:none}
+@media (min-width:768px) and (min-height:560px){#navbar{display:none}}
+
+/* Anmeldung: Logo erscheint */
+#login .llogo{animation:logoIn .7s var(--spring) .05s both}
+#login h1,#login p,#login .gbtn,#login .lor,#login #lgMail{animation:vIn .5s var(--ease) both}
+#login h1{animation-delay:.12s} #login p{animation-delay:.16s} #login .gbtn{animation-delay:.2s} #login .lor{animation-delay:.24s} #login #lgMail{animation-delay:.27s}
+@keyframes logoIn{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:none}}
+
+@media (prefers-reduced-motion:reduce){
+  #view *,#view,.modal,.modal *,.toast,#login *,#tabs *{animation:none!important;transition:none!important}
+}
 </style>
 </head>
 <body>
@@ -498,12 +598,13 @@ ul.todo .tl{font-weight:600}
   <main id="view"></main>
 </div>
 <nav class="tabs"><div class="brand"><img src="icons/favicon.svg" alt=""><span>LemmaLab</span></div><div class="in" id="tabs"></div></nav>
+<div id="navbar" aria-hidden="true"><span id="navTitle"></span></div>
 <div class="toast" id="toast"></div>
 <script src="vendor/katex/katex.min.js"></script>
-<script src="data.js?v=2026-11-19.17"></script>
-<script src="logic.js?v=2026-11-19.17"></script>
-<script src="app.js?v=2026-11-19.17"></script>
+<script src="data.js?v=2026-11-19.18"></script>
+<script src="logic.js?v=2026-11-19.18"></script>
+<script src="app.js?v=2026-11-19.18"></script>
 <script src="vendor/supabase/supabase.js"></script>
-<script src="account.js?v=2026-11-19.17"></script>
+<script src="account.js?v=2026-11-19.18"></script>
 </body>
 </html>

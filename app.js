@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-19.17';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-19.18';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -430,15 +430,16 @@ function nextCard() {
   session.cur = session.queue.shift() || null;
   session.revealed = false;
   Timer.start();
+  Motion.set(session.cur ? 'next' : 'tab');
   render();
   preloadSession();
 }
 
-function reveal() { if (!session || !session.cur || session.revealed) return; Timer.markReveal(); session.revealed = true; render(); }
-function qReveal() { if (!quiz || quiz.revealed) return; Timer.markReveal(); quiz.revealed = true; render(); }
+function reveal() { if (!session || !session.cur || session.revealed || Motion.busy) return; Timer.markReveal(); session.revealed = true; Motion.set('reveal'); render(); }
+function qReveal() { if (!quiz || quiz.revealed) return; Timer.markReveal(); quiz.revealed = true; Motion.set('reveal'); render(); }
 
 function rate(g) {
-  if (!session || !session.cur || !session.revealed) return;
+  if (!session || !session.cur || !session.revealed || Motion.busy) return;
   const id = session.cur, c = BY_ID[id], before = { ...cs(id) };
   const tm = Timer.result();
   const after = schedule(c, before, g);
@@ -449,7 +450,7 @@ function rate(g) {
   if (g === 1) session.again++;
   if (after.st === 1 || after.st === 3) session.later.push(id);
   save();
-  nextCard();
+  Motion.leave(g === 1 ? 'leave-again' : 'leave', nextCard);
 }
 
 function undo() {
@@ -461,6 +462,7 @@ function undo() {
   if (session.cur) session.queue.unshift(session.cur);
   session.cur = u.id; session.revealed = true; Timer.start(); Timer.front = 0;
   save();
+  Motion.set('back');
   render();
   toast('Rückgängig gemacht');
 }
@@ -488,9 +490,12 @@ $('#tabs').addEventListener('click', e => {
   go(b.dataset.tab);
 });
 function go(t) {
+  const changed = t !== tab;
   tab = t;
   try { history.replaceState(null, '', '#' + t); } catch (e) { location.hash = t; }
+  Motion.set('tab');
   render(); window.scrollTo(0, 0);
+  if (changed) Motion.bounceTab();
 }
 window.addEventListener('hashchange', () => { const t = location.hash.slice(1); if (TABS.some(x => x[0] === t) && t !== tab) { tab = t; render(); } });
 
@@ -507,8 +512,72 @@ function render() {
   else if (tab === 'statistik') v.innerHTML = viewStats();
   else if (tab === 'admin' && typeof viewAdmin === 'function') v.innerHTML = viewAdmin();
   else v.innerHTML = viewSettings();
+  { const n = $('#navTitle'); if (n) n.textContent = $('#hdrTitle') ? $('#hdrTitle').textContent : ''; }
+  Motion.apply(v);
   afterRender();
 }
+
+/* ---------- Bewegung (wie in den Apple-Apps) ----------
+ * Kurze, physikalisch wirkende Übergänge: Seitenwechsel blendet weich ein,
+ * Karten gleiten seitlich weiter, Aufdecken klappt die Aussage auf, Ringe und
+ * Balken füllen sich, Zahlen zählen hoch. Bei «Bewegung reduzieren» aus. */
+const Motion = {
+  next: null,
+  reduced: () => !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches),
+  set(k) { this.next = k; },
+  apply(v) {
+    const k = this.next; this.next = null;
+    v.classList.remove('a-tab', 'a-next', 'a-back', 'a-reveal');
+    if (!k || this.reduced()) return;
+    void v.offsetWidth;
+    v.classList.add('a-' + k);
+    clearTimeout(v._at); v._at = setTimeout(() => v.classList.remove('a-' + k), 1100);
+    if (k === 'tab') this.countUp(v);
+  },
+  countUp(root) {
+    root.querySelectorAll('.kpi .v').forEach(el => {
+      const tn = [...el.childNodes].find(n => n.nodeType === 3 && /\d/.test(n.textContent));
+      if (!tn) return;
+      const m = tn.textContent.match(/^(\s*)(\d+(?:[.,]\d+)?)([^\d'’][\s\S]*|)$/);
+      if (!m) return;
+      const target = parseFloat(m[2].replace(',', '.')); if (!(target > 1)) return;
+      const dec = (m[2].split(/[.,]/)[1] || '').length, sep = m[2].includes(',') ? ',' : '.';
+      const t0 = performance.now(), D = 750;
+      const step = t => {
+        const p = Math.min(1, (t - t0) / D), e = 1 - Math.pow(1 - p, 3);
+        tn.textContent = m[1] + (target * e).toFixed(dec).replace('.', sep) + m[3];
+        if (p < 1) requestAnimationFrame(step);
+      };
+      tn.textContent = m[1] + (0).toFixed(dec).replace('.', sep) + m[3];
+      requestAnimationFrame(step);
+    });
+  },
+  /* aktuelle Karte hinausgleiten lassen, dann fn() */
+  leave(cls, fn) {
+    const fc = $('.fc');
+    if (!fc || this.reduced()) return fn();
+    this.busy = true;
+    fc.classList.add(cls);
+    setTimeout(() => { this.busy = false; fn(); }, 170);
+  },
+  bounceTab() {
+    if (this.reduced()) return;
+    const b = document.querySelector('#tabs button.on'); if (!b) return;
+    b.classList.remove('bounce'); void b.offsetWidth; b.classList.add('bounce');
+  },
+};
+
+/* Kompakter Titel oben, sobald der grosse Titel weggescrollt ist (iPhone) */
+(() => {
+  let on = false;
+  const upd = () => {
+    const nb = $('#navbar'); if (!nb) return;
+    const show = window.scrollY > 46 && !document.body.classList.contains('focus');
+    if (show !== on) { on = show; nb.classList.toggle('on', show); }
+  };
+  window.addEventListener('scroll', upd, { passive: true });
+  window.addEventListener('resize', upd);
+})();
 
 function kindTag(c) { return `<span class="tag" style="--k:${KIND_COLOR[c.kind]}">${KIND_SHORT[c.kind]} ${c.nr}</span>`; }
 function prioTag(c) { const p = prioOf(c); return `<span class="pill" style="background:color-mix(in srgb,${PRIO[p].color} 14%,transparent);color:${PRIO[p].color}"><span class="dot" style="background:${PRIO[p].color}"></span>${PRIO[p].name}</span>`; }
@@ -628,7 +697,7 @@ function viewHome() {
 }
 function ringSVG(done, total, size = 38) {
   const f = total ? Math.min(1, done / total) : 1, sw = size > 50 ? 7 : 4, r = (size - sw) / 2 - 1, C = 2 * Math.PI * r, c = size / 2;
-  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="flex:none" aria-label="Tagesfortschritt ${Math.round(f * 100)} Prozent"><circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="color-mix(in srgb,var(--accent) 16%,transparent)" stroke-width="${sw}"/><circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="var(--accent)" stroke-width="${sw}" stroke-linecap="round" stroke-dasharray="${(f * C).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 ${c} ${c})" style="transition:stroke-dasharray .6s ease"/><text x="${c}" y="${c + (size > 50 ? 5 : 3.5)}" text-anchor="middle" font-size="${size > 50 ? 15 : 10.5}" font-weight="700" fill="var(--ink)" style="font-family:var(--sfd)">${Math.round(f * 100)}%</text></svg>`;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="flex:none" aria-label="Tagesfortschritt ${Math.round(f * 100)} Prozent"><circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="color-mix(in srgb,var(--accent) 16%,transparent)" stroke-width="${sw}"/><circle cx="${c}" cy="${c}" r="${r}" fill="none" class="ringp" stroke="var(--accent)" stroke-width="${sw}" stroke-linecap="round" stroke-dasharray="${(f * C).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 ${c} ${c})" style="transition:stroke-dasharray .6s ease"/><text x="${c}" y="${c + (size > 50 ? 5 : 3.5)}" text-anchor="middle" font-size="${size > 50 ? 15 : 10.5}" font-weight="700" fill="var(--ink)" style="font-family:var(--sfd)">${Math.round(f * 100)}%</text></svg>`;
 }
 /* Konfetti-Animation (abgeschaltet bei „Bewegung reduzieren“) */
 function celebrate() {
@@ -854,6 +923,7 @@ function quizAnswer(val) {
 function quizNext() {
   quiz.i++; quiz.picked = null; quiz.revealed = false; Timer.start();
   if (quiz.i < quiz.items.length && quiz.type === 'match') quiz.opts = makeOpts(quiz.items[quiz.i]);
+  Motion.set(quiz.i < quiz.items.length ? 'next' : 'tab');
   render();
   preloadQuiz();
 }
@@ -1300,7 +1370,12 @@ function modal(html) {
   m.addEventListener('click', e => { if (e.target === m) closeModal(); });
   document.body.appendChild(m);
 }
-function closeModal() { const m = $('#modal'); if (m) m.remove(); }
+function closeModal() {
+  const m = $('#modal'); if (!m) return;
+  if (Motion.reduced()) return m.remove();
+  m.id = ''; m.classList.add('closing');
+  setTimeout(() => m.remove(), 280);
+}
 let zoomW = (() => { try { return +localStorage.getItem('lemmalab-zoom') || Math.max(780, Math.round(window.innerWidth * 1.9)); } catch (e) { return 780; } })();
 let toastT;
 function toast(s) { const t = $('#toast'); t.textContent = s; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2200); }
@@ -1684,7 +1759,7 @@ window.addEventListener('visibilitychange', () => { if (document.visibilityState
 /* ============================================================
  * Start
  * ============================================================ */
-render();
+Motion.set('tab'); render();
 Sync.init();
 Gist.init();
 checkUpdate();
