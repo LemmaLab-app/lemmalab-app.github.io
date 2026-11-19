@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-19.32';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-19.33';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -987,8 +987,8 @@ function viewStudy() {
   </div>
   ${s.revealed && swipeMode() ? `<div class="actionbar swipeact">
     <div class="rbtns">
-      <button class="rb no" data-rate="1" aria-label="Nicht gewusst"><span class="rc"><svg viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg></span><span class="rl">Nicht gewusst</span></button>
-      <button class="rb ok" data-rate="3" aria-label="Gewusst"><span class="rc"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span class="rl">Gewusst</span></button>
+      <button class="rb no" data-rate="1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"/></svg><span>Nicht gewusst</span></button>
+      <button class="rb ok" data-rate="3"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5l4 4L18.5 8"/></svg><span>Gewusst</span></button>
     </div>
   </div>` : ''}`;
 }
