@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-19.7';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-19.8';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -514,6 +514,54 @@ function statusOf(c) {
 }
 
 /* ---------- Startseite ---------- */
+/* Tagesstand als To-do-Liste */
+function todayStatus() {
+  const q = buildQueue();
+  const ds = dayStart();
+  const L = S.log.filter(l => l[0] >= ds && modeOf(l) === 'l');
+  const revDone = new Set(L.filter(l => l[3] === 2).map(l => l[1])).size;
+  const newDone = newIntroducedToday();
+  const learnOpen = CARDS.filter(c => { const x = S.cards[c.id]; return x && !x.susp && (x.st === 1 || x.st === 3); }).length;
+  const learning = Math.max(0, q.queue.length - q.nRev - q.nNew);
+  const items = [
+    { k: 'rev', label: 'Fällige Wiederholungen', done: revDone, total: revDone + q.nRev, color: 'var(--easy)' },
+    { k: 'new', label: 'Neue Karten', done: newDone, total: newDone + q.nNew, color: 'var(--good)' },
+    { k: 'learn', label: 'Lernschritte abschliessen', done: learnOpen ? 0 : 1, total: 1, open: learnOpen, color: 'var(--hard)' },
+  ];
+  const learnedToday = L.some(l => l[3] === 0 || l[3] === 1 || l[3] === 3);
+  const visible = items.filter(it => it.k === 'rev' ? it.total > 0 : it.k === 'new' ? it.total > 0 : (it.open > 0 || learnedToday));
+  const allDone = q.queue.length === 0 && q.later.length === 0;
+  return { q, items: visible.length ? visible : items.slice(0, 1), allDone, learning, startedToday: L.length > 0 };
+}
+function streakDays() {
+  const days = new Set(S.log.map(l => dayKey(l[0])));
+  let n = 0, d = dayStart();
+  if (!days.has(dayKey(d + HOUR))) d -= DAY;
+  while (days.has(dayKey(d + HOUR)) && n < 999) { n++; d -= DAY; }
+  return n;
+}
+function todoHTML(ts) {
+  return `<ul class="todo">${ts.items.map(it => {
+    const done = it.k === 'learn' ? !it.open : it.done >= it.total;
+    const sub = it.k === 'learn' ? (it.open ? `${it.open} Karte${it.open === 1 ? '' : 'n'} offen` : 'keine offen') : `${it.done} / ${it.total}`;
+    const pct = it.k === 'learn' ? (it.open ? 0 : 100) : (it.total ? it.done / it.total * 100 : 100);
+    return `<li class="${done ? 'done' : ''}"><span class="cb">${done ? '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>' : ''}</span>
+      <div class="ti"><div class="tl"><span>${it.label}</span><span class="muted">${sub}</span></div>
+      <div class="tb"><i style="width:${pct}%;background:${it.color}"></i></div></div></li>`;
+  }).join('')}</ul>`;
+}
+function doneHeroHTML(ts) {
+  const tomorrow = CARDS.filter(c => { const x = S.cards[c.id]; return x && x.st && !x.susp && x.due < dayStart() + 2 * DAY; }).length;
+  const L = S.log.filter(l => l[0] >= dayStart());
+  const mins = Math.max(1, Math.round(L.reduce((a, l) => a + l[4], 0) / 600));
+  const st = streakDays();
+  return `<div class="donehero">
+    <svg class="bigcheck" viewBox="0 0 120 120"><circle class="c" cx="60" cy="60" r="52"/><path class="k" d="M36 62l16 16 33-35"/></svg>
+    <div class="dt">Für heute geschafft!</div>
+    <div class="ds">${L.length ? `${L.length} Bewertungen in ${mins} Min` : 'Heute war nichts fällig'}${st ? ` · 🔥 ${st} Tag${st === 1 ? '' : 'e'} in Folge` : ''}</div>
+    <div class="dn">Morgen fällig: <b>${tomorrow}</b> Karte${tomorrow === 1 ? '' : 'n'}</div>
+  </div>`;
+}
 function viewHome() {
   const q = buildQueue();
   const dte = daysToExam();
@@ -525,20 +573,18 @@ function viewHome() {
   const pt = personalTimes();
   const estMin = Math.round((q.nRev * pt.review + q.nNew * pt.newCost + Math.max(0, learning) * pt.learn) / 60);
   const focus = nextFocus();
+  const ts = todayStatus();
   const chap = groupStats(c => c.chap, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
   return `<div class="home"><div class="col">
   <div class="card hero">
-    <div class="row">${ringSVG(todayLog.length, todayLog.length + q.queue.length)}<h3 style="margin:0">Heute</h3><div class="spacer"></div>
+    <div class="row">${ringSVG(todayLog.length, todayLog.length + q.queue.length)}<h3 style="margin:0">Heute${ts.allDone ? ' ✓' : ''}</h3><div class="spacer"></div>
       <span class="pill gray">${dte > 0 ? `Prüfung in ${dte} Tagen` : dte === 0 ? 'Prüfung heute' : 'Prüfung vorbei'}</span></div>
-    <div class="grid g3" style="margin-top:12px">
-      <div class="kpi"><div class="v" style="color:var(--easy)">${q.nRev}</div><div class="l">Wiederholungen fällig</div></div>
-      <div class="kpi"><div class="v" style="color:var(--good)">${q.nNew}</div><div class="l">neue Karten</div></div>
-      <div class="kpi"><div class="v" style="color:var(--hard)">${Math.max(0, learning)}</div><div class="l">in Lernschritten</div></div>
-    </div>
+    ${ts.allDone ? doneHeroHTML(ts) : todoHTML(ts)}
     <div style="margin-top:14px">
       ${q.queue.length
-        ? `<button class="btn primary big" data-act="start">Lernen starten · ca. ${Math.max(1, estMin)} Min</button>`
-        : `<div class="empty" style="padding:14px"><div class="big">✓</div><b>Für heute alles erledigt.</b><div class="muted small">${q.later.length ? q.later.length + ' Karte(n) in Lernschritten folgen später. ' : ''}Mit Quiz oder Test kannst du freiwillig weiterüben.</div></div>
+        ? `<button class="btn primary big" data-act="start">${ts.startedToday ? 'Weiterlernen' : 'Lernen starten'} · ca. ${Math.max(1, estMin)} Min</button>`
+        : `${ts.allDone ? '' : `<div class="muted small center" style="margin-bottom:10px">${q.later.length} Karte${q.later.length === 1 ? '' : 'n'} in Lernschritten – kommen in wenigen Minuten wieder.</div>`}
+           <div class="muted small center" style="margin-bottom:8px">Freiwillig weiterüben:</div>
            <div class="row" style="gap:8px"><button class="btn big" style="flex:1" data-act="extra">10 neue Karten</button>${aheadIds().length ? `<button class="btn big" style="flex:1" data-act="ahead">Vorausüben (${Math.min(20, aheadIds().length)})</button>` : ''}</div>`}
     </div>
     <div class="muted small" style="margin-top:10px">Heute erledigt: ${todayLog.length} Bewertungen · ${minToday} Min · Neue Karten pro Tag: ${plannedNewPerDay()} (${S.settings.newMode === 'auto' ? 'automatisch aus Prüfungsdatum' : 'manuell'})</div>
@@ -573,6 +619,35 @@ function viewHome() {
 function ringSVG(done, total) {
   const f = total ? done / total : 1, r = 15, C = 2 * Math.PI * r;
   return `<svg width="38" height="38" viewBox="0 0 38 38" style="flex:none" aria-label="Tagesfortschritt"><circle cx="19" cy="19" r="${r}" fill="none" stroke="var(--line)" stroke-width="5"/><circle cx="19" cy="19" r="${r}" fill="none" stroke="var(--good)" stroke-width="5" stroke-linecap="round" stroke-dasharray="${(f * C).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 19 19)"/><text x="19" y="23" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--ink)">${Math.round(f * 100)}</text></svg>`;
+}
+/* Konfetti-Animation (abgeschaltet bei „Bewegung reduzieren“) */
+function celebrate() {
+  if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const cv = document.createElement('canvas');
+  cv.className = 'confetti';
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  cv.width = innerWidth * dpr; cv.height = innerHeight * dpr;
+  document.body.appendChild(cv);
+  const ctx = cv.getContext('2d'); ctx.scale(dpr, dpr);
+  const cols = ['#2f9e5b', '#2b7bd6', '#d98a1c', '#d64545', '#7c3aed', '#f2c94c'];
+  const P = Array.from({ length: 140 }, (_, i) => ({
+    x: innerWidth / 2 + (Math.random() - .5) * 60, y: innerHeight * .38,
+    vx: (Math.random() - .5) * 13, vy: -Math.random() * 13 - 5,
+    r: Math.random() * Math.PI, vr: (Math.random() - .5) * .3,
+    w: 6 + Math.random() * 6, h: 4 + Math.random() * 5, c: cols[i % cols.length],
+  }));
+  const t0 = performance.now();
+  (function frame(t) {
+    const el = t - t0;
+    ctx.clearRect(0, 0, innerWidth, innerHeight);
+    for (const p of P) {
+      p.vy += .32; p.vx *= .99; p.x += p.vx; p.y += p.vy; p.r += p.vr;
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.r);
+      ctx.globalAlpha = Math.max(0, 1 - el / 2600);
+      ctx.fillStyle = p.c; ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); ctx.restore();
+    }
+    if (el < 2700) requestAnimationFrame(frame); else cv.remove();
+  })(t0);
 }
 /* Karten, die in den nächsten 3 Tagen fällig werden – zum Vorausüben (schwächste zuerst) */
 function aheadIds() {
@@ -637,14 +712,16 @@ function viewStudy() {
     const secs = L.reduce((a, l) => a + l[4], 0) / 10;
     const tomorrow = CARDS.filter(c => { const x = S.cards[c.id]; return x && x.st && !x.susp && x.due < dayStart() + 2 * DAY; }).length;
     const lapsed = [...new Set(rev.filter(l => l[2] === 1).map(l => l[1]))].map(id => BY_ID[id]);
-    return `<div class="card"><div class="center"><div class="big" style="font-size:40px">🎉</div><h3>Sitzung abgeschlossen</h3></div>
+    const ts = todayStatus();
+    if (ts.allDone && !s.celebrated) { s.celebrated = true; setTimeout(() => celebrate(), 60); }
+    return `<div class="card">${ts.allDone ? doneHeroHTML(ts) : `<div class="center"><div class="big" style="font-size:40px">👍</div><h3>Sitzung abgeschlossen</h3><div class="muted small">Für heute ist noch etwas offen – siehe Übersicht.</div></div>`}
       <div class="grid g4" style="margin-top:12px">
         <div class="kpi center"><div class="v">${L.length}</div><div class="l">Bewertungen</div></div>
         <div class="kpi center"><div class="v">${fresh.length}</div><div class="l">neu gelernt</div></div>
         <div class="kpi center"><div class="v">${acc == null ? '–' : acc + '%'}</div><div class="l">Wiederholungen gewusst</div></div>
         <div class="kpi center"><div class="v">${Math.max(1, Math.round(secs / 60))}</div><div class="l">Minuten</div></div>
       </div>
-      <div class="muted small center" style="margin-top:10px">Morgen fällig: ${tomorrow} Karten · Ø ${L.length ? fmtSec(secs / L.length) : '–'} pro Bewertung</div>
+      <div class="muted small center" style="margin-top:10px">${ts.allDone ? '' : `Morgen fällig: ${tomorrow} Karten · `}Ø ${L.length ? fmtSec(secs / L.length) : '–'} pro Bewertung</div>
       ${lapsed.length ? `<h3 style="margin-top:16px">Vergessen – lohnt sich kurz nachzulesen</h3><div class="list">${lapsed.map(liHTML).join('')}</div>` : ''}
       <div class="row" style="justify-content:center;margin-top:16px">
         <button class="btn" data-act="home">Zur Übersicht</button>

@@ -256,6 +256,33 @@ details.logic[open] summary::before{content:"▾ ";}
 .lf{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;padding:3px 0 4px;line-height:2.1}
 .lf .katex{font-size:1.08em;white-space:normal}
 @media (max-width:480px){.lf .katex{font-size:.95em}}
+
+/* Tages-To-do */
+ul.todo{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:10px}
+ul.todo li{display:flex;gap:12px;align-items:center}
+ul.todo .cb{flex:none;width:24px;height:24px;border-radius:7px;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;transition:all .3s}
+ul.todo li.done .cb{background:var(--good);border-color:var(--good);animation:pop .45s cubic-bezier(.2,1.6,.4,1)}
+ul.todo .cb svg{width:16px;height:16px;fill:none;stroke:#fff;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:24;stroke-dashoffset:24;animation:draw .4s .15s ease forwards}
+ul.todo .ti{flex:1;min-width:0}
+ul.todo .tl{display:flex;justify-content:space-between;gap:8px;font-weight:600;font-size:14.5px}
+ul.todo .tl .muted{font-weight:500;font-size:13px;font-variant-numeric:tabular-nums}
+ul.todo li.done .tl>span:first-child{text-decoration:line-through;text-decoration-color:color-mix(in srgb,var(--ink) 35%,transparent);color:var(--muted)}
+ul.todo .tb{height:5px;border-radius:9px;background:var(--line);overflow:hidden;margin-top:5px}
+ul.todo .tb i{display:block;height:100%;border-radius:9px;transition:width .6s ease}
+/* Erledigt-Ansicht */
+.donehero{text-align:center;padding:10px 0 4px}
+.bigcheck{width:96px;height:96px;display:block;margin:4px auto 6px}
+.bigcheck .c{fill:color-mix(in srgb,var(--good) 14%,transparent);stroke:var(--good);stroke-width:6;stroke-dasharray:330;stroke-dashoffset:330;animation:draw .7s ease forwards;transform-origin:center}
+.bigcheck .k{fill:none;stroke:var(--good);stroke-width:9;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:80;stroke-dashoffset:80;animation:draw .45s .55s ease forwards}
+.bigcheck{animation:pop .6s .45s cubic-bezier(.2,1.6,.4,1) both}
+.donehero .dt{font-size:22px;font-weight:800;letter-spacing:-.01em;animation:rise .5s .7s ease both}
+.donehero .ds{color:var(--muted);font-size:13.5px;margin-top:4px;animation:rise .5s .85s ease both}
+.donehero .dn{margin-top:10px;font-size:14px;animation:rise .5s 1s ease both}
+@keyframes draw{to{stroke-dashoffset:0}}
+@keyframes pop{0%{transform:scale(.6)}100%{transform:scale(1)}}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+canvas.confetti{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:100}
+@media (prefers-reduced-motion:reduce){.bigcheck,.bigcheck *,.donehero *,ul.todo *{animation:none!important;stroke-dashoffset:0!important}}
 </style>
 </head>
 <body>
@@ -273,8 +300,8 @@ details.logic[open] summary::before{content:"▾ ";}
 <nav class="tabs"><div class="in" id="tabs"></div></nav>
 <div class="toast" id="toast"></div>
 <script src="vendor/katex/katex.min.js"></script>
-<script src="data.js?v=2026-11-19.7"></script>
-<script src="logic.js?v=2026-11-19.7"></script>
-<script src="app.js?v=2026-11-19.7"></script>
+<script src="data.js?v=2026-11-19.8"></script>
+<script src="logic.js?v=2026-11-19.8"></script>
+<script src="app.js?v=2026-11-19.8"></script>
 </body>
 </html>
