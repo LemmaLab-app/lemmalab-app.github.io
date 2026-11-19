@@ -528,16 +528,21 @@ label.ir{cursor:pointer}
 .kpi .s{font-size:13px;color:var(--muted);margin-top:8px}
 @media (min-width:768px) and (min-height:560px){.ii .ir-l b{font-size:15px}.ii .ir-l small{font-size:13px}}
 
-/* Schalter (iOS) */
-.sw{position:relative;display:inline-block;width:51px;height:31px;flex:none}
-.sw input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer;z-index:1}
-.sw i{position:absolute;inset:0;border-radius:99px;background:color-mix(in srgb,var(--ink) 12%,transparent);transition:background .25s ease}
-.sw i::after{content:"";position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 3px 8px rgba(0,0,0,.15),0 1px 1px rgba(0,0,0,.16),0 3px 1px rgba(0,0,0,.1);transition:transform .35s var(--spring),width .2s ease}
+/* Schalter wie in iOS 26: breite Spur, kapselförmiger Knopf, der beim
+   Drücken zu «Glas» wird und sich streckt */
+.sw{position:relative;display:inline-block;width:63px;height:28px;flex:none;-webkit-tap-highlight-color:transparent}
+.sw input{position:absolute;inset:-8px -4px;width:calc(100% + 8px);height:calc(100% + 16px);opacity:0;margin:0;cursor:pointer;z-index:2}
+.sw i{position:absolute;inset:0;border-radius:99px;background:color-mix(in srgb,var(--ink) 9%,transparent);transition:background .3s ease}
+.sw i::after{content:"";position:absolute;top:2px;left:2px;width:37px;height:24px;border-radius:99px;background:#fff;
+  box-shadow:0 0 0 .5px rgba(0,0,0,.04),0 1.5px 4px rgba(0,0,0,.12),0 3px 8px rgba(0,0,0,.06);
+  transition:transform .42s var(--spring),width .25s var(--ease),background .2s ease,box-shadow .2s ease}
 .sw input:checked+i{background:var(--switch)}
-.sw input:checked+i::after{transform:translateX(20px)}
-.sw input:active+i::after{width:31px}
-.sw input:checked:active+i::after{transform:translateX(16px)}
+.sw input:checked+i::after{transform:translateX(22px)}
+.sw input:active+i::after{width:43px;background:rgba(255,255,255,.72);box-shadow:0 0 0 .5px rgba(0,0,0,.06),0 4px 14px rgba(0,0,0,.16),inset 0 0 0 1px rgba(255,255,255,.9);transform:scale(1.12)}
+.sw input:checked:active+i::after{transform:translateX(16px) scale(1.12)}
 .sw input:focus-visible+i{outline:3px solid color-mix(in srgb,var(--accent) 55%,transparent);outline-offset:2px}
+:root.dark .sw i::after{box-shadow:0 1.5px 4px rgba(0,0,0,.35)}
+@media (prefers-color-scheme:dark){:root:not(.light) .sw i::after{box-shadow:0 1.5px 4px rgba(0,0,0,.35)}}
 
 /* Auswahl: Wert rechts mit Doppelpfeil, Systemmenü beim Antippen */
 .isel{position:relative;display:inline-flex;align-items:center;gap:5px;color:var(--muted)}
@@ -691,10 +696,10 @@ body.focus #navbar{display:none}
 <div id="navbar" aria-hidden="true"><span id="navTitle"></span></div>
 <div class="toast" id="toast"></div>
 <script src="vendor/katex/katex.min.js"></script>
-<script src="data.js?v=2026-11-19.20"></script>
-<script src="logic.js?v=2026-11-19.20"></script>
-<script src="app.js?v=2026-11-19.20"></script>
+<script src="data.js?v=2026-11-19.21"></script>
+<script src="logic.js?v=2026-11-19.21"></script>
+<script src="app.js?v=2026-11-19.21"></script>
 <script src="vendor/supabase/supabase.js"></script>
-<script src="account.js?v=2026-11-19.20"></script>
+<script src="account.js?v=2026-11-19.21"></script>
 </body>
 </html>
