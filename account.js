@@ -9,6 +9,8 @@
 const SUPA_URL = 'https://bcqbxwiniuiousnnrpbf.supabase.co';
 const SUPA_KEY = 'sb_publishable_EfxVTJbVzdgbptp3osRacg_GY-tlheD';
 const LOCAL_MODE_KEY = 'lemmalab-localmode';
+const ADMIN_EMAIL = 'lemmalab.app@gmail.com';   // nur Anzeige – die echte Prüfung macht die Datenbank (admin_stats)
+const isAdmin = () => !!(Cloud.user && (Cloud.user.email || '').toLowerCase() === ADMIN_EMAIL);
 
 const Cloud = {
   sb: null, user: null, busy: false, dirty: false, timer: null, status: '', lastSync: 0, ready: false,
@@ -180,7 +182,7 @@ function updatePillCloud() {
 }
 function updateAccountUI() {
   if (Cloud.user) updatePillCloud(); else setPill('lokal');
-  if (typeof tab !== 'undefined' && tab === 'mehr' && !session && !quiz) render();
+  if (typeof tab !== 'undefined' && (tab === 'mehr' || tab === 'admin') && !session && !quiz) render();
 }
 function accountSettingsHTML() {
   if (Cloud.user) {
@@ -194,7 +196,7 @@ function accountSettingsHTML() {
         <button class="btn" data-act="cloudsync">Jetzt abgleichen</button>
         <button class="btn" data-act="logout">Abmelden</button>
         <button class="btn" data-act="clouddelete" style="color:var(--again)">Konto-Daten löschen</button>
-      </div>`;
+      </div>${isAdmin() ? `<div class="row" style="margin-top:12px"><button class="btn primary" data-act="tab:admin">📊 Admin-Bereich öffnen</button></div>` : ''}`;
   }
   return `<div class="small">Du lernst ohne Konto – der Fortschritt bleibt nur auf diesem Gerät. Melde dich an, damit er auf allen Geräten gleich ist und nicht verloren geht.</div>
     <div class="row" style="margin-top:12px"><button class="btn primary" data-act="login">Anmelden</button></div>`;
@@ -206,6 +208,7 @@ document.addEventListener('click', e => {
   if (act === 'login') { showLogin(); }
   else if (act === 'logout') confirmBox('Abmelden? Der Lernstand bleibt in deinem Konto gespeichert und wird auf diesem Gerät entfernt.', () => Cloud.signOut());
   else if (act === 'cloudsync') Cloud.sync();
+  else if (act === 'adminload') Admin.load(true);
   else if (act === 'clouddelete') confirmBox('Deinen gesamten Lernstand in der Cloud und auf diesem Gerät löschen? Das kann nicht rückgängig gemacht werden.', () => Cloud.deleteCloudData());
 });
 window.addEventListener('online', () => Cloud.sync());
@@ -214,5 +217,81 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') { if (Cloud.dirty) Cloud.sync(); }
   else if (!session && Date.now() - Cloud.lastSync > 60000) Cloud.sync();
 });
+
+/* ---------------- Admin-Bereich ----------------
+ * Zeigt nur zusammengefasste Zahlen über alle Konten (keine E-Mails/Namen).
+ * Daten kommen aus der Datenbank-Funktion admin_stats() (tools/admin.sql),
+ * die selbst prüft, ob das angemeldete Konto das Admin-Konto ist. */
+const Admin = {
+  data: null, err: '', loading: false, at: 0,
+  async load(force) {
+    if (this.loading || !Cloud.sb || !Cloud.user) return;
+    if (!force && this.data && Date.now() - this.at < 5 * 60e3) return;
+    this.loading = true; this.err = ''; if (tab === 'admin') render();
+    try {
+      const { data, error } = await Cloud.sb.rpc('admin_stats');
+      if (error) throw error;
+      this.data = data; this.at = Date.now();
+    } catch (e) {
+      const m = (e && (e.message || e.code)) || String(e);
+      this.err = /not authorized|42501/.test(m) ? 'Kein Zugriff – nur für das Admin-Konto.'
+        : /admin_stats|PGRST202|function/i.test(m) ? 'Die Datenbank-Funktion fehlt noch: tools/admin.sql im Supabase SQL Editor ausführen.'
+        : navigator.onLine ? 'Laden fehlgeschlagen: ' + m : 'Offline – Admin-Statistik braucht Internet.';
+    }
+    this.loading = false;
+    if (tab === 'admin' && !session && !quiz) render();
+  },
+};
+
+function viewAdmin() {
+  const head = `<div class="row" style="margin:4px 0 12px"><button class="btn ghost" data-act="tab:mehr" title="Zurück">←</button>
+    <h2 style="margin:0">Admin</h2><div class="spacer"></div>
+    <button class="btn" data-act="adminload" ${Admin.loading ? 'disabled' : ''}>${Admin.loading ? 'Lädt …' : '↻ Aktualisieren'}</button></div>`;
+  if (!Cloud.ready) return head + `<div class="card muted">Anmeldung wird geprüft …</div>`;
+  if (!isAdmin()) return head + `<div class="card">Dieser Bereich ist nur für das Admin-Konto (${esc(ADMIN_EMAIL)}).</div>`;
+  if (!Admin.data && !Admin.loading && !Admin.err) setTimeout(() => Admin.load(), 0);
+  if (Admin.err) return head + `<div class="card" style="color:var(--again)">${esc(Admin.err)}</div>`;
+  const d = Admin.data;
+  if (!d) return head + `<div class="card muted">Statistik wird geladen …</div>`;
+  const u = d.users || {}, T = d.totals || {}, daily = d.daily || [];
+  const num = x => Number(x || 0).toLocaleString('de-CH');
+  const pct = x => x == null ? '–' : Math.round(x * 100) + '%';
+  const hrs = m => { m = Number(m || 0); return m < 90 ? Math.round(m) + ' Min' : (m / 60).toFixed(m < 600 ? 1 : 0) + ' Std'; };
+  const kpi = (v, l) => `<div class="kpi center"><div class="v">${v}</div><div class="l">${l}</div></div>`;
+  const dl = i => { const p = (daily[i] || {}).day || ''; return (i % 5 === 4 || i === daily.length - 1) && p ? p.slice(8, 10) + '.' + p.slice(5, 7) + '.' : ''; };
+  const prov = Object.entries(u.providers || {}).map(([k, n]) => `${k === 'google' ? 'Google' : k === 'email' ? 'E-Mail-Code' : esc(k)}: <b>${num(n)}</b>`).join(' · ') || '–';
+
+  const cards = (d.cards || []).filter(c => BY_ID[c.id]);
+  const hard = cards.filter(c => c.rev >= 3).map(c => ({ ...c, r: c.again / c.rev })).sort((a, b) => b.r - a.r || b.rev - a.rev).slice(0, 15);
+  const slow = cards.filter(c => c.n >= 3).sort((a, b) => b.avgS - a.avgS).slice(0, 10);
+  const most = cards.slice().sort((a, b) => b.users - a.users || b.n - a.n).slice(0, 10);
+  const row = (c, right) => { const k = BY_ID[c.id]; return `<li data-card="${esc(c.id)}" style="cursor:pointer;display:flex;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)">${kindTag(k)}<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(k.title || '')}</span><span class="small muted" style="white-space:nowrap">${right}</span></li>`; };
+  const list = (arr, f, empty) => arr.length ? `<ul style="list-style:none;margin:0;padding:0">${arr.map(c => row(c, f(c))).join('')}</ul>` : `<div class="small muted">${empty}</div>`;
+
+  return head + `
+  <div class="small muted" style="margin:-4px 0 12px">Nur zusammengefasste Zahlen aller Konten · Stand ${new Date(d.generated || Admin.at).toLocaleString('de-CH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>
+  <h2>Nutzer</h2>
+  <div class="grid g4">${kpi(num(u.total), 'Konten')}${kpi(num(u.active1), 'aktiv (24 h)')}${kpi(num(u.active7), 'aktiv (7 T)')}${kpi(num(u.active30), 'aktiv (30 T)')}</div>
+  <div class="card small" style="margin-top:10px">
+    Neu: <b>${num(u.new7)}</b> in 7 Tagen · <b>${num(u.new30)}</b> in 30 Tagen<br>
+    Haben schon gelernt: <b>${num(u.learning)}</b> · an ≥ 2 Tagen: <b>${num(u.days2)}</b> · an ≥ 7 Tagen: <b>${num(u.days7)}</b><br>
+    Anmeldung: ${prov}</div>
+  <h2>Lernen</h2>
+  <div class="grid g4">${kpi(num(T.reviews), 'Bewertungen total')}${kpi(hrs(T.minutes), 'Lernzeit total')}${kpi(num(T.reviews7), 'Bewertungen (7 T)')}${kpi(pct(T.retention), 'Wiederholungen gewusst')}</div>
+  <div class="card small" style="margin-top:10px">
+    Lernzeit letzte 7 Tage: <b>${hrs(T.minutes7)}</b><br>
+    Pro lernender Person (Median): <b>${hrs(T.medianMinutesPerUser)}</b> Lernzeit · <b>${num(Math.round(T.medianDaysPerUser || 0))}</b> Lerntage · <b>${num(Math.round(T.medianIntro || 0))}</b> Karten begonnen</div>
+  <h2>Aktive Nutzer pro Tag (30 Tage)</h2>
+  <div class="card">${barChart(daily.map(x => x.users), dl, daily.length - 1)}</div>
+  <h2>Bewertungen pro Tag (30 Tage)</h2>
+  <div class="card">${barChart(daily.map(x => x.reviews), dl, daily.length - 1)}</div>
+  <h2>Schwierigste Karten</h2>
+  <div class="card"><div class="small muted" style="margin-bottom:6px">Anteil «Nochmal» bei Wiederholungen (mind. 3 Wiederholungen)</div>
+    ${list(hard, c => `${Math.round(c.r * 100)}% · ${c.rev}×`, 'Noch zu wenige Wiederholungen.')}</div>
+  <h2>Längste Bearbeitungszeit</h2>
+  <div class="card">${list(slow, c => `Ø ${fmtSec(c.avgS)} · ${c.n}×`, 'Noch zu wenige Daten.')}</div>
+  <h2>Von den meisten gelernt</h2>
+  <div class="card">${list(most, c => `${c.users} Pers. · ${c.n}×`, 'Noch keine Daten.')}</div>`;
+}
 
 Cloud.init();

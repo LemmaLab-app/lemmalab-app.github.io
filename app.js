@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-19.11';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-19.12';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -474,7 +474,7 @@ if (!TABS.some(t => t[0] === tab)) tab = 'heute';
 
 function renderTabs() {
   $('#tabs').innerHTML = TABS.map(([k, l]) =>
-    `<button data-tab="${k}" class="${k === tab ? 'on' : ''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[k]}</svg>${l}</button>`).join('');
+    `<button data-tab="${k}" class="${k === tab || (k === 'mehr' && tab === 'admin') ? 'on' : ''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[k]}</svg>${l}</button>`).join('');
 }
 $('#tabs').addEventListener('click', e => {
   const b = e.target.closest('button[data-tab]'); if (!b) return;
@@ -497,6 +497,7 @@ function render() {
   else if (tab === 'quiz') v.innerHTML = viewQuiz();
   else if (tab === 'katalog') v.innerHTML = viewCatalog();
   else if (tab === 'statistik') v.innerHTML = viewStats();
+  else if (tab === 'admin' && typeof viewAdmin === 'function') v.innerHTML = viewAdmin();
   else v.innerHTML = viewSettings();
   afterRender();
 }
@@ -1222,13 +1223,13 @@ function planText() {
   s += `Erwartete Wiederholungen in den nächsten 7 Tagen: ${load7.reduce((a, b) => a + b, 0)} (≈ ${Math.round(load7.reduce((a, b) => a + b, 0) * 25 / 60 / 7)} Min/Tag).`;
   return s;
 }
-function barChart(vals, lbl) {
-  const W = 420, H = 150, pad = 10, bw = (W - pad) / vals.length, max = Math.max(1, ...vals);
+function barChart(vals, lbl, hi = 0) {
+  const W = 420, H = 150, pad = 10, bw = (W - pad) / vals.length, max = Math.max(1, ...vals), gap = vals.length > 14 ? 2 : 6;
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" width="100%" role="img">${vals.map((v, i) => {
-    const h = v / max * (H - 40); const x = pad + i * bw + 3, y = H - 20 - h;
-    return `<rect x="${x}" y="${y}" width="${bw - 6}" height="${h}" rx="3" fill="${i === 0 ? 'var(--accent)' : 'color-mix(in srgb,var(--accent) 55%,transparent)'}"/>
-      <text x="${x + (bw - 6) / 2}" y="${y - 4}" text-anchor="middle">${v || ''}</text>
-      ${(vals.length <= 7 || i % 2 === 0) ? `<text x="${x + (bw - 6) / 2}" y="${H - 6}" text-anchor="middle">${lbl(i)}</text>` : ''}`;
+    const h = v / max * (H - 40); const x = pad + i * bw + gap / 2, y = H - 20 - h;
+    return `<rect x="${x}" y="${y}" width="${bw - gap}" height="${h}" rx="${gap > 2 ? 3 : 1.5}" fill="${i === hi ? 'var(--accent)' : 'color-mix(in srgb,var(--accent) 55%,transparent)'}"/>
+      <text x="${x + (bw - gap) / 2}" y="${y - 4}" text-anchor="middle">${(vals.length <= 14 || i === hi || v === max) && v ? v : ''}</text>
+      ${(vals.length <= 7 || i % 2 === 0) ? `<text x="${x + (bw - gap) / 2}" y="${H - 6}" text-anchor="middle">${lbl(i)}</text>` : ''}`;
   }).join('')}</svg>`;
 }
 function lineChart(vals, o = {}) {
