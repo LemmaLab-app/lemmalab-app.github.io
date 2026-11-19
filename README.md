@@ -1,3 +1,5 @@
+<p align="center"><img src="icons/icon-512.png" width="140" alt="LemmaLab"></p>
+
 # LemmaLab – Analysis I: Definitionen & Sätze lernen
 
 Private Lernhilfe, nur für den Eigengebrauch, ohne Gewähr.
