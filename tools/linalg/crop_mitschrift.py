@@ -6,22 +6,27 @@ from entries import E
 SRC, OUT = sys.argv[1], sys.argv[2]
 os.makedirs(OUT + '/img', exist_ok=True)
 B = json.load(open('ann/bands.json'))
-DPI0, DPI = 110, 170; S = DPI / DPI0
+DPI0, DPI = 110, 300; S = DPI / DPI0
 _pages = {}
 def page(f, p):
+    """Seite in voller Scan-Auflösung (300 dpi), Karopapier weg, Schrift tiefschwarz und etwas kräftiger, Rot bleibt rot."""
     if (f, p) not in _pages:
+        import cv2
         pix = fitz.open(f'{SRC}/{f}.pdf')[p].get_pixmap(dpi=DPI)
-        im = np.asarray(Image.frombytes('RGB', (pix.width, pix.height), pix.samples)).astype(int)
-        # Karopapier entfernen: helle, wenig gesättigte Pixel werden weiss
-        mx, mn = im.max(2), im.min(2)
-        light = (mn > 150) & (mx - mn < 70) | (mn > 195)
-        im[light] = 255
-        img = Image.fromarray(im.astype('uint8'))
-        # Bessere Lesbarkeit: Striche verdicken (Minimumfilter) und Mitteltöne abdunkeln, Farben (rot) bleiben erhalten
-        img = img.filter(ImageFilter.MinFilter(3))
-        a = np.asarray(img).astype(float) / 255
-        a = np.where(a > 0.93, 1.0, a ** 2.4)
-        _pages[(f, p)] = Image.fromarray((a * 255).astype('uint8'))
+        rgb = np.asarray(Image.frombytes('RGB', (pix.width, pix.height), pix.samples)).astype(np.float32)
+        mn = rgb.min(2)
+        bg = cv2.blur(cv2.dilate(mn, np.ones((31, 31), np.uint8)), (31, 31))   # Papierhelligkeit (ungleichmässiger Scan)
+        dark = np.clip(1 - mn / np.maximum(bg, 1), 0, 1)                      # 0 = Papier, 1 = Tinte
+        sat = rgb.max(2) - mn
+        dark[((sat < 70) & (dark < 0.30)) | (dark < 0.15)] = 0               # Karolinien und Rauschen weg
+        d = np.clip((dark - 0.15) / 0.25, 0, 1)                               # starker Kontrast
+        d = cv2.dilate(d, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)))   # Striche leicht verdicken
+        d = cv2.GaussianBlur(d, (3, 3), 0)                                     # weiche Kanten
+        red = ((rgb[..., 0] - rgb[..., 2] > 40) & (rgb[..., 0] - rgb[..., 1] > 40)).astype(np.uint8)
+        red = cv2.dilate(red, np.ones((7, 7), np.uint8)) > 0
+        ink = np.zeros_like(rgb); ink[red] = (205, 20, 45)
+        out = 255 * (1 - d[..., None]) + ink * d[..., None]
+        _pages[(f, p)] = Image.fromarray(np.clip(out, 0, 255).astype('uint8'))
     return _pages[(f, p)]
 def trim(im, pb, pt):
     # Nicht mitten durch eine Zeile schneiden: Schrift, die im Rand unten/oben nach einer Lücke beginnt, wegschneiden
@@ -44,9 +49,14 @@ for i, (kind, nr, title, regs) in enumerate(E):
         im = page(f, p); W = im.width
         cr = im.crop((int(0.075 * W), max(0, int(y0)), int(0.975 * W), min(im.height, int(y1))))
         ims.append(trim(cr, int(22 * S), int(7 * S)))
-    w = max(im.width for im in ims); h = sum(im.height for im in ims) + 14 * (len(ims) - 1)
-    cv = Image.new('RGB', (w, h), 'white'); y = 0
+    W0 = max(im.width for im in ims); H0 = sum(im.height for im in ims) + 14 * (len(ims) - 1)
+    cv = Image.new('RGB', (W0, H0), 'white'); y = 0
     for im in ims: cv.paste(im, (0, y)); y += im.height + 14
+    a = np.asarray(cv.convert('L')) < 160
+    cols = np.where(a.sum(0) > 2)[0]
+    if len(cols): cv = cv.crop((max(0, cols[0] - 25), 0, min(cv.width, cols[-1] + 25), cv.height))
+    if cv.width > 1500: cv = cv.resize((1500, round(cv.height * 1500 / cv.width)), Image.LANCZOS)
+    w, h = cv.size
     cv = cv.quantize(colors=16, dither=Image.Dither.NONE)
     fn = f'm{i:03d}.png'
     cv.save(f'{OUT}/img/{fn}', optimize=True)
