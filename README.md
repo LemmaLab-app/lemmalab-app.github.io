@@ -1,10 +1,10 @@
 <p align="center"><img src="icons/icon-512.png" width="140" alt="LemmaLab"></p>
 
-# LemmaLab – Analysis 1, Physik 1 & Informatik lernen
+# LemmaLab – Analysis 1, Physik 1, Informatik & Lineare Algebra lernen
 
 Private Lernhilfe, nur für den Eigengebrauch, ohne Gewähr.
 
-Lern-Website (Anki + Quizlet in einem) mit drei getrennten **Fächern** (Umschalter oben über dem Seitentitel
+Lern-Website (Anki + Quizlet in einem) mit vier getrennten **Fächern** (Umschalter oben über dem Seitentitel
 bzw. *Einstellungen → Fach*). Jedes Fach hat eigene Karten, eigenen Lernplan, eigenes Prüfungsdatum und eigene Statistik.
 
 - **Analysis 1:** alle 228 Definitionen, Sätze, Theoreme, Lemmata, Propositionen und Korollare aus Kapitel 1–9
@@ -20,6 +20,13 @@ bzw. *Einstellungen → Fach*). Jedes Fach hat eigene Karten, eigenen Lernplan, 
   versteckten Fehler (Kompilierfehler, undefiniertes Verhalten, Endlosschleife, logischer Fehler), wie in der Prüfung.
   Jede Code-Karte ist mit g++ geprüft: `node tools/test_informatik.mjs`. Prioritäten sind (noch) eine Einschätzung,
   keine Auswertung alter Prüfungen. Quelle: `informatik.js` (von Hand gepflegt; ⟦…⟧ = Inline-Code, ⟪…⟫ = Code-Block).
+- **Lineare Algebra** (LA I & II als ein Fach, Prüfung nach LA II): 358 Karten, wie bei Analysis exakt ausgeschnitten.
+  Vorrang hat die **Mitschrift der Vorlesung** (99 Einträge aus §0–§10: algebraische Strukturen, Vektorräume, Basen,
+  Unterräume/Quotienten, Dualraum, Hom(V,W), Basiswechsel, duale Abbildung, Kern/Bild/Rang; Karopapier entfernt).
+  Stoff, der in der Mitschrift noch fehlt, kommt aus dem Skript von Menny Akka Ginosar (259 Einträge: Rang und LGS,
+  Determinanten, Eigenwerte, Skalarprodukte, Spektralsätze, Bilinearformen, Jordan-Normalform, Annulator, Tensorprodukt);
+  diese Karten sind eine Prioritätsstufe tiefer eingeordnet. Prioritäten aus alten Prüfungen LA I/II.
+  Quelle: `linalg.js` (erzeugt mit `tools/linalg/`, siehe dortiges README).
 
 ## Funktionen
 - **Lernen (Spaced Repetition, FSRS-6):** Titel → Aussage selbst formulieren → aufdecken → nach rechts (gewusst) oder links (nicht gewusst) wischen. Persönliches Modell wird im Browser trainiert; die Schwierigkeit neuer Karten kommt aus anonymen Daten aller Nutzer (`tools/community.sql`).
@@ -52,8 +59,8 @@ bzw. *Einstellungen → Fach*). Jedes Fach hat eigene Karten, eigenen Lernplan, 
 Karte umdrehen (in beide Richtungen): Leertaste oder Karte antippen. Tastatur: 1–4 bzw. ←/→ = bewerten, U = rückgängig.
 
 ## Fächer & Speicher
-- `fach.js` legt die Fächer fest und lädt die Karten des aktiven Fachs (`data.js` + `logic.js`, `physik.js` bzw. `informatik.js`).
-- Lernstand pro Fach im `localStorage` (`lemmalab-v1` = Analysis wie bisher, `lemmalab-phy1-v1` = Physik, `lemmalab-inf1-v1` = Informatik).
+- `fach.js` legt die Fächer fest und lädt die Karten des aktiven Fachs (`data.js` + `logic.js`, `physik.js`, `informatik.js` bzw. `linalg.js`).
+- Lernstand pro Fach im `localStorage` (`lemmalab-v1` = Analysis wie bisher, `lemmalab-phy1-v1` = Physik, `lemmalab-inf1-v1` = Informatik, `lemmalab-la-v1` = Lineare Algebra).
 - Konto (Supabase): eine Zeile pro Konto; Analysis liegt wie bisher in `state`, weitere Fächer unter `state.subjects.<fach>`.
   Damit auch Physik-Karten im «Wissen aller Nutzer» landen, `tools/community.sql` nochmals im Supabase SQL Editor ausführen.
 - Gist-Abgleich: pro Fach eine eigene Datei im selben privaten Gist.

@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-19.41';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-19.42';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -31,12 +31,15 @@ const PRIO = {
   1: { name: 'Rand',      color: 'var(--p1)', ret: 0.85, w: 0.4 },
 };
 const KIND_COLOR = { Definition: 'var(--def)', Satz: 'var(--satz)', Theorem: 'var(--satz)', Lemma: 'var(--lem)', Proposition: 'var(--prop)', Korollar: 'var(--kor)',
-  Gesetz: 'var(--satz)', Formel: 'var(--prop)', Konzept: 'var(--kor)', Rezept: 'var(--lem)', Regel: 'var(--satz)', Code: 'var(--prop)' };
+  Gesetz: 'var(--satz)', Formel: 'var(--prop)', Konzept: 'var(--kor)', Rezept: 'var(--lem)', Regel: 'var(--satz)', Code: 'var(--prop)',
+  Behauptung: 'var(--prop)', Bemerkung: 'var(--kor)', Beispiel: 'var(--lem)', Axiom: 'var(--satz)' };
 const KIND_SHORT = { Definition: 'Def.', Satz: 'Satz', Theorem: 'Thm.', Lemma: 'Lemma', Proposition: 'Prop.', Korollar: 'Kor.',
-  Gesetz: 'Gesetz', Formel: 'Formel', Konzept: 'Konzept', Rezept: 'Rezept', Regel: 'Regel', Code: 'Code' };
+  Gesetz: 'Gesetz', Formel: 'Formel', Konzept: 'Konzept', Rezept: 'Rezept', Regel: 'Regel', Code: 'Code',
+  Behauptung: 'Beh.', Bemerkung: 'Bem.', Beispiel: 'Bsp.', Axiom: 'Axiom' };
 const KIND_PLURAL = { Definition: 'Definitionen', Satz: 'Sätze/Theoreme', Lemma: 'Lemmata', Proposition: 'Propositionen', Korollar: 'Korollare',
-  Gesetz: 'Gesetze', Formel: 'Formeln', Konzept: 'Konzeptfragen', Rezept: 'Rezepte', Regel: 'Regeln', Code: 'Code-Tracing' };
-const kindKey = c => c.kind === 'Theorem' ? 'Satz' : c.kind;
+  Gesetz: 'Gesetze', Formel: 'Formeln', Konzept: 'Konzeptfragen', Rezept: 'Rezepte', Regel: 'Regeln', Code: 'Code-Tracing',
+  Behauptung: 'Behauptungen', Bemerkung: 'Bemerkungen', Beispiel: 'Beispiele', Axiom: 'Axiome' };
+const kindKey = c => c.kind === 'Theorem' ? 'Satz' : c.kind === 'Axiom' ? 'Regel' : c.kind;
 const KINDS = Object.keys(KIND_PLURAL).filter(k => CARDS.some(c => kindKey(c) === k));
 const CHAP_KEYS = Object.keys(window.CHAPTERS || {}).map(Number).sort((a, b) => a - b);
 
@@ -958,7 +961,7 @@ function nextFocus() {
   const rows = [];
   if (kernLeft) rows.push(UI.item('target', '#ff453a', `${kernLeft} Kernkarten noch neu`, 'Kommen als Nächstes dran.', '', { act: 'cat:neu:5' }));
   if (weak.length) rows.push(UI.item('wave', '#ff9f0a', `${weak.length} wichtige Karte${weak.length === 1 ? '' : 'n'} wackel${weak.length === 1 ? 't' : 'n'}`, 'Werden automatisch öfter wiederholt.', '', { act: 'cat:wackelig:' }));
-  if (leeches.length) rows.push(UI.item('alert', '#8e8e93', `${leeches.length} Problemkarte${leeches.length === 1 ? '' : 'n'}`, FACH === 'ana1' ? 'Dreimal oder öfter vergessen. Beweisidee nachlesen hilft.' : FACH === 'inf1' ? 'Dreimal oder öfter vergessen. Code selbst kompilieren und laufen lassen hilft.' : 'Dreimal oder öfter vergessen. Herleitung im Skript nachlesen hilft.', '', { act: 'cat:schwach:' }));
+  if (leeches.length) rows.push(UI.item('alert', '#8e8e93', `${leeches.length} Problemkarte${leeches.length === 1 ? '' : 'n'}`, FACH === 'ana1' ? 'Dreimal oder öfter vergessen. Beweisidee nachlesen hilft.' : FACH === 'inf1' ? 'Dreimal oder öfter vergessen. Code selbst kompilieren und laufen lassen hilft.' : FACH === 'la' ? 'Dreimal oder öfter vergessen. Beweis in der Mitschrift nachlesen hilft.' : 'Dreimal oder öfter vergessen. Herleitung im Skript nachlesen hilft.', '', { act: 'cat:schwach:' }));
   return rows.length ? UI.group(rows) : '';
 }
 
@@ -988,7 +991,8 @@ function cardExtras(c) {
 }
 function metaLine(c, long) {
   if (!c.img) return `Kap. ${c.chap}${long ? ' ' + esc(c.chapTitle) : ''}${c.sec ? ` · Skript ${esc(c.sec)}` : ''}`;
-  return long ? `Kap. ${c.chap} ${esc(c.chapTitle)} · ${esc(c.sec)} · Skript S. ${c.page}` : `Kapitel ${c.chap} · Skript S. ${c.page}`;
+  const src = `${c.src || 'Skript'} S. ${c.page}`;   // Lineare Algebra: Mitschrift oder Skript
+  return long ? `Kap. ${c.chap} ${esc(c.chapTitle)} · ${esc(c.sec)} · ${src}` : `Kapitel ${c.chap} · ${src}`;
 }
 function scanHTML(c, masked) {
   if (!c.img) return richHTML(c) + (masked ? '' : cardExtras(c));
@@ -1341,7 +1345,7 @@ function openCard(id) {
   modal(`
     <div class="row">${kindTag(c)}<div class="spacer"></div>${prioTag(c)}<button class="btn ghost" data-act="close">✕</button></div>
     <h3 style="font-size:19px;margin:10px 0 2px">${esc(c.title)}</h3>
-    <div class="muted small">${metaLine(c, true)}${!c.titled ? ' · Titel ergänzt (im Skript ohne Namen)' : ''}</div>
+    <div class="muted small">${metaLine(c, true)}${!c.titled ? ` · Titel ergänzt (${c.src === 'Mitschrift' ? 'in der Mitschrift' : 'im Skript'} ohne Namen)` : ''}</div>
     ${qHTML(c)}
     ${scanHTML(c, false)}
     ${logicHTML(c)}
@@ -1707,7 +1711,7 @@ function fachSummary(id) {
 function fachPicker() {
   if (session || quiz) { toast('Zuerst die laufende Sitzung beenden'); return; }
   const F = window.FAECHER || {};
-  const col = { ana1: '#3a2bb5', phy1: '#b4531f', inf1: '#1f7a5a' };
+  const col = { ana1: '#3a2bb5', phy1: '#b4531f', inf1: '#1f7a5a', la: '#9b2c6e' };
   modal(`<div class="row"><h3 style="margin:0">Fach wählen</h3><div class="spacer"></div><button class="btn ghost" data-act="close">✕</button></div>
     <div class="fachlist">${Object.entries(F).map(([id, f]) => `<button class="fachopt${id === FACH ? ' on' : ''}" data-fach="${id}">
       <span class="dot" style="background:${col[id] || 'var(--accent)'}"></span>

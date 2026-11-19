@@ -24,6 +24,12 @@ window.FAECHER = {
     scripts: ['informatik.js'],
     gist: 'lemmalab-informatik.json', syncPrefix: 'inf1-', examDate: '2027-02-08', accent: 'inf',
   },
+  la: {
+    name: 'Lineare Algebra', short: 'Lin. Algebra', sub: 'LA I & II: Mitschrift & Skript',
+    ls: 'lemmalab-la-v1',
+    scripts: ['linalg.js'],
+    gist: 'lemmalab-linalg.json', syncPrefix: 'la-', examDate: '2027-08-02', accent: 'la',
+  },
 };
 window.FACH_KEY = 'lemmalab-fach';
 window.FACH = (() => {
