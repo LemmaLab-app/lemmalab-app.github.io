@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-19.23';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-19.24';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -866,12 +866,10 @@ function viewStudy() {
       <div class="kbd center ratehelp" style="margin-top:8px">Nochmal = wesentlicher Teil fehlte · Schwer = mit Mühe/kleine Lücke · Gut = vollständig · Einfach = sofort und sicher</div>`}
     `}
   </div>
-  ${s.revealed && swipeMode() ? `<div class="actionbar swipeact">
-    ${S.log.filter(l => modeOf(l) === 'l').length < 20 ? '<div class="swipehint">Nach rechts wischen, wenn du es vollständig wusstest, sonst nach links.</div>' : ''}
-    <div class="swipebar">
-      <button class="sb no" data-rate="1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg><span>Nicht gewusst<small>${ivls[0]}</small></span></button>
-      <button class="sb ok" data-rate="3"><span>Gewusst<small>${ivls[2]}</small></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
-    </div></div>` : ''}`;
+  ${s.revealed && swipeMode() ? `<div class="swipeact">
+    ${S.log.filter(l => modeOf(l) === 'l').length < 30 ? `<div class="swipehint"><span>‹ Nicht gewusst</span><span class="hide-touch">oder ← →</span><span>Gewusst ›</span></div>` : ''}
+    <div class="sr-only"><button data-rate="1">Nicht gewusst</button><button data-rate="3">Gewusst</button></div>
+  </div>` : ''}`;
 }
 
 /* ---------- Wischen: rechts = gewusst, links = nicht gewusst ---------- */
@@ -922,8 +920,7 @@ const Swipe = {
     fc.classList.add('fly');
     fc.style.setProperty('--pos', dir > 0 ? 1 : 0); fc.style.setProperty('--neg', dir < 0 ? 1 : 0);
     fc.style.transform = `translate(${dir * (innerWidth + 120)}px,${dy * .12 + 30}px) rotate(${dir * 16}deg)`;
-    const b = document.querySelector(`.swipebar .sb.${dir > 0 ? 'ok' : 'no'}`); if (b) b.classList.add('hit');
-    setTimeout(() => { Motion.busy = false; rate(g, { flown: true }); }, 240);
+        setTimeout(() => { Motion.busy = false; rate(g, { flown: true }); }, 240);
   },
 };
 

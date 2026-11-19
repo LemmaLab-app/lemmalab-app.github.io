@@ -789,30 +789,14 @@ body.focus .rate .r1,body.focus .rate .r2,body.focus .rate .r3,body.focus .rate 
 .sbadge.ok{left:16px;color:var(--good);opacity:var(--pos,0);transform:scale(calc(.85 + var(--pos,0) * .15)) rotate(4deg)}
 .sbadge.no{right:16px;color:var(--again);opacity:var(--neg,0);transform:scale(calc(.85 + var(--neg,0) * .15)) rotate(-4deg)}
 
-.swipeact{max-width:900px;margin:14px auto 0}
-.swipehint{text-align:center;font-size:13px;color:var(--muted);margin:0 8px 10px}
-.swipebar{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.sb{display:flex;align-items:center;gap:8px;border:0;border-radius:18px;padding:12px 16px;font-weight:650;font-size:16px;letter-spacing:-.01em;transition:background .2s,transform .12s;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.55),inset 0 0 0 .5px color-mix(in srgb,var(--c) 25%,transparent)}
-.sb span{display:flex;flex-direction:column;line-height:1.2}
-.sb small{font-weight:500;font-size:12.5px;color:color-mix(in srgb,var(--c) 70%,var(--muted))}
-.sb svg{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
-.sb.no{--c:var(--again);color:var(--again);background:color-mix(in srgb,var(--again) 13%,var(--panel));justify-content:flex-start;text-align:left}
-.sb.ok{--c:var(--good);color:var(--good);background:color-mix(in srgb,var(--good) 14%,var(--panel));justify-content:flex-end;text-align:right}
-.sb.ok span{align-items:flex-end}
-.sb:active,.sb.hit{transform:scale(.96);background:color-mix(in srgb,var(--c) 24%,var(--panel))}
-body.focus .sb.no{background:color-mix(in srgb,var(--again) 15%,rgba(255,255,255,.5))}
-body.focus .sb.ok{background:color-mix(in srgb,var(--good) 16%,rgba(255,255,255,.5))}
-:root.dark body.focus .sb{background:color-mix(in srgb,var(--c) 22%,rgba(255,255,255,.04))}
-#view.a-reveal .sb{animation:rise .5s var(--spring) both}
-#view.a-reveal .sb.ok{animation-delay:.05s}
-#view.a-reveal .swipehint{animation:vIn .4s var(--ease) .1s both}
-@media (max-width:767px),(max-height:559px){
-  body.focus .swipeact{margin:0}
-  body.focus .swipehint{margin-bottom:8px}
-}
-@media (orientation:landscape) and (max-height:559px){.sb{padding:8px 14px}.sb small{display:none}.swipehint{display:none}}
-@media (min-width:768px) and (min-height:560px){.sb{padding:15px 20px;font-size:17px}}
+.swipeact{max-width:900px;margin:16px auto 0}
+.swipehint{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--muted);padding:0 6px;letter-spacing:0}
+.swipehint span:first-child{color:color-mix(in srgb,var(--again) 70%,var(--muted))}
+.swipehint span:last-child{color:color-mix(in srgb,var(--good) 75%,var(--muted))}
+#view.a-reveal .swipehint{animation:vIn .4s var(--ease) .15s both}
+.sr-only{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.sr-only button:focus-visible{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);width:auto;height:auto;clip:auto}
+body.focus .app{padding-bottom:calc(40px + var(--safe-b))!important}
 @media (prefers-reduced-motion:reduce){.fc.swipeable{transition:none}}
 </style>
 </head>
@@ -833,10 +817,10 @@ body.focus .sb.ok{background:color-mix(in srgb,var(--good) 16%,rgba(255,255,255,
 <div id="navbar" aria-hidden="true"><span id="navTitle"></span></div>
 <div class="toast" id="toast"></div>
 <script src="vendor/katex/katex.min.js"></script>
-<script src="data.js?v=2026-11-19.23"></script>
-<script src="logic.js?v=2026-11-19.23"></script>
-<script src="app.js?v=2026-11-19.23"></script>
+<script src="data.js?v=2026-11-19.24"></script>
+<script src="logic.js?v=2026-11-19.24"></script>
+<script src="app.js?v=2026-11-19.24"></script>
 <script src="vendor/supabase/supabase.js"></script>
-<script src="account.js?v=2026-11-19.23"></script>
+<script src="account.js?v=2026-11-19.24"></script>
 </body>
 </html>
