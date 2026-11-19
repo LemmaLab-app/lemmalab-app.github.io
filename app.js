@@ -1,9 +1,9 @@
 /* LemmaLab – Definitionen, Sätze & Korollare lernen
- * Spaced Repetition mit FSRS-5, Prüfungs-Priorisierung, Quiz, Test, Statistik.
+ * Spaced Repetition mit FSRS-6 (persönlich trainiert), Prüfungs-Priorisierung, Quiz, Test, Statistik.
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-19.24';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-19.25';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -59,28 +59,37 @@ function fmtIvl(ms) {
 function hash(s) { let h = 2166136261; for (const ch of s) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
 
 /* ============================================================
- * FSRS-5
+ * FSRS-6 (21 Parameter, trainierbarer Vergessensverlauf)
+ * Formeln wie in ts-fsrs / fsrs-rs. makeFSRS(w) wird auch im
+ * Trainings-Worker verwendet – darum ohne Bezüge nach aussen.
  * ============================================================ */
-const FSRS = (() => {
-  const w = [0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192,
-             1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621];
-  const DECAY = -0.5, FACTOR = 19 / 81;
-  const R = (t, S) => Math.pow(1 + FACTOR * t / S, DECAY);
-  const ivl = (S, r) => S / FACTOR * (Math.pow(r, 1 / DECAY) - 1);
+const FSRS6_DEFAULT = [0.212, 1.2931, 2.3065, 8.2956, 6.4133, 0.8334, 3.0194, 0.001, 1.8722, 0.1666, 0.796,
+  1.4835, 0.0614, 0.2629, 1.6483, 0.6014, 1.8729, 0.5425, 0.0912, 0.0658, 0.1542];
+const FSRS6_BOUNDS = [[0.001, 100], [0.001, 100], [0.001, 100], [0.001, 100], [1, 10], [0.001, 4], [0.001, 4], [0.001, 0.75],
+  [0, 4.5], [0, 0.8], [0.001, 3.5], [0.001, 5], [0.001, 0.25], [0.001, 0.9], [0, 4], [0, 1], [1, 6], [0, 2], [0, 2], [0.01, 0.8], [0.1, 0.8]];
+function makeFSRS(w) {
+  const lim = (v, a, b) => Math.min(b, Math.max(a, v));
+  const decay = -w[20], factor = Math.pow(0.9, 1 / decay) - 1;
+  const R = (t, S) => Math.pow(1 + factor * t / S, decay);
+  const ivl = (S, r) => S / factor * (Math.pow(r, 1 / decay) - 1);
   const S0 = g => Math.max(w[g - 1], 0.1);
-  const D0 = g => clamp(w[4] - Math.exp(w[5] * (g - 1)) + 1, 1, 10);
-  const nextD = (D, g) => {
-    const d2 = D + (-w[6] * (g - 3)) * (10 - D) / 9;
-    return clamp(w[7] * D0(4) + (1 - w[7]) * d2, 1, 10);
+  const D0raw = g => w[4] - Math.exp((g - 1) * w[5]) + 1;
+  const D0 = g => lim(D0raw(g), 1, 10);
+  const nextD = (D, g) => { const d2 = D + (-w[6] * (g - 3)) * (10 - D) / 9; return lim(w[7] * D0raw(4) + (1 - w[7]) * d2, 1, 10); };
+  const recallS = (D, S, r, g) => lim(S * (1 + Math.exp(w[8]) * (11 - D) * Math.pow(S, -w[9]) * (Math.exp((1 - r) * w[10]) - 1) * (g === 2 ? w[15] : 1) * (g === 4 ? w[16] : 1)), 0.001, 36500);
+  const forgetS = (D, S, r) => Math.min(S / Math.exp(w[17] * w[18]), lim(w[11] * Math.pow(D, -w[12]) * (Math.pow(S + 1, w[13]) - 1) * Math.exp((1 - r) * w[14]), 0.001, 36500));
+  const shortS = (S, g) => { let k = Math.pow(S, -w[19]) * Math.exp(w[17] * (g - 3 + w[18])); if (g >= 2) k = Math.max(k, 1); return lim(S * k, 0.001, 36500); };
+  /* Startzustand; dl = Schwierigkeits-Verschiebung aus den Daten aller Nutzer */
+  const init = (g, dl = 0) => ({ S: Math.max(0.1, S0(g) * Math.exp(-0.25 * dl)), D: lim(D0(g) + dl, 1, 10) });
+  /* ein Lernschritt: el = vergangene Tage (< 0,5 = gleicher Tag) */
+  const step = (m, g, el) => {
+    if (el < 0.5) return { S: shortS(m.S, g), D: nextD(m.D, g) };
+    const r = R(el, m.S);
+    return { S: g === 1 ? forgetS(m.D, m.S, r) : recallS(m.D, m.S, r, g), D: nextD(m.D, g) };
   };
-  const recallS = (D, S, r, g) => S * (1 + Math.exp(w[8]) * (11 - D) * Math.pow(S, -w[9]) *
-    (Math.exp((1 - r) * w[10]) - 1) * (g === 2 ? w[15] : 1) * (g === 4 ? w[16] : 1));
-  const forgetS = (D, S, r) => Math.min(
-    w[11] * Math.pow(D, -w[12]) * (Math.pow(S + 1, w[13]) - 1) * Math.exp((1 - r) * w[14]),
-    S / Math.exp(w[17] * w[18]));
-  const shortS = (S, g) => S * Math.exp(w[17] * (g - 3 + w[18]));
-  return { R, ivl, S0, D0, nextD, recallS, forgetS, shortS };
-})();
+  return { w, R, ivl, S0, D0, nextD, recallS, forgetS, shortS, init, step };
+}
+let FSRS = makeFSRS(FSRS6_DEFAULT);
 
 /* ============================================================
  * Zustand & Speicherung
@@ -215,9 +224,9 @@ function dueLoadByDay(exceptId, t) {
  * (Karte war im Wiederholungsmodus) die verstrichene Zeit, Stabilität und
  * ob gewusst – Grundlage für Kalibrierung und Statistiken. */
 const Replay = {
-  _len: -1, _res: null,
+  _len: -1, _res: null, _ver: '',
   run() {
-    if (this._len === S.log.length && this._res) return this._res;
+    if (this._len === S.log.length && this._ver === Model.ver && this._res) return this._res;
     const byCard = {};
     for (const l of S.log) if (modeOf(l) !== 'q' && BY_ID[l[1]]) (byCard[l[1]] = byCard[l[1]] || []).push(l);
     const reviews = [], timeline = {};
@@ -231,10 +240,10 @@ const Replay = {
           if (el >= 0.5) reviews.push({ id, el, S: x.S, ok: l[2] >= 2, t: l[0], prio: BY_ID[id].prio });
         }
         x = schedule(BY_ID[id], x, l[2], l[0], { replay: true });
-        tl.push({ t: l[0], S: x.S, last: x.last, st: x.st });
+        tl.push({ t: l[0], S: x.S, D: x.D, last: x.last, st: x.st });
       }
     }
-    this._len = S.log.length;
+    this._len = S.log.length; this._ver = Model.ver;
     return (this._res = { reviews, timeline });
   },
 };
@@ -244,12 +253,12 @@ const Replay = {
  * k > 1: du behältst besser als das Standardmodell → längere Intervalle.
  * Wird erst ab 40 Wiederholungen aktiv und zu 1 hin gedämpft. */
 const Calib = {
-  _len: -1, _k: 1, _raw: 1, _n: 0,
+  _len: -1, _ver: '', _k: 1, _raw: 1, _n: 0,
   k() { this.update(); return this._k; },
   update() {
-    if (this._len === S.log.length) return;
-    this._len = S.log.length;
-    if (S.settings.calib === false) { this._k = 1; return; }
+    if (this._len === S.log.length && this._ver === Model.ver) return;
+    this._len = S.log.length; this._ver = Model.ver;
+    if (S.settings.calib === false || Model.personal()) { this._k = 1; this._n = 0; return; }
     const rv = Replay.run().reviews;
     this._n = rv.length;
     if (rv.length < 40) { this._k = 1; this._raw = 1; return; }
@@ -265,6 +274,169 @@ const Calib = {
     this._k = Math.exp(wgt * Math.log(best));
   },
 };
+
+/* ============================================================
+ * Modell: Standard-FSRS-6 oder persönlich trainierte Parameter
+ * ============================================================ */
+const Model = {
+  ver: 'd', _key: '',
+  personal() { const st = S.settings; return st.calib !== false && Array.isArray(st.fsrsW) && st.fsrsW.length === 21 && !!(st.fsrsMeta && st.fsrsMeta.adopted); },
+  apply() {
+    const w = this.personal() ? S.settings.fsrsW : FSRS6_DEFAULT;
+    const key = w.join(',') + '|' + Community.ver + '|' + (S.settings.community === false ? 0 : 1);
+    if (key === this._key) return false;
+    this._key = key; FSRS = makeFSRS(w.slice()); this.ver = hash(key).toString(36);
+    return true;
+  },
+  /* Gedächtniszustand (S, D) aller Karten aus dem Verlauf neu berechnen; Fälligkeiten bleiben */
+  rebuild() {
+    const tl = Replay.run().timeline;
+    for (const [id, arr] of Object.entries(tl)) { const x = S.cards[id], e = arr[arr.length - 1]; if (x && x.st && e && e.S) { x.S = e.S; x.D = e.D; } }
+    try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (e) { }
+  },
+  sync() { if (this.apply() && S.log.length) this.rebuild(); },
+  status() {
+    const m = S.settings.fsrsMeta || {}, n = Trainer.count();
+    if (S.settings.calib === false) return 'Aus – Standardwerte';
+    if (this.personal()) return `Persönlich trainiert auf ${n.toLocaleString('de-CH')} Wiederholungen${m.gain > 0 ? ` · ${Math.round(m.gain * 100)} % genauer` : ''}`;
+    if (m.at) return `Standardwerte passen noch besser (${n} Wiederholungen)`;
+    return n < Trainer.MIN ? `Startet ab ${Trainer.MIN} Wiederholungen (bisher ${n})` : 'Training ausstehend';
+  },
+};
+
+/* ---------- Training im Hintergrund (Web Worker) ----------
+ * Minimiert den Log-Loss der Vorhersage «gewusst?» über deine Wiederholungen.
+ * Prüfung auf den jüngsten 20 %: Nur wenn das trainierte Modell dort besser
+ * vorhersagt als die Standardwerte, wird es übernommen. */
+const Trainer = {
+  MIN: 100, running: false, progress: 0,
+  seqs() {
+    const by = {};
+    for (const l of S.log) if (modeOf(l) !== 'q' && BY_ID[l[1]]) (by[l[1]] = by[l[1]] || []).push([l[0], l[2]]);
+    return Object.entries(by).map(([id, a]) => ({ dl: Community.delta(id), r: a.sort((p, q) => p[0] - q[0]) }));
+  },
+  _cl: -1, _cn: 0,
+  count() {
+    if (this._cl === S.log.length) return this._cn;
+    let n = 0; for (const q of this.seqs()) for (let i = 1; i < q.r.length; i++) if ((q.r[i][0] - q.r[i - 1][0]) / DAY >= 0.5) n++;
+    this._cl = S.log.length; return (this._cn = n);
+  },
+  due() {
+    if (S.settings.calib === false || this.running || typeof Worker === 'undefined') return false;
+    const m = S.settings.fsrsMeta || {}, n = this.count();
+    if (n < this.MIN) return false;
+    if (!m.at) return true;
+    return now() - m.at > 20 * HOUR && n >= (m.n || 0) * 1.1 + 20;
+  },
+  run() {
+    if (this.running || typeof Worker === 'undefined') return;
+    const seqs = this.seqs();
+    const times = []; for (const q of seqs) for (let i = 1; i < q.r.length; i++) if ((q.r[i][0] - q.r[i - 1][0]) / DAY >= 0.5) times.push(q.r[i][0]);
+    if (times.length < this.MIN) return;
+    times.sort((a, b) => a - b);
+    const split = times[Math.floor(times.length * 0.8)];
+    const src = `${makeFSRS.toString()}\nconst B=${JSON.stringify(FSRS6_BOUNDS)},W0=${JSON.stringify(FSRS6_DEFAULT)};\n(${trainWorker.toString()})();`;
+    let wk;
+    try { wk = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' }))); } catch (e) { return; }
+    this.running = true; this.progress = 0;
+    wk.onmessage = e => {
+      const d = e.data;
+      if (d.progress != null) { this.progress = d.progress; const el = $('#trainStatus'); if (el) el.textContent = `Training läuft … ${Math.round(d.progress * 100)} %`; return; }
+      this.running = false; wk.terminate();
+      if (d.error) { console.warn('Training', d.error); return; }
+      S.settings.fsrsW = d.w.map(v => Math.round(v * 1e4) / 1e4);
+      S.settings.fsrsMeta = { at: now(), n: times.length, adopted: d.adopted, gain: d.gain, testN: d.testN, lossFit: d.lossFit, lossDef: d.lossDef };
+      S.settings.u = now();
+      save(['settings']);
+      Model.sync();
+      if ((tab === 'mehr' || tab === 'statistik') && !session && !quiz) render();
+    };
+    wk.onerror = () => { this.running = false; };
+    wk.postMessage({ seqs, split });
+  },
+};
+/* läuft im Worker: makeFSRS, B (Grenzen) und W0 (Standardwerte) sind dort definiert */
+function trainWorker() {
+  onmessage = e => {
+    try {
+      const { seqs, split } = e.data, DAYMS = 86400000;
+      const loss = (w, mode) => {
+        const F = makeFSRS(w); let L = 0, n = 0;
+        for (const q of seqs) {
+          let m = F.init(q.r[0][1], q.dl);
+          for (let i = 1; i < q.r.length; i++) {
+            const el = (q.r[i][0] - q.r[i - 1][0]) / DAYMS, g = q.r[i][1], t = q.r[i][0];
+            if (el >= 0.5 && (mode === 0 || (mode === 1 && t < split) || (mode === 2 && t >= split))) {
+              const p = Math.min(1 - 1e-6, Math.max(1e-6, F.R(el, m.S)));
+              L -= g > 1 ? Math.log(p) : Math.log(1 - p); n++;
+            }
+            m = F.step(m, g, el);
+          }
+        }
+        return { L: n ? L / n : 0, n };
+      };
+      const toW = u => u.map((v, i) => B[i][0] + v * (B[i][1] - B[i][0]));
+      const U0 = W0.map((v, i) => (v - B[i][0]) / (B[i][1] - B[i][0]));
+      const fit = (mode, start, steps, p0, p1) => {
+        const N = loss(W0, mode).n, lam = 1.5 / Math.max(1, N);
+        const obj = u => { let pen = 0; for (let i = 0; i < u.length; i++) { const d = (u[i] - U0[i]) / 0.12; pen += d * d; } return loss(toW(u), mode).L + lam * pen; };
+        let u = start.slice(), f = obj(u);
+        const m = new Array(21).fill(0), v = new Array(21).fill(0), lr = 0.01, h = 1e-4;
+        for (let it = 1; it <= steps; it++) {
+          const g = new Array(21);
+          for (let i = 0; i < 21; i++) {
+            const uu = u.slice(); const up = u[i] + h <= 1; uu[i] = up ? u[i] + h : u[i] - h;
+            g[i] = up ? (obj(uu) - f) / h : (f - obj(uu)) / h;
+          }
+          for (let i = 0; i < 21; i++) {
+            m[i] = 0.9 * m[i] + 0.1 * g[i]; v[i] = 0.999 * v[i] + 0.001 * g[i] * g[i];
+            const mh = m[i] / (1 - Math.pow(0.9, it)), vh = v[i] / (1 - Math.pow(0.999, it));
+            u[i] = Math.min(1, Math.max(0, u[i] - lr * mh / (Math.sqrt(vh) + 1e-8)));
+          }
+          f = obj(u);
+          if (it % 10 === 0) postMessage({ progress: p0 + (p1 - p0) * it / steps });
+        }
+        return u;
+      };
+      const uTrain = fit(1, U0, 150, 0, 0.6);
+      const tDef = loss(W0, 2), tFit = loss(toW(uTrain), 2);
+      const adopted = tDef.n >= 25 && tFit.L < tDef.L;
+      const uAll = adopted ? fit(0, uTrain, 80, 0.6, 1) : uTrain;
+      const w = toW(uAll);
+      postMessage({ w, adopted, gain: tDef.L > 0 ? (tDef.L - tFit.L) / tDef.L : 0, testN: tDef.n, lossFit: loss(w, 0).L, lossDef: loss(W0, 0).L });
+    } catch (err) { postMessage({ error: String(err) }); }
+  };
+}
+
+/* ============================================================
+ * Wissen aller Nutzer: wie schwer ist eine Karte beim ersten Mal?
+ * (anonyme Summen aus der Datenbank, mind. 5 Personen pro Karte)
+ * ============================================================ */
+const Community = {
+  KEY: 'lemmalab-community', ver: '0', data: null,
+  init() { try { this.data = JSON.parse(localStorage.getItem(this.KEY) || 'null'); } catch (e) { } this.ver = this.data ? String(this.data.at) : '0'; },
+  delta(id) {
+    if (S.settings.community === false || !this.data || !this.data.cards) return 0;
+    const c = this.data.cards[id]; if (!c || c[1] < 5) return 0;
+    const lg = p => Math.log(p / (1 - p)), cl = p => Math.min(0.95, Math.max(0.05, p));
+    const wgt = c[1] / (c[1] + 20);                     // wenig Personen → schwächer gewichten
+    return clamp((lg(cl(c[2])) - lg(cl(this.data.ff0))) * 1.2 * wgt, -2.5, 2.5);
+  },
+  async refresh(force) {
+    if (typeof Cloud === 'undefined' || !Cloud.sb || !navigator.onLine) return;
+    if (!force && this.data && Date.now() - this.data.at < 12 * HOUR) return;
+    try { await Cloud.sb.rpc('refresh_card_stats'); } catch (e) { }
+    const { data, error } = await Cloud.sb.from('card_stats').select('card,users,first_n,first_fail');
+    if (error || !data) return;
+    const cards = {}; let a = 0, b = 0;
+    for (const r of data) { if (!BY_ID[r.card]) continue; cards[r.card] = [r.users, r.first_n, r.first_fail]; a += r.first_n * r.first_fail; b += r.first_n; }
+    this.data = { at: Date.now(), cards, ff0: b ? a / b : 0.3, n: Object.keys(cards).length };
+    try { localStorage.setItem(this.KEY, JSON.stringify(this.data)); } catch (e) { }
+    this.ver = String(this.data.at);
+    Model.sync();
+  },
+};
+Community.init();
 
 /* ============================================================
  * Bewertung einer Karte (Scheduler)
@@ -289,29 +461,20 @@ function schedule(c, x, g, t = now(), opts = {}) {
   };
   y.reps = (x.reps || 0) + 1;
   y.last = t;
-  if (!x.st) {                                    // neue Karte
-    y.S = FSRS.S0(g); y.D = FSRS.D0(g); y.intro = x.intro || t; y.lapses = 0;
+  if (!x.st || !x.S) {                            // neue Karte
+    const m = FSRS.init(g, Community.delta(c.id)); y.S = m.S; y.D = m.D; y.intro = x.intro || t; y.lapses = 0;
     if (g === 1) { y.st = 1; y.step = 0; y.due = t + 1 * MIN; }
     else if (g === 2) { y.st = 1; y.step = 0; y.due = t + 6 * MIN; }
     else if (g === 3) { y.st = 1; y.step = 1; y.due = t + 10 * MIN; }
     else { y.st = 2; y.due = t + toDays(y.S) * DAY; }
   } else {
     const elapsed = Math.max(0, (t - (x.last || t)) / DAY);
-    const r = FSRS.R(elapsed, x.S);
-    const sameDay = elapsed < 0.5;
-    y.D = FSRS.nextD(x.D, g);
+    const m = FSRS.step({ S: x.S, D: x.D || 5 }, g, elapsed);
+    y.S = m.S; y.D = m.D;
     if (x.st === 2) {                               // Wiederholung
-      if (g === 1) {
-        y.lapses = (x.lapses || 0) + 1;
-        y.S = sameDay ? FSRS.shortS(x.S, g) : FSRS.forgetS(x.D, x.S, r);
-        y.st = 3; y.step = 0; y.due = t + 10 * MIN;
-      } else {
-        y.S = sameDay ? Math.max(x.S, FSRS.shortS(x.S, g)) : FSRS.recallS(x.D, x.S, r, g);
-        let d = fuzz(toDays(y.S));
-        y.due = t + d * DAY;
-      }
+      if (g === 1) { y.lapses = (x.lapses || 0) + 1; y.st = 3; y.step = 0; y.due = t + 10 * MIN; }
+      else y.due = t + fuzz(toDays(y.S)) * DAY;
     } else {                                        // Lernen / Neu-Lernen (st 1/3)
-      y.S = FSRS.shortS(x.S, g);
       if (g === 1) { y.step = 0; y.due = t + (x.st === 3 ? 10 : 1) * MIN; }
       else if (g === 2) { y.due = t + (x.st === 3 ? 10 : 6) * MIN; }
       else if (g === 3 && x.st === 1 && (x.step || 0) < 1) { y.step = 1; y.due = t + 10 * MIN; }
@@ -521,6 +684,7 @@ window.addEventListener('hashchange', () => { const t = location.hash.slice(1); 
 
 function render() {
   applyTheme();
+  Model.sync();
   { const h = $('#hdrTitle'); if (h) h.textContent = ({ heute: 'Lernen', quiz: 'Quiz & Test', katalog: 'Katalog', statistik: 'Statistik', mehr: 'Einstellungen', admin: 'Admin' })[tab] || 'LemmaLab'; }
   const focusMode = (tab === 'heute' && session && session.cur) || (tab === 'quiz' && quiz && quiz.i < quiz.items.length);
   document.body.classList.toggle('focus', !!focusMode);
@@ -1294,7 +1458,7 @@ function memoryStatsHTML() {
     <div class="card"><h3>Kalibrierung: stimmt die Vorhersage?</h3>
       <table class="t"><tr><th>vorhergesagt</th><th class="num">Ø vorhergesagt</th><th class="num">tatsächlich</th><th class="num">n</th></tr>
       ${cal.map(b => `<tr><td>${Math.round(b.a * 100)}–${Math.min(100, Math.round(b.b * 100))} %</td><td class="num">${pct(b.pred)}</td><td class="num" style="${b.n >= 10 && Math.abs(b.act - b.pred) > .08 ? 'color:var(--again);font-weight:700' : ''}">${pct(b.act)}</td><td class="num">${b.n}</td></tr>`).join('')}</table>
-      <div class="muted small" style="margin-top:10px">Gedächtnisfaktor <b style="color:var(--ink)">${K.toFixed(2)}</b>${Calib._n >= 40 ? ` aus ${Calib._n} Wiederholungen` : ` · aktiv ab 40 Wiederholungen (${Calib._n})`}. Über 1 heisst längere Abstände.</div></div>
+      <div class="muted small" style="margin-top:10px">Modell: FSRS-6 · ${esc(Model.status())}${!Model.personal() && Calib._n >= 40 ? ` · Faktor ${K.toFixed(2)}` : ''}</div></div>
     <div class="card"><h3>Behaltensquote je Priorität</h3>
       <table class="t"><tr><th></th><th class="num">Ziel</th><th class="num">erreicht</th><th class="num">n</th></tr>
       ${byP.map(b => `<tr><td><span class="dot" style="background:${PRIO[b.p].color}"></span> ${PRIO[b.p].name}</td><td class="num">${Math.round(PRIO[b.p].ret * 100)}%</td><td class="num" style="${b.n >= 15 && b.act < PRIO[b.p].ret - .05 ? 'color:var(--again);font-weight:700' : ''}">${pct(b.act)}</td><td class="num">${b.n}</td></tr>`).join('')}</table>
@@ -1447,10 +1611,12 @@ function viewSettings() {
   ], { footer: `Mit Zeitbudget werden die neuen Karten so begrenzt, dass der Tag hineinpasst (0 = aus). ${pt.fromData ? `Gerechnet mit deinen Zeiten: Wiederholung ≈ ${Math.round(pt.review)} s, neue Karte ≈ ${Math.round(pt.newCost)} s.` : 'Bis genug Daten da sind, mit Standardwerten.'}` })}
 
   ${UI.group([
-    UI.toggle('sCalib', st.calib !== false, 'An mein Gedächtnis anpassen', `Persönlicher Faktor ${Calib.k().toFixed(2)}`),
+    UI.toggle('sCalib', st.calib !== false, 'Persönliches Modell', `<span id="trainStatus">${Trainer.running ? 'Training läuft …' : Model.status()}</span>`),
+    UI.toggle('sCommunity', st.community !== false, 'Wissen aller Nutzer', Community.data && Community.data.n ? `Schwierigkeit von ${Community.data.n} Karten bekannt` : 'Schwierigkeit neuer Karten aus anonymen Daten'),
     UI.toggle('sRand', !!st.includeRand, 'Randstoff ebenfalls lernen'),
     UI.toggle('sFour', !!st.fourButtons, 'Vier Bewertungsstufen', 'Nochmal · Schwer · Gut · Einfach statt Wischen'),
-  ], { header: 'Algorithmus', footer: 'Standard ist Wischen: rechts gewusst, links nicht gewusst. Der Algorithmus erkennt den Lernstand aus der Abfolge und den Abständen.' })}
+    st.calib !== false && Trainer.count() >= Trainer.MIN ? UI.action(Trainer.running ? 'Training läuft …' : 'Modell jetzt neu trainieren', 'train') : '',
+  ], { header: 'Algorithmus', footer: 'FSRS-6. Das persönliche Modell lernt aus deinen Wiederholungen und wird nur übernommen, wenn es deine neuesten Ergebnisse besser vorhersagt. Das Wissen aller Nutzer zeigt, welche Karten allgemein schwer sind.' })}
 
   ${UI.group([
     UI.toggle('sLogic', st.showLogic !== false, 'Prädikatenlogik anzeigen'),
@@ -1470,7 +1636,7 @@ function viewSettings() {
 
   ${UI.group([UI.action('Gesamten Fortschritt löschen', 'resetall', { danger: true })])}
 
-  <div class="ig-foot">LemmaLab ${APP_VERSION}<br><a href="#mehr" data-act="update">Nach Update suchen</a> · <a href="datenschutz.html">Datenschutz</a><br>Inoffizielle Lernhilfe, ohne Gewähr. Inhalte aus dem Vorlesungsskript (Kapitel 1–9). Prioritäten aus alten Prüfungen geschätzt. Algorithmus FSRS-5.</div>
+  <div class="ig-foot">LemmaLab ${APP_VERSION}<br><a href="#mehr" data-act="update">Nach Update suchen</a> · <a href="datenschutz.html">Datenschutz</a><br>Inoffizielle Lernhilfe, ohne Gewähr. Inhalte aus dem Vorlesungsskript (Kapitel 1–9). Prioritäten aus alten Prüfungen geschätzt. Algorithmus FSRS-6.</div>
   </div>`;
 }
 
@@ -1518,7 +1684,8 @@ function afterRender() {
   on('#sBudget', 'change', e => { S.settings.budget = clamp(+e.target.value || 0, 0, 300); touchSettings(); });
   on('#sMax', 'change', e => { S.settings.maxReviews = clamp(+e.target.value || 200, 20, 1000); touchSettings(); });
   on('#sRand', 'change', e => { S.settings.includeRand = e.target.checked; touchSettings(); });
-  on('#sCalib', 'change', e => { S.settings.calib = e.target.checked; Calib._len = -1; touchSettings(); });
+  on('#sCalib', 'change', e => { S.settings.calib = e.target.checked; Calib._len = -1; touchSettings(); Model.sync(); if (e.target.checked && Trainer.due()) Trainer.run(); render(); });
+  on('#sCommunity', 'change', e => { S.settings.community = e.target.checked; touchSettings(); Model.sync(); if (e.target.checked) Community.refresh(true); render(); });
   on('#sLogic', 'change', e => { S.settings.showLogic = e.target.checked; touchSettings(); });
   on('#sFour', 'change', e => { S.settings.fourButtons = e.target.checked; touchSettings(); });
   on('#sType', 'change', e => { S.settings.typeAnswer = e.target.checked; touchSettings(); });
@@ -1551,6 +1718,7 @@ document.addEventListener('click', e => {
   if (act.startsWith('cat:')) { const [, st, pr] = act.split(':'); cat = { q: '', chap: '', kind: '', prio: pr || '', status: st || '' }; return go('katalog'); }
   switch (act) {
     case 'start': startSession(); break;
+    case 'train': if (!Trainer.running) { Trainer.run(); render(); } break;
     case 'extra': {
       const ids = eligibleNew().slice(0, 10).map(c => c.id);
       if (!ids.length) { toast('Keine neuen Karten mehr'); break; }
@@ -1880,6 +2048,11 @@ window.addEventListener('visibilitychange', () => { if (document.visibilityState
  * Start
  * ============================================================ */
 Motion.set('tab'); render();
+/* Hintergrund: Wissen aller Nutzer holen, persönliches Modell trainieren */
+const bgTasks = () => { Community.refresh().catch(() => { }); if (Trainer.due()) Trainer.run(); };
+setTimeout(bgTasks, 5000);
+setInterval(bgTasks, HOUR);
+window.addEventListener('online', () => setTimeout(bgTasks, 2000));
 Sync.init();
 Gist.init();
 checkUpdate();

@@ -9,7 +9,7 @@ Propositionen und Korollare aus Kapitel 1–9** des Vorlesungsskripts.
 Die Aussagen sind exakt aus dem Skript ausgeschnitten (keine Abtippfehler).
 
 ## Funktionen
-- **Lernen (Spaced Repetition, FSRS-5):** Titel → Aussage selbst formulieren → aufdecken → Nochmal/Schwer/Gut/Einfach.
+- **Lernen (Spaced Repetition, FSRS-6):** Titel → Aussage selbst formulieren → aufdecken → nach rechts (gewusst) oder links (nicht gewusst) wischen. Persönliches Modell wird im Browser trainiert; die Schwierigkeit neuer Karten kommt aus anonymen Daten aller Nutzer (`tools/community.sql`).
   Der Algorithmus plant jede Karte kurz vor dem Vergessen; Fortschritt wird gespeichert, es geht jeden Tag dort weiter, wo du warst.
 - **Prüfungs-Priorisierung:** 5 Stufen (Kern, Wichtig, Solide, Ergänzung, Rand). Neue Karten kommen in dieser Reihenfolge,
   Kernstoff wird auf 95 % Abrufsicherheit gehalten, Randstoff auf 85 %. Beweis-Wahrscheinlichkeiten aus der
