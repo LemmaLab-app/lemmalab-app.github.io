@@ -416,8 +416,9 @@ function viewHome() {
   const pt = personalTimes();
   const estMin = Math.round((q.nRev * pt.review + q.nNew * pt.newCost + Math.max(0, learning) * pt.learn) / 60);
   const focus = nextFocus();
-  return `
-  <div class="card">
+  const chap = groupStats(c => c.chap, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  return `<div class="home"><div class="col">
+  <div class="card hero">
     <div class="row"><h3 style="margin:0">Heute</h3><div class="spacer"></div>
       <span class="pill gray">${dte > 0 ? `Prüfung in ${dte} Tagen` : dte === 0 ? 'Prüfung heute' : 'Prüfung vorbei'}</span></div>
     <div class="grid g3" style="margin-top:12px">
@@ -442,8 +443,13 @@ function viewHome() {
       <div class="bar" style="margin-top:8px">${prioBarSegments()}</div>
       <div class="s">Kern ${countIntro(5)} · Wichtig ${countIntro(4)} · Solide ${countIntro(3)}</div></div>
   </div>
-
+  </div><div class="col">
   ${focus ? `<h2>Nächster Fokus</h2><div class="card small">${focus}</div>` : ''}
+  <h2>Kapitel</h2>
+  <div class="card">
+    <table class="t">${chap.map(g => `<tr><td style="width:46%"><span class="muted">${g.k}.</span> ${esc((window.CHAPTERS || {})[g.k] || '')}</td><td>${stackBar(g)}</td><td class="num muted" style="width:52px">${g.n - g.neu}/${g.n}</td></tr>`).join('')}</table>
+    <div class="legend" style="margin-bottom:0"><span><i style="background:var(--good)"></i>sitzt</span><span><i style="background:var(--easy)"></i>jung</span><span><i style="background:var(--hard)"></i>lernend</span><span><i style="background:var(--line)"></i>neu</span></div>
+  </div>
 
   <h2>So funktioniert's</h2>
   <div class="card small muted">
@@ -452,7 +458,8 @@ function viewHome() {
     Keine Wiederholung wird über das Prüfungsdatum hinaus geplant – alles kommt in den letzten Tagen vor der Prüfung noch einmal.
     <br><br><b>Ablauf:</b> Titel lesen → Aussage im Kopf oder auf Papier <i>vollständig</i> formulieren (alle Voraussetzungen!) → aufdecken → ehrlich bewerten.
     <span class="kbd">Tastatur: Leertaste = aufdecken, 1–4 = bewerten, U = rückgängig.</span>
-  </div>`;
+  </div>
+  </div></div>`;
 }
 function countIntro(p) { const all = CARDS.filter(c => prioOf(c) === p); return `${all.filter(c => S.cards[c.id] && S.cards[c.id].st).length}/${all.length}`; }
 function prioBarSegments() {
@@ -650,7 +657,7 @@ function viewQuiz() {
       ${wrong.length ? `<button class="btn primary" data-act="learnwrong">Falsche jetzt lernen</button>` : ''}</div></div>`;
   }
   const chOpts = Object.entries(window.CHAPTERS || {}).map(([k, v]) => `<option value="k${k}">Kapitel ${k}: ${esc(v)}</option>`).join('');
-  return `
+  return `<div class="quizgrid">
   <div class="card">
     <h3>Zuordnen (Quizlet-Stil)</h3>
     <div class="muted small">Du siehst die Aussage aus dem Skript ohne Titel und wählst den richtigen Namen. Trainiert das Wiedererkennen – ideal zwischendurch auf dem Handy. Bevorzugt werden Karten, die bei dir wackeln.</div>
@@ -668,6 +675,7 @@ function viewQuiz() {
       <select id="tN"><option>8</option><option selected>12</option><option>20</option></select>
     </div>
     <button class="btn primary big" data-act="teststart">Test starten</button>
+  </div>
   </div>
   ${quizHistory()}`;
 }
@@ -848,7 +856,7 @@ function viewStats() {
   </div>
   <h2>Plan bis zur Prüfung</h2><div class="card small">${plan}</div>
   <h2>Fortschritt</h2>
-  <div class="grid">${grp('Nach Priorität', byPrio, k => `<span class="dot" style="background:${PRIO[k].color}"></span> ${PRIO[k].name}`)}
+  <div class="grid cols2">${grp('Nach Priorität', byPrio, k => `<span class="dot" style="background:${PRIO[k].color}"></span> ${PRIO[k].name}`)}
   ${grp('Nach Kapitel', byChap, k => `${k}. ${esc((window.CHAPTERS || {})[k] || '')}`)}
   ${grp('Nach Typ', byKind, k => k === 'Satz' ? 'Sätze/Theoreme' : k === 'Definition' ? 'Definitionen' : k === 'Lemma' ? 'Lemmata' : k === 'Proposition' ? 'Propositionen' : 'Korollare')}</div>
   <h2>Prognose: fällige Karten nächste 14 Tage</h2>
