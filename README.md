@@ -1,4 +1,4 @@
-# Analysis I – Definitionen & Sätze lernen
+# LemmaLab – Analysis I: Definitionen & Sätze lernen
 
 Private Lernhilfe, nur für den Eigengebrauch, ohne Gewähr.
 
@@ -25,7 +25,7 @@ Die Aussagen sind exakt aus dem Skript ausgeschnitten (keine Abtippfehler).
 - **Statistik:** Prüfungsbereitschaft, Fortschritt nach Priorität/Kapitel/Typ, Prognose, Aktivität, Problemkarten, Plan bis zur Prüfung.
 
 ## Benutzen
-- **GitHub Pages:** https://teddy8002.github.io/Analysis-1-Definitionen-und-S-tze-lernen/ – unter *Einstellungen → Geräte abgleichen*
+- **GitHub Pages:** https://lemmalab-app.github.io/ – unter *Einstellungen → Geräte abgleichen*
   einmal pro Gerät einen GitHub-Token (nur Recht `gist`) eintragen; der Fortschritt wird dann in einem privaten Gist gespeichert
   und ist auf iPhone und Mac derselbe.
 - **Offline:** Ein Service Worker (`sw.js`) speichert beim ersten Öffnen alle Dateien (inkl. Bilder) auf dem Gerät.
