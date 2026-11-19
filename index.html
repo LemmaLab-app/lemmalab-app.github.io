@@ -472,7 +472,9 @@ ul.todo .tl{font-weight:600}
   nav.tabs{background:color-mix(in srgb,var(--bg) 80%,transparent);border-top:0;border-right:.5px solid var(--line);width:220px}
   nav.tabs .brand{display:flex;align-items:center;gap:10px;padding:4px 12px 24px}
   nav.tabs .brand img{width:30px;height:30px;border-radius:8px}
-  nav.tabs .brand span{font-family:var(--sfd);font-weight:700;font-size:19px;letter-spacing:-.02em;color:var(--ink)}
+  nav.tabs .brand>span{font-family:var(--sfd);font-weight:700;font-size:19px;letter-spacing:-.02em;color:var(--ink)}
+  nav.tabs .brand>span{display:flex;flex-direction:column;align-items:flex-start;line-height:1.15}
+  nav.tabs .brand .bf{flex:none;flex-direction:row;padding:0;gap:4px;background:none;font-family:inherit;font-size:13.5px;font-weight:600;letter-spacing:0;color:var(--accent);margin-top:2px;white-space:nowrap}
   nav.tabs button{border-radius:9px;padding:8px 12px;font-size:14.5px;color:var(--ink);font-weight:500}
   nav.tabs button svg{color:var(--accent)}
   nav.tabs button:hover{background:color-mix(in srgb,var(--ink) 5%,transparent)}
@@ -1086,9 +1088,9 @@ details.adv2+.ig,details.adv2+details{margin-top:30px}
 <div id="navbar" aria-hidden="true"><span id="navTitle"></span></div>
 <div class="toast" id="toast"></div>
 <script src="vendor/katex/katex.min.js"></script>
-<script src="fach.js?v=2026-11-19.38"></script>
-<script src="app.js?v=2026-11-19.38"></script>
+<script src="fach.js?v=2026-11-19.39"></script>
+<script src="app.js?v=2026-11-19.39"></script>
 <script src="vendor/supabase/supabase.js"></script>
-<script src="account.js?v=2026-11-19.38"></script>
+<script src="account.js?v=2026-11-19.39"></script>
 </body>
 </html>

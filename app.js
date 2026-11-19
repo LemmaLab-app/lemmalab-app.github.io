@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-19.38';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-19.39';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -707,7 +707,7 @@ function render() {
   Model.sync();
   { const h = $('#hdrTitle'); if (h) h.textContent = ({ heute: 'Lernen', quiz: 'Quiz', katalog: 'Karten', statistik: 'Fortschritt', mehr: 'Einstellungen', admin: 'Admin' })[tab] || 'LemmaLab'; }
   { const h = $('#hdrSub'); if (h && !h.dataset.f) { h.dataset.f = 1; h.innerHTML = `<button class="fachbtn" data-act="fachpick" title="Fach wechseln">${esc(FACH_CFG.name)} <span class="car">▼</span></button>`; } }
-  { const b = document.querySelector('nav.tabs .brand span'); if (b && !b.dataset.f) { b.dataset.f = 1; b.textContent = 'LemmaLab · ' + (FACH_CFG.short || FACH_CFG.name); } }
+  { const b = document.querySelector('nav.tabs .brand span'); if (b && !b.dataset.f) { b.dataset.f = 1; b.innerHTML = `LemmaLab<button class="fachbtn bf" data-act="fachpick" title="Fach wechseln">${esc(FACH_CFG.name)} <span class="car">▼</span></button>`; } }
   const focusMode = (tab === 'heute' && session && session.cur) || (tab === 'quiz' && quiz && quiz.i < quiz.items.length);
   document.body.classList.toggle('focus', !!focusMode);
   renderTabs();
