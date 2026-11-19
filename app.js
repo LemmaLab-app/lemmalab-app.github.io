@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-19.6';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-19.7';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -381,6 +381,31 @@ function startSession(customIds) {
   nextCard();
 }
 
+/* Bilder vorladen: die aktuelle und die nächsten Karten werden schon im
+ * Hintergrund geladen und dekodiert, damit das Aufdecken sofort geht. */
+const Pre = {
+  m: new Map(),
+  get(c) {
+    if (!c) return;
+    const src = 'img/' + c.img;
+    if (this.m.has(src)) return;
+    const im = new Image();
+    im.decoding = 'async';
+    im.src = src;
+    if (im.decode) im.decode().catch(() => { });
+    this.m.set(src, im);
+    if (this.m.size > 60) this.m.delete(this.m.keys().next().value);
+  },
+  ids(ids) { for (const id of ids) this.get(BY_ID[id]); },
+};
+function preloadSession() {
+  if (!session) return;
+  Pre.ids([session.cur, ...session.queue.slice(0, 5), ...session.later.slice(0, 3)].filter(Boolean));
+}
+function preloadQuiz() {
+  if (!quiz) return;
+  Pre.ids(quiz.items.slice(quiz.i, quiz.i + 4));
+}
 function nextCard() {
   const t = now();
   // Lernkarten, die inzwischen fällig sind, nach vorne holen
@@ -398,6 +423,7 @@ function nextCard() {
   session.revealed = false;
   Timer.start();
   render();
+  preloadSession();
 }
 
 function reveal() { if (!session || !session.cur || session.revealed) return; Timer.markReveal(); session.revealed = true; render(); }
@@ -579,7 +605,7 @@ function promptFor(c) {
 }
 function scanHTML(c, masked) {
   const m = masked && c.mask ? `<div class="mask" style="left:${c.mask[0] / c.w * 100}%;top:${c.mask[1] / c.h * 100}%;width:${(c.mask[2] - c.mask[0]) / c.w * 100}%;height:${(c.mask[3] - c.mask[1]) / c.h * 100}%"></div>` : '';
-  return `<div class="scanwrap" ${masked ? '' : `data-zoom="${c.id}" title="Antippen zum Vergrössern"`}><img class="scan" src="img/${c.img}" width="${c.w}" height="${c.h}" alt="${esc(c.kind + ' ' + c.nr)}" loading="lazy">${m}${masked ? '' : '<span class="zoomchip">⤢ Vergrössern</span>'}</div>`;
+  return `<div class="scanwrap" ${masked ? '' : `data-zoom="${c.id}" title="Antippen zum Vergrössern"`}><img class="scan" src="img/${c.img}" width="${c.w}" height="${c.h}" alt="${esc(c.kind + ' ' + c.nr)}" decoding="sync">${m}${masked ? '' : '<span class="zoomchip">⤢ Vergrössern</span>'}</div>`;
 }
 /* Prädikatenlogische Formulierung (KaTeX), falls vorhanden */
 const _texCache = {};
@@ -696,6 +722,7 @@ function startQuiz(type, scope, n) {
   Timer.start();
   if (type === 'match') quiz.opts = makeOpts(items[0]);
   render();
+  preloadQuiz();
 }
 function makeOpts(id) {
   const c = BY_ID[id];
@@ -740,6 +767,7 @@ function quizNext() {
   quiz.i++; quiz.picked = null; quiz.revealed = false; Timer.start();
   if (quiz.i < quiz.items.length && quiz.type === 'match') quiz.opts = makeOpts(quiz.items[quiz.i]);
   render();
+  preloadQuiz();
 }
 function viewQuiz() {
   if (quiz && quiz.i < quiz.items.length) {
@@ -1198,6 +1226,10 @@ function applyTheme() {
  * Events
  * ============================================================ */
 function afterRender() {
+  if (tab === 'heute' && !session) {
+    const idle = window.requestIdleCallback || (f => setTimeout(f, 300));
+    idle(() => { try { Pre.ids(buildQueue().queue.slice(0, 6)); } catch (e) { } });
+  }
   const on = (sel, ev, fn) => { const el = $(sel); if (el) el.addEventListener(ev, fn); };
   on('#cq', 'input', e => { cat.q = e.target.value; const pos = e.target.selectionStart; render(); const el = $('#cq'); el.focus(); el.setSelectionRange(pos, pos); });
   for (const [id, key] of [['#cchap', 'chap'], ['#ckind', 'kind'], ['#cprio', 'prio'], ['#cstat', 'status']]) on(id, 'change', e => { cat[key] = e.target.value; render(); });
