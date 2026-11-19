@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-19.37';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-19.38';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -610,6 +610,17 @@ function nextCard() {
 
 function reveal() { if (!session || !session.cur || session.revealed || Motion.busy) return; Timer.markReveal(); session.revealed = true; Motion.set('reveal'); render(); }
 function qReveal() { if (!quiz || quiz.revealed) return; Timer.markReveal(); quiz.revealed = true; Motion.set('reveal'); render(); }
+/* Karte umdrehen – in beide Richtungen (Leertaste bzw. Antippen der Karte) */
+function flip() {
+  if (!session || !session.cur || Motion.busy) return;
+  if (!session.revealed) return reveal();
+  session.revealed = false; Motion.set('reveal'); render();
+}
+function qFlip() {
+  if (!quiz || quiz.type !== 'test' || quiz.i >= quiz.items.length) return;
+  if (!quiz.revealed) return qReveal();
+  quiz.revealed = false; Motion.set('reveal'); render();
+}
 
 function rate(g, o = {}) {
   if (!session || !session.cur || !session.revealed || Motion.busy) return;
@@ -1750,6 +1761,12 @@ document.addEventListener('click', e => {
   if (trate) return quizAnswer(+trate.dataset.trate);
   const opt = t.closest('[data-opt]');
   if (opt && !opt.disabled) return quizAnswer(opt.dataset.opt);
+  // Antippen der Lernkarte dreht sie um (Vergrössern dann über «⤢ Vergrössern»)
+  const fcard = t.closest('.fc');
+  if (fcard && !act && !t.closest('button,a,summary,details,input,textarea,select,label,.zoomchip,.lf') && !(window.getSelection && String(window.getSelection()).length)) {
+    if (tab === 'heute' && session && session.cur) return flip();
+    if (tab === 'quiz' && quiz && quiz.type === 'test') return qFlip();
+  }
   const z = t.closest('[data-zoom]');
   if (z && !t.closest('.zoombox')) { const c = BY_ID[z.dataset.zoom]; modal(`<div class="row"><b>${esc(c.kind)} ${c.nr}</b><div class="spacer"></div><button class="btn" data-act="zin">＋</button><button class="btn" data-act="zout">－</button><button class="btn ghost" data-act="close">✕</button></div><div class="zoombox"><img class="scan" id="zimg" src="img/${c.img}" alt="" style="width:${zoomW}px"></div><div class="muted small">Seitlich wischen zum Lesen · Tipp: Handy quer halten.</div>`); $('#modal').classList.add('full'); return; }
   const li = t.closest('[data-card]');
@@ -1814,7 +1831,8 @@ function confirmBox(msg, fn) {
 document.addEventListener('keydown', e => {
   if (e.target.matches('input,textarea,select')) return;
   if (tab === 'heute' && session && session.cur) {
-    if ((e.key === ' ' || e.key === 'Enter') && !session.revealed) { e.preventDefault(); reveal(); }
+    if (e.key === ' ') { e.preventDefault(); flip(); }
+    else if (e.key === 'Enter' && !session.revealed) { e.preventDefault(); reveal(); }
     else if (session.revealed && swipeMode() && (e.key === 'ArrowRight' || '234'.includes(e.key))) { e.preventDefault(); rate(3); }
     else if (session.revealed && swipeMode() && (e.key === 'ArrowLeft' || e.key === '1')) { e.preventDefault(); rate(1); }
     else if (session.revealed && '1234'.includes(e.key)) rate(+e.key);
@@ -1823,7 +1841,8 @@ document.addEventListener('keydown', e => {
     if (quiz.type === 'match') {
       if (!quiz.picked && '1234'.includes(e.key)) quizAnswer(quiz.opts[+e.key - 1]);
       else if (quiz.picked && (e.key === ' ' || e.key === 'Enter')) { e.preventDefault(); quizNext(); }
-    } else if (!quiz.revealed && (e.key === ' ' || e.key === 'Enter')) { e.preventDefault(); qReveal(); }
+    } else if (e.key === ' ') { e.preventDefault(); qFlip(); }
+    else if (!quiz.revealed && e.key === 'Enter') { e.preventDefault(); qReveal(); }
     else if (quiz.revealed && '123'.includes(e.key)) quizAnswer(+e.key);
   }
   if (e.key === 'Escape') closeModal();

@@ -43,7 +43,7 @@ bzw. *Einstellungen → Fach*). Jedes Fach hat eigene Karten, eigenen Lernplan, 
   Export/Import unter *Einstellungen*.
 - **Als claude.ai-Artifact:** Fortschritt wird zusätzlich im claude.ai-Konto gespeichert und ist auf iPhone und Mac derselbe.
 
-Tastatur: Leertaste = aufdecken, 1–4 = bewerten, U = rückgängig.
+Karte umdrehen (in beide Richtungen): Leertaste oder Karte antippen. Tastatur: 1–4 bzw. ←/→ = bewerten, U = rückgängig.
 
 ## Fächer & Speicher
 - `fach.js` legt die Fächer fest und lädt die Karten des aktiven Fachs (`data.js` + `logic.js` bzw. `physik.js`).
