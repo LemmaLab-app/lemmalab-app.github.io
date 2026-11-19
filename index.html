@@ -963,6 +963,30 @@ details.adv2{margin-top:0}
 details.adv2[open]>summary{margin-bottom:22px}
 .fc .meta{margin-bottom:2px}
 .study-head .progress{margin-right:4px}
+
+/* Zwei runde Bewertungsknöpfe (zusätzlich zum Wischen) */
+.rbtns{display:flex;justify-content:center;gap:56px;padding:2px 0}
+.rb{border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:6px;padding:0;-webkit-tap-highlight-color:transparent}
+.rb .rc{width:62px;height:62px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  background:color-mix(in srgb,var(--c) 14%,var(--panel));box-shadow:inset 0 0 0 .5px color-mix(in srgb,var(--c) 30%,transparent);
+  transition:transform .3s var(--spring),background .2s}
+.rb svg{width:26px;height:26px;fill:none;stroke:var(--c);stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.rb .rl{font-size:12px;font-weight:500;color:var(--muted)}
+.rb.no{--c:var(--again)} .rb.ok{--c:var(--good)}
+.rb:active .rc,.rb.hit .rc{transform:scale(.88);background:color-mix(in srgb,var(--c) 26%,var(--panel))}
+@media (hover:hover){.rb:hover .rc{background:color-mix(in srgb,var(--c) 20%,var(--panel))}}
+#view.a-reveal .rb .rc{animation:rise .5s var(--spring) both}
+#view.a-reveal .rb.ok .rc{animation-delay:.05s}
+/* Handy: Knöpfe sitzen frei über der Tab-Position, ohne Glasleiste */
+@media (max-width:767px),(max-height:559px){
+  body.focus .actionbar.swipeact{background:none!important;box-shadow:none!important;backdrop-filter:none;-webkit-backdrop-filter:none;left:0;right:0;padding:0!important;bottom:calc(max(var(--safe-b),12px) + 6px)}
+  body.focus .app{padding-bottom:calc(max(var(--safe-b),12px) + 110px)!important}
+}
+@media (orientation:landscape) and (max-height:559px){.rb .rc{width:48px;height:48px}.rb .rl{display:none}.rbtns{gap:40px}}
+/* Lernen: kleine Übersicht */
+.solo{min-height:auto;padding-top:28px}
+.solo-list{max-width:420px;margin:26px auto 0}
+.solo-list .ig{margin:0}
 </style>
 </head>
 <body>
@@ -982,10 +1006,10 @@ details.adv2[open]>summary{margin-bottom:22px}
 <div id="navbar" aria-hidden="true"><span id="navTitle"></span></div>
 <div class="toast" id="toast"></div>
 <script src="vendor/katex/katex.min.js"></script>
-<script src="data.js?v=2026-11-19.30"></script>
-<script src="logic.js?v=2026-11-19.30"></script>
-<script src="app.js?v=2026-11-19.30"></script>
+<script src="data.js?v=2026-11-19.31"></script>
+<script src="logic.js?v=2026-11-19.31"></script>
+<script src="app.js?v=2026-11-19.31"></script>
 <script src="vendor/supabase/supabase.js"></script>
-<script src="account.js?v=2026-11-19.30"></script>
+<script src="account.js?v=2026-11-19.31"></script>
 </body>
 </html>

@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-19.30';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-19.31';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -839,7 +839,12 @@ function viewHome() {
     <div class="solo-n">${q.queue.length} Karte${q.queue.length === 1 ? '' : 'n'}</div>
     <div class="solo-s">etwa ${estMin} Minute${estMin === 1 ? '' : 'n'}${dte > 0 ? ` · Prüfung in ${dte} Tagen` : ''}</div>
     <button class="btn primary big solo-btn" data-act="start">${ts.startedToday ? 'Weiterlernen' : 'Lernen'}</button>
-  </div>`;
+  </div>
+  <div class="solo-list">${UI.group([
+    UI.row('Wiederholungen', `<span class="v">${q.nRev}</span>`),
+    UI.row('Neue Karten', `<span class="v">${q.nNew}</span>`),
+    UI.row('Prüfungsbereit', `<span class="v">${Math.round(readiness().exam * 100)} %</span>`),
+  ])}</div>`;
 }
 function ringSVG(done, total, size = 38) {
   const f = total ? Math.min(1, done / total) : 1, sw = size > 100 ? 14 : size > 50 ? 7 : 4, r = (size - sw) / 2 - 1, C = 2 * Math.PI * r, c = size / 2;
@@ -962,7 +967,7 @@ function viewStudy() {
       ${isNew ? '<span class="muted small">· neu</span>' : ''}
     </div>
     <div class="ttl">${esc(c.title) || esc(c.kind + ' ' + c.nr)}</div>
-    <div class="meta">Kapitel ${c.chap}</div>
+    <div class="meta">Kapitel ${c.chap} · Skript S. ${c.page}</div>
     ${!s.revealed ? `
       ${S.settings.typeAnswer ? `<textarea class="note" id="answer" placeholder="Hier aufschreiben (wird nicht gespeichert) …"></textarea>` : ''}
       <div class="spacer"></div>
@@ -980,9 +985,11 @@ function viewStudy() {
       <div class="kbd center ratehelp" style="margin-top:8px">Nochmal = wesentlicher Teil fehlte · Schwer = mit Mühe/kleine Lücke · Gut = vollständig · Einfach = sofort und sicher</div>`}
     `}
   </div>
-  ${s.revealed && swipeMode() ? `<div class="swipeact">
-    ${S.log.filter(l => modeOf(l) === 'l').length < 30 ? `<div class="swipehint"><span>‹ Nicht gewusst</span><span class="hide-touch">oder ← →</span><span>Gewusst ›</span></div>` : ''}
-    <div class="sr-only"><button data-rate="1">Nicht gewusst</button><button data-rate="3">Gewusst</button></div>
+  ${s.revealed && swipeMode() ? `<div class="actionbar swipeact">
+    <div class="rbtns">
+      <button class="rb no" data-rate="1" aria-label="Nicht gewusst"><span class="rc"><svg viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg></span><span class="rl">Nicht gewusst</span></button>
+      <button class="rb ok" data-rate="3" aria-label="Gewusst"><span class="rc"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span class="rl">Gewusst</span></button>
+    </div>
   </div>` : ''}`;
 }
 
@@ -1034,6 +1041,7 @@ const Swipe = {
     fc.classList.add('fly');
     fc.style.setProperty('--pos', dir > 0 ? 1 : 0); fc.style.setProperty('--neg', dir < 0 ? 1 : 0);
     fc.style.transform = `translate(${dir * (innerWidth + 120)}px,${dy * .12 + 30}px) rotate(${dir * 16}deg)`;
+    const rb = document.querySelector(`.rb.${dir > 0 ? 'ok' : 'no'}`); if (rb) rb.classList.add('hit');
         setTimeout(() => { Motion.busy = false; rate(g, { flown: true }); }, 240);
   },
 };
@@ -1208,10 +1216,11 @@ function viewCatalog() {
   if (cat.prio) extra.push(['prio', PRIO[cat.prio].name]);
   if (cat.kind) extra.push(['kind', cat.kind === 'Satz' ? 'Sätze' : cat.kind]);
   if (cat.chap) extra.push(['chap', 'Kapitel ' + cat.chap]);
-  if (cat.status) extra.push(['status', { wackelig: 'Wackelig', jung: 'Jung', flag: 'Markiert', pause: 'Pausiert' }[cat.status] || cat.status]);
+  if (cat.status && !segs.some(x => x[0] === cat.status)) extra.push(['status', { wackelig: 'Wackelig', jung: 'Jung', flag: 'Markiert', pause: 'Pausiert' }[cat.status] || cat.status]);
   const by = {}; for (const c of list) (by[c.chap] = by[c.chap] || []).push(c);
   return `
   <div class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></svg><input id="cq" type="search" placeholder="Suchen" value="${esc(cat.q)}" autocomplete="off"></div>
+  <div class="seg" role="tablist">${segs.map(([v, l]) => `<button role="tab" data-seg="${v}" class="${cat.status === v ? 'on' : ''}">${l}</button>`).join('')}</div>
   ${extra.length ? `<div class="chips">${extra.map(([k, l]) => `<button class="chip" data-unfilter="${k}">${esc(l)} <span aria-hidden="true">×</span></button>`).join('')}</div>` : ''}
   ${list.length ? Object.keys(by).sort((a, b) => a - b).map(k => UI.group(by[k].map(liHTML), { header: `${k}. ${esc((window.CHAPTERS || {})[k] || '')}` })).join('') : '<div class="empty muted">Keine Treffer</div>'}`;
 }
@@ -1332,13 +1341,15 @@ function viewStats() {
   <div class="grid g2">
     <div class="card kpi"><div class="l">Prüfungsbereit</div><div class="v">${Math.round(rd.exam * 100)}%</div></div>
     <div class="card kpi"><div class="l">Sitzt sicher</div><div class="v">${sitzt}<span class="of"> / ${CARDS.length}</span></div></div>
+    <div class="card kpi"><div class="l">Gewusst</div><div class="v">${retention == null ? '–' : Math.round(retention * 100) + '%'}</div></div>
+    <div class="card kpi"><div class="l">Serie</div><div class="v">${streak}<span class="of"> Tage</span></div></div>
   </div>
+  <h2>Nächste 14 Tage</h2>
+  <div class="card">${barChart(fc, i => i === 0 ? 'heute' : fmtDate(dayStart() + i * DAY).replace('.', ''))}</div>
   <h2>Kapitel</h2>
   ${UI.group(byChap.map(g => `<div class="ir chr"><span class="ir-l"><b>${esc((window.CHAPTERS || {})[g.k] || '')}</b></span><span class="ir-r chb"><div class="bar"><span style="width:${g.n ? (g.n - g.neu) / g.n * 100 : 0}%;background:var(--accent)"></span></div></span></div>`))}
   <details class="more"><summary>Details</summary>
     <h2>Plan</h2>${plan}
-    <h2>Nächste 14 Tage</h2>
-    <div class="card">${barChart(fc, i => i === 0 ? 'heute' : fmtDate(dayStart() + i * DAY).replace('.', ''))}</div>
     ${problem.length ? `<h2>Schwierige Karten</h2>${UI.group(problem.map(o => liHTML(o.c)))}` : ''}
     <h2>Nach Priorität</h2>${UI.group(byPrio.map(g => `<div class="ir chr"><span class="ir-l"><b>${PRIO[g.k].name}</b><small>${g.n - g.neu} von ${g.n}</small></span><span class="ir-r chb">${stackBar(g)}</span></div>`))}
     ${memoryStatsHTML()}
