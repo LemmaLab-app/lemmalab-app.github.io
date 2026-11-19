@@ -984,6 +984,8 @@ details.more[open]>summary{margin-bottom:6px}
 }
 details.adv2{margin-top:0;margin-bottom:30px}
 details.adv2[open]>summary{margin-bottom:22px}
+/* Safari ignoriert den Aussenabstand unter <details> → Abstand zusätzlich am nächsten Block (Ränder fallen sonst zusammen) */
+details.adv2+.ig,details.adv2+details{margin-top:30px}
 .fc .meta{margin-bottom:2px}
 .study-head .progress{margin-right:4px}
 
@@ -1084,9 +1086,9 @@ details.adv2[open]>summary{margin-bottom:22px}
 <div id="navbar" aria-hidden="true"><span id="navTitle"></span></div>
 <div class="toast" id="toast"></div>
 <script src="vendor/katex/katex.min.js"></script>
-<script src="fach.js?v=2026-11-19.36"></script>
-<script src="app.js?v=2026-11-19.36"></script>
+<script src="fach.js?v=2026-11-19.37"></script>
+<script src="app.js?v=2026-11-19.37"></script>
 <script src="vendor/supabase/supabase.js"></script>
-<script src="account.js?v=2026-11-19.36"></script>
+<script src="account.js?v=2026-11-19.37"></script>
 </body>
 </html>
