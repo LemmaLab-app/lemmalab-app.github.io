@@ -1212,6 +1212,11 @@ body.focus #view.a-tab .study-head,body.focus #view.a-tab .fc>:not(.actionbar){a
 #view.a-tab .fchart .lhist{stroke-dasharray:3000;animation:drawLine 1.2s var(--ease) both}
 #view.a-tab .frev rect{animation:colIn .8s var(--ease) both;transform-box:fill-box;transform-origin:bottom}
 @media (min-width:768px) and (min-height:560px){.fcard{padding:24px 26px 18px}.fv{font-size:46px}}
+
+/* Prüfungs-Hinweis beim Lernen */
+.gnote{display:inline-flex;align-items:center;gap:8px;margin-top:16px;border:0;border-radius:99px;padding:8px 14px;background:var(--panel);color:var(--ink);font-size:13.5px;font-weight:500;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.gnote .gd{width:8px;height:8px;border-radius:50%;flex:none}
+.home .solo + .ig{margin-top:-6px}
 </style>
 </head>
 <body>
@@ -1231,9 +1236,9 @@ body.focus #view.a-tab .study-head,body.focus #view.a-tab .fc>:not(.actionbar){a
 <div id="navbar" aria-hidden="true"><span id="navTitle"></span></div>
 <div class="toast" id="toast"></div>
 <script src="vendor/katex/katex.min.js"></script>
-<script src="fach.js?v=2026-11-20.20"></script>
-<script src="app.js?v=2026-11-20.20"></script>
+<script src="fach.js?v=2026-11-20.21"></script>
+<script src="app.js?v=2026-11-20.21"></script>
 <script src="vendor/supabase/supabase.js"></script>
-<script src="account.js?v=2026-11-20.20"></script>
+<script src="account.js?v=2026-11-20.21"></script>
 </body>
 </html>

@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-20.20';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-20.21';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -878,12 +878,37 @@ function todoHTML(ts) {
       <div class="tb"><i style="width:${pct}%;background:${it.color}"></i></div></div></li>`;
   }).join('')}</ul>`;
 }
+/* Kurzer Prüfungs-Hinweis für Lernen und Sitzungsende (Details unter Fortschritt) */
+function goalNote() {
+  try {
+    const tr = trackStatus(); if (tr.level === 'done') return null;
+    const exam = examTime(), goal = exam - MASTER_BEFORE * DAY;
+    const N = CARDS.filter(c => prioOf(c) !== 1 || S.settings.includeRand).length;
+    let v = null;
+    if (goal > now() + DAY) { const r = Forecast.run(); for (const p of r.plan) if (p.t <= goal) v = Math.round(p.v); }
+    const okF = v != null && v >= (Forecast._best || N) - Math.max(3, N * 0.02);
+    const level = tr.level === 'bad' ? 'bad' : (tr.level === 'warn' || (v != null && !okF)) ? 'warn' : tr.level === 'start' ? 'start' : 'ok';
+    const title = level === 'ok' ? 'Auf Kurs für die Prüfung' : level === 'warn' ? 'Knapp für die Prüfung' : level === 'bad' ? 'Hinter dem Plan' : 'Lernplan bis zur Prüfung';
+    const when = new Date(goal).toLocaleDateString('de-CH', { day: 'numeric', month: 'short' });
+    const sub = v != null ? `Am ${when} voraussichtlich ${v} von ${N} sicher` : tr.sub;
+    const today = plannedNewPerDay();
+    const hint = level === 'bad' || level === 'warn' ? `Heute ${today} neue Karten lernen, um aufzuholen` : '';
+    return { level, title, sub, hint, col: TRACK_COL[level] };
+  } catch (e) { return null; }
+}
+function goalNoteHTML(compact) {
+  const g = goalNote(); if (!g) return '';
+  const icon = g.level === 'ok' ? 'check' : g.level === 'start' ? 'calendar' : 'alert';
+  if (compact) return `<button type="button" class="gnote" data-act="tab:statistik"><span class="gd" style="background:${g.col}"></span>${esc(g.title)} · ${esc(g.sub)}</button>`;
+  return UI.group([UI.item(icon, g.col, esc(g.title), esc(g.sub) + (g.hint ? `<br><span style="color:${g.col}">${esc(g.hint)}</span>` : ''), '', { act: 'tab:statistik' })]);
+}
 function doneHeroHTML(ts) {
   const tomorrow = CARDS.filter(c => { const x = S.cards[c.id]; return x && x.st && !x.susp && x.due < dayStart() + 2 * DAY; }).length;
   return `<div class="donehero">
     <svg class="bigcheck" viewBox="0 0 120 120"><circle class="c" cx="60" cy="60" r="52"/><path class="k" d="M36 62l16 16 33-35"/></svg>
     <div class="dt">Für heute erledigt</div>
     <div class="ds">Morgen ${tomorrow} Karte${tomorrow === 1 ? '' : 'n'}</div>
+    ${goalNoteHTML(true)}
   </div>`;
 }
 function pauseHTML(until, n, forceAct, extra = '') {
@@ -926,6 +951,7 @@ function viewHome() {
   </div>`;
   return `<div class="home"><div class="col">
   ${hero}
+  ${goalNoteHTML(false)}
   ${UI.group([
     UI.row('Wiederholungen', `<span class="v">${q.nRev}</span>`),
     UI.row('Neue Karten', `<span class="v">${q.nNew}</span>`),
