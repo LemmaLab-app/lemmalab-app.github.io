@@ -29,6 +29,7 @@ window.FAECHER = {
     ls: 'lemmalab-la-v1',
     scripts: ['linalg.js'],
     gist: 'lemmalab-linalg.json', syncPrefix: 'la-', examDate: '2027-08-09', accent: 'la',
+    pace: { minNew: 4, low: 8, mid: 6, max: 15 },   // lockerer: Prüfung erst im Sommer (sonst 12 / 20 / 16 / 40)
   },
 };
 /* Prüfungsdaten: vorerst der erstmögliche Termin der jeweiligen ETH-Prüfungssession

@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-20.33';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-20.8';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -188,7 +188,9 @@ function personalTimes() {
   return (_ptCache = { review, fresh, learn, steps, newCost: fresh + steps * learn, newFactor: 1, fromData: srs.length >= 20 });
 }
 
-const MIN_NEW_BASE = 12;
+// Tempo pro Fach (fach.js: pace). Lineare Algebra ist lockerer, weil die Prüfung erst im Sommer ist.
+const PACE = { minNew: 12, low: 20, mid: 16, max: 40, ...(FACH_CFG.pace || {}) };
+const MIN_NEW_BASE = PACE.minNew;
 function MIN_NEW() { const t = Tune.get(); return t && Number.isFinite(t.minNew) ? t.minNew : MIN_NEW_BASE; }   // so viele neue Karten pro Tag mindestens (Ziel: alles so schnell wie möglich beherrschen)
 function plannedNewPerDay() {
   if (S.settings.newMode === 'manual') return S.settings.newPerDay;
@@ -202,8 +204,8 @@ function plannedNewPerDay() {
   // 3) Mehr, wenn die Wiederholungen heute wenig Platz brauchen
   const ds = dayStart();
   const load = dueReviews().length + S.log.filter(l => l[0] >= ds && l[3] === 2 && modeOf(l) !== 'q').length;
-  if (load < 25) n = Math.max(n, 20);
-  else if (load < 50) n = Math.max(n, 16);
+  if (load < 25) n = Math.max(n, PACE.low);
+  else if (load < 50) n = Math.max(n, PACE.mid);
   // Zeitbudget (falls gesetzt) begrenzt nach oben, aber nie unter das Minimum
   const b = +S.settings.budget || 0;
   if (b > 0) {
@@ -211,7 +213,7 @@ function plannedNewPerDay() {
     const free = b * 60 - load * pt.review;
     n = Math.min(n, Math.max(minN, Math.floor(free / pt.newCost)));
   }
-  return Math.min(clamp(n, MIN_NEW(), 40), remaining);
+  return Math.min(clamp(n, MIN_NEW(), Math.max(PACE.max, minN)), remaining);
 }
 /* Was heute mindestens nötig ist, damit die Prognose hält (ohne Zuschlag «mehr, wenn Platz ist») */
 function minNewToday() {
