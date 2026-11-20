@@ -54,8 +54,8 @@ window.FachStore = {
 window.switchFach = id => {
   if (!window.FAECHER[id] || id === window.FACH) return;
   try { localStorage.setItem(window.FACH_KEY, id); } catch (e) { }
-  document.documentElement.classList.add('leaving');
-  setTimeout(() => location.replace(location.pathname + '?fach=' + id + '#heute'), 110);   // neue Adresse → Seite lädt neu
+  // direkt neu laden: der Browser zeigt die alte Seite, bis die neue gezeichnet ist (kein schwarzes Zwischenbild)
+  location.replace(location.pathname + '?fach=' + id + '#heute');
 };
 
 (() => {

@@ -1,6 +1,6 @@
 /* Service Worker: macht die Lern-App offline nutzbar.
  * Automatisch erzeugt aus tools/sw.template.js (tools/build_sw.py) – nicht von Hand ändern. */
-const CACHE = 'lemmalab-9eba216a34';
+const CACHE = 'lemmalab-eec4065ed7';
 const FILES = [
  "./",
  "index.html",
@@ -647,13 +647,24 @@ self.addEventListener('fetch', e => {
   const path = url.pathname.split('/').pop() || 'index.html';
   const isCore = req.mode === 'navigate' || CORE.includes(path);
   if (isCore) {
-    e.respondWith(
-      // immer beim Server nachfragen (If-None-Match → meist 304), nie eine alte Kopie aus dem Browser-Cache
-      fetch(req.mode === 'navigate' ? req.url : req, { cache: 'no-cache' }).then(res => res.redirected ? fetch(req) : res).then(res => {
-        if (res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req.mode === 'navigate' ? 'index.html' : req, copy)); }
-        return res;
-      }).catch(() => caches.match(req.mode === 'navigate' ? 'index.html' : req, { ignoreSearch: true }))
-    );
+    const put = (key, res) => { if (res.ok && !res.redirected) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(key, copy)); } return res; };
+    const net = () => fetch(req.mode === 'navigate' ? req.url : req, { cache: 'no-cache' }).then(res => res.redirected ? fetch(req) : res);
+    if (req.mode === 'navigate' && !url.searchParams.has('v')) {
+      // Seitenaufruf (Start, Fachwechsel): sofort aus dem Speicher, im Hintergrund auffrischen.
+      // Neue Versionen erkennt die App selbst (checkUpdate) und lädt dann mit ?v= neu.
+      e.respondWith(caches.match('index.html').then(hit => {
+        const fresh = net().then(res => put('index.html', res));
+        if (hit) { e.waitUntil(fresh.catch(() => { })); return hit; }
+        return fresh;
+      }));
+    } else if (req.mode === 'navigate') {
+      // Neuladen nach einem Update (?v=…): direkt vom Server
+      e.respondWith(net().then(res => put('index.html', res)).catch(() => caches.match('index.html')));
+    } else {
+      // Kerndateien tragen ?v=<Version>: exakt diese Version aus dem Speicher, sonst vom Server
+      e.respondWith(caches.match(req).then(hit => hit || net().then(res => put(req, res)))
+        .catch(() => caches.match(req, { ignoreSearch: true })));
+    }
   } else {
     e.respondWith(caches.match(req, { ignoreSearch: true }).then(hit => hit || fetch(req).then(res => {
       if (res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }

@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-20.2111';   // bei jeder Änderung neu setzen: sh tools/bump.sh (UTC-Zeit, nie von Hand runterzählen)
+const APP_VERSION = '2026-11-20.2118';   // bei jeder Änderung neu setzen: sh tools/bump.sh (UTC-Zeit, nie von Hand runterzählen)
 
 /* ============================================================
  * Grundlagen
@@ -2887,6 +2887,7 @@ window.addEventListener('visibilitychange', () => { if (document.visibilityState
  * Start
  * ============================================================ */
 Motion.set('tab'); render();
+requestAnimationFrame(() => document.documentElement.classList.add('ready'));
 /* Hintergrund: Wissen aller Nutzer holen, persönliches Modell trainieren */
 const bgTasks = () => { Community.refresh().catch(() => { }); if (Trainer.due()) Trainer.run(); };
 setTimeout(bgTasks, 5000);
