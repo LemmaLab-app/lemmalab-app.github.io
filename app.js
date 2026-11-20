@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-20.3';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-20.4';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -724,8 +724,8 @@ function render() {
   applyTheme();
   Model.sync();
   { const h = $('#hdrTitle'); if (h) h.textContent = ({ heute: 'Lernen', quiz: 'Quiz', katalog: 'Karten', statistik: 'Fortschritt', mehr: 'Einstellungen', admin: 'Admin' })[tab] || 'LemmaLab'; }
-  { const h = $('#hdrSub'); if (h && !h.dataset.f) { h.dataset.f = 1; h.innerHTML = `<button class="fachbtn" data-act="fachpick" title="Fach wechseln">${esc(FACH_CFG.name)} <span class="car">▼</span></button>`; } }
-  { const b = document.querySelector('nav.tabs .brand span'); if (b && !b.dataset.f) { b.dataset.f = 1; b.innerHTML = `LemmaLab<button class="fachbtn bf" data-act="fachpick" title="Fach wechseln">${esc(FACH_CFG.name)} <span class="car">▼</span></button>`; } }
+  { const h = $('#hdrSub'); if (h && !h.dataset.f) { h.dataset.f = 1; h.innerHTML = fachPillHTML(); } }
+  { const b = document.querySelector('nav.tabs .brand span'); if (b && !b.dataset.f) { b.dataset.f = 1; b.innerHTML = `LemmaLab${fachPillHTML('bf')}`; } }
   const focusMode = (tab === 'heute' && session && session.cur) || (tab === 'quiz' && quiz && quiz.i < quiz.items.length);
   document.body.classList.toggle('focus', !!focusMode);
   renderTabs();
@@ -1777,21 +1777,43 @@ function fachSummary(id) {
   const due = Object.values(st.cards).filter(x => x && x.st && !x.susp && x.due < ds + DAY).length;
   return n ? `${n} Karte${n === 1 ? "" : "n"} begonnen${due ? ` · ${due} heute fällig` : ''}` : 'noch nicht begonnen';
 }
-function fachPicker() {
+const FACH_COL = { ana1: '#3a2bb5', phy1: '#b4531f', inf1: '#1f7a5a', la: '#9b2c6e' };
+const FACH_ICON = { ana1: '∫', phy1: 'Φ', inf1: '{ }', la: '⊕' };
+function fachPillHTML(extra) {
+  // Fach-Umschalter im Stil von iOS (Liquid Glass): Kapsel mit Fach-Symbol, Name und Auf/Ab-Pfeil
+  return `<button class="fachpill glass${extra ? ' ' + extra : ''}" data-act="fachpick" title="Fach wechseln" aria-haspopup="menu">
+    <span class="fic" style="--c:${FACH_COL[FACH] || 'var(--accent)'}">${FACH_ICON[FACH] || '•'}</span><span class="fnm">${esc(FACH_CFG.name)}</span><svg class="chev" viewBox="0 0 12 16" aria-hidden="true"><path d="M3 6l3-3 3 3M3 10l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`;
+}
+function closeFachMenu() {
+  const m = document.querySelector('.fachmenu-wrap'); if (!m) return;
+  m.classList.add('out'); setTimeout(() => m.remove(), 160);
+}
+function fachPicker(anchor) {
   if (session || quiz) { toast('Zuerst die laufende Sitzung beenden'); return; }
+  if (document.querySelector('.fachmenu-wrap')) { closeFachMenu(); return; }
   const F = window.FAECHER || {};
-  const col = { ana1: '#3a2bb5', phy1: '#b4531f', inf1: '#1f7a5a', la: '#9b2c6e' };
-  modal(`<div class="row"><h3 style="margin:0">Fach wählen</h3><div class="spacer"></div><button class="btn ghost" data-act="close">✕</button></div>
-    <div class="fachlist">${Object.entries(F).map(([id, f]) => `<button class="fachopt${id === FACH ? ' on' : ''}" data-fach="${id}">
-      <span class="dot" style="background:${col[id] || 'var(--accent)'}"></span>
-      <span style="flex:1"><b>${esc(f.name)}</b><small>${esc(f.sub || '')}<br>${esc(fachSummary(id))}</small></span>
-      ${id === FACH ? '<span class="pill">aktiv</span>' : ''}</button>`).join('')}</div>`);
+  const wrap = document.createElement('div'); wrap.className = 'fachmenu-wrap';
+  wrap.innerHTML = `<div class="fachmenu glass" role="menu"><div class="fmh">Fach wechseln</div>${Object.entries(F).map(([id, f]) => `<button class="fachopt fmi${id === FACH ? ' on' : ''}" data-fach="${id}" role="menuitemradio" aria-checked="${id === FACH}">
+      <span class="fic" style="--c:${FACH_COL[id] || 'var(--accent)'}">${FACH_ICON[id] || '•'}</span>
+      <span class="ftx"><b>${esc(f.name)}</b><small>${esc(f.sub || '')}</small><small class="fst">${esc(fachSummary(id))}</small></span>
+      <svg class="fck" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`).join('')}</div>`;
+  document.body.appendChild(wrap);
+  const menu = wrap.firstChild;
+  const r = (anchor || document.querySelector('.fachpill')).getBoundingClientRect();
+  const W = Math.min(340, window.innerWidth - 24);
+  const left = clamp(r.left, 12, window.innerWidth - W - 12);
+  menu.style.width = W + 'px'; menu.style.left = left + 'px'; menu.style.top = (r.bottom + 8) + 'px';
+  menu.style.transformOrigin = `${r.left + r.width / 2 - left}px -8px`;
+  const mh = menu.offsetHeight;
+  if (r.bottom + 8 + mh > window.innerHeight - 12) menu.style.top = Math.max(12, window.innerHeight - 12 - mh) + 'px';
+  wrap.addEventListener('click', e => { if (!e.target.closest('.fachmenu')) closeFachMenu(); });
 }
 document.addEventListener('click', e => {
-  if (e.target.closest('[data-act="fachpick"]')) { e.stopPropagation(); fachPicker(); return; }
+  const fp = e.target.closest('[data-act="fachpick"]');
+  if (fp) { e.stopPropagation(); fachPicker(fp); return; }
   const b = e.target.closest('.fachopt[data-fach]'); if (!b) return;
   const id = b.dataset.fach;
-  if (id === FACH) { closeModal(); return; }
+  if (id === FACH) { closeFachMenu(); closeModal(); return; }
   try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (err) { }
   if (Sync.pending && Sync.pending.size) Sync.flush();
   if (Gist.dirty) Gist.push();
@@ -1952,6 +1974,7 @@ document.addEventListener('keydown', e => {
     else if (!quiz.revealed && e.key === 'Enter') { e.preventDefault(); qReveal(); }
     else if (quiz.revealed && '123'.includes(e.key)) quizAnswer(+e.key);
   }
+  if (e.key === 'Escape' && document.querySelector('.fachmenu-wrap')) { closeFachMenu(); return; }
   if (e.key === 'Escape') { const lb = document.querySelector('.lightbox'); if (lb) { lb.remove(); return; } closeModal(); }
 });
 
