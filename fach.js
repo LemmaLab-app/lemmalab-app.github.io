@@ -7,19 +7,19 @@
 'use strict';
 window.FAECHER = {
   ana1: {
-    name: 'Analysis 1', short: 'Analysis', sub: 'Definitionen & Sätze',
+    name: 'Analysis 1', short: 'Analysis 1', sub: 'Definitionen & Sätze',
     ls: 'lemmalab-v1',                         // bisheriger Schlüssel (Fortschritt bleibt erhalten)
     scripts: ['data.js', 'logic.js'],
     gist: 'lemmalab-fortschritt.json', syncPrefix: '', examDate: '2027-01-25', accent: null,
   },
   phy1: {
-    name: 'Physik 1', short: 'Physik', sub: 'Gesetze, Formeln & Konzeptfragen',
+    name: 'Physik 1', short: 'Physik 1', sub: 'Gesetze, Formeln & Konzeptfragen',
     ls: 'lemmalab-phy1-v1',
     scripts: ['physik.js'],
     gist: 'lemmalab-physik1.json', syncPrefix: 'phy1-', examDate: '2027-01-25', accent: 'phy',
   },
   inf1: {
-    name: 'Informatik', short: 'Informatik', sub: 'C++: Konzepte & Code-Tracing',
+    name: 'Informatik 1', short: 'Informatik 1', sub: 'C++: Konzepte & Code-Tracing',
     ls: 'lemmalab-inf1-v1',
     scripts: ['informatik.js'],
     gist: 'lemmalab-informatik.json', syncPrefix: 'inf1-', examDate: '2027-01-25', accent: 'inf',
