@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-20.13';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-20.14';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -1863,8 +1863,15 @@ function viewSettings() {
   ${UI.group([UI.item('cards', 'var(--accent)', esc(FACH_CFG.name), `${CARDS.length} Karten · ${esc(FACH_CFG.sub || '')}`, 'Wechseln', { act: 'fachpick' })],
     { header: 'Fach', footer: 'Jedes Fach hat eigene Karten, einen eigenen Lernplan und ein eigenes Prüfungsdatum. Der Fortschritt bleibt beim Wechseln erhalten.' })}
 
+  ${UI.group(Object.keys(window.FAECHER || { [FACH]: FACH_CFG }).map(k => {
+    const F = (window.FAECHER || {})[k] || FACH_CFG;
+    const o = k === FACH ? S : (window.FachStore && FachStore.read(k));
+    const d = (o && o.settings && o.settings.examDate) || F.examDate;
+    const set = !!(o && o.settings && o.settings.examSet);
+    return UI.row(esc(F.name), `<span class="idate${set ? '' : ' prov'}"><span>${esc(fmtDateLong(d))}</span><input type="date" ${k === FACH ? 'id="sExam"' : `data-examfach="${k}"`} value="${esc(d)}" aria-label="Prüfungsdatum ${esc(F.name)}"></span>`);
+  }), { header: 'Prüfungsdaten', footer: 'Grau = vorläufig der erste Tag der Prüfungssession. Trag das echte Datum ein, sobald du es kennst; der Lernplan des Fachs passt sich an.' })}
+
   ${UI.group([
-    UI.row('Prüfungsdatum', `<span class="idate"><span>${esc(fmtDateLong(st.examDate))}</span><input type="date" id="sExam" value="${esc(st.examDate)}" aria-label="Prüfungsdatum"></span>`),
     UI.row('Erscheinungsbild', UI.select('sTheme', [['auto', 'Automatisch'], ['light', 'Hell'], ['dark', 'Dunkel']], st.theme)),
   ])}
 
@@ -2015,6 +2022,15 @@ function afterRender() {
   on('#cq', 'input', e => { cat.q = e.target.value; const pos = e.target.selectionStart; render(); const el = $('#cq'); el.focus(); el.setSelectionRange(pos, pos); });
   document.querySelectorAll('.seg [data-seg]').forEach(b => b.addEventListener('click', () => { cat.status = b.dataset.seg; render(); }));
   document.querySelectorAll('[data-unfilter]').forEach(b => b.addEventListener('click', () => { cat[b.dataset.unfilter] = ''; render(); }));
+  document.querySelectorAll('input[data-examfach]').forEach(inp => inp.addEventListener('change', e => {
+    const k = e.target.dataset.examfach, v = e.target.value; if (!v || !window.FachStore) return;
+    let o = FachStore.read(k) || (typeof blankFor === 'function' ? blankFor(k) : { v: 1, cards: {}, log: [], settings: {} });
+    o.settings = { ...(o.settings || {}), examDate: v, examSet: true, u: now() };
+    FachStore.write(k, o);
+    try { const all = JSON.parse(localStorage.getItem('lemmalab-track') || '{}'); if (all[k]) { all[k].exam = parseDate(v); localStorage.setItem('lemmalab-track', JSON.stringify(all)); } } catch (_) { }
+    if (typeof Cloud !== 'undefined' && Cloud.user) { Cloud.lastSent = ''; Cloud.schedule(); }
+    render();
+  }));
   on('#sExam', 'change', e => { if (e.target.value) { S.settings.examDate = e.target.value; S.settings.examSet = true; touchSettings(); rescheduleForExam(); } });
   on('#sNewMode', 'change', e => { S.settings.newMode = e.target.value; touchSettings(); render(); });
   on('#sNew', 'change', e => { S.settings.newPerDay = clamp(+e.target.value || 0, 0, 80); touchSettings(); });
