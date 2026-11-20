@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-20.7';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-20.8';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -1129,6 +1129,8 @@ function viewStudy() {
       ${isNew ? '<span class="muted small">· neu</span>' : ''}
     </div>
     <div class="ttl">${esc(c.title) || esc(c.kind + ' ' + c.nr)}</div>
+    ${cueOf(c) ? `<div class="cue">${esc(cueOf(c))}</div>` : ''}
+    ${Similar.of(c.id).length ? `<div class="sim">Nicht verwechseln mit ${Similar.of(c.id).map(o => `${esc(KIND_SHORT[o.kind] || o.kind)} ${o.nr}${cueOf(o) ? ` (${esc(cueOf(o))})` : ''}`).join(', ')}</div>` : ''}
     <div class="meta">${metaLine(c)}</div>
     ${qHTML(c)}
     ${!s.revealed ? `
@@ -1242,6 +1244,59 @@ function startQuiz(type, scope, n) {
   render();
   preloadQuiz();
 }
+/* ---------- Verwechslungsgefahr: gleich oder fast gleich betitelte Karten ----------
+ * CUES: kurzer Unterscheidungs-Hinweis, der die Antwort nicht verrät. */
+const CUES = {
+  'Satz-2.15': 'Anfang und Schritt von n zu n + 1',
+  'Satz-2.19': 'Starke Form: alle kleineren k',
+  'Definition-2.52': 'In ℂ',
+  'Definition-5.16': 'In metrischen Räumen, mit offenen Mengen',
+  'Definition-2.82': 'Was die Cantor-Menge ist',
+  'Korollar-2.83': 'Folgerung über die Mächtigkeit',
+  'Definition-3.45': 'Reelle Funktionen, ε-δ',
+  'Lemma-7.96': 'Ziffern-Abbildungen auf der Cantor-Menge',
+  'Satz-3.67': 'Stetige Funktionen auf [a, b]',
+  'Lemma-5.27': 'Konvergente Folgen',
+  'Lemma-5.39': 'Teilfolgen einer konvergenten Folge',
+  'Satz-6.15': 'Teilfolgen einer beschränkten reellen Folge',
+  'Definition-5.48': 'Metrische Räume, ε-δ',
+  'Lemma-5.49': 'Zusammenhang zweier Stetigkeitsbegriffe',
+  'Definition-8.16': 'Was ein lokales Extremum ist',
+  'Korollar-8.18': 'Wo lokale Extrema liegen können',
+  'Theorem-9.2': 'f Riemann-integrierbar, Aussage bei einem Punkt',
+  'Korollar-9.3': 'f stetig, Stammfunktionen',
+  'Satz-6.26': 'Für Folgen',
+  'Satz-7.26': 'Für Reihen',
+  'Definition-2.43': 'In ℝ',
+  'Definition-5.24': 'In metrischen Räumen',
+  'Definition-2.45': 'Reelle Zahlen',
+  'Definition-2.51': 'Komplexe Zahlen',
+  'Lemma-2.17': 'Natürliche Zahlen ℕ',
+  'Lemma-2.25': 'Ganze Zahlen ℤ',
+  'Definition-2.48': 'In ℝ',
+  'Definition-2.54': 'In ℂ',
+  'Lemma-8.60': 'Ohne Störterm',
+  'Lemma-8.61': 'Mit Störterm',
+};
+const cueOf = c => CUES[c.id] || '';
+const Similar = {
+  _m: null,
+  norm: t => (t || '').toLowerCase().replace(/[^a-zäöüß0-9 ]/g, ' ').replace(/\s+/g, ' ').trim(),
+  build() {
+    const STOP = new Set(['eines', 'einer', 'einem', 'sind', 'fuer', 'für', 'von', 'und', 'der', 'die', 'das', 'mit', 'auf', 'des']);
+    const words = t => new Set(this.norm(t).split(' ').filter(w => w.length > 3 && !STOP.has(w)));
+    const W = CARDS.map(c => words(c.title)); const m = {};
+    for (let i = 0; i < CARDS.length; i++) for (let j = i + 1; j < CARDS.length; j++) {
+      const a = W[i], b = W[j]; if (!a.size || !b.size) continue;
+      let n = 0; for (const w of a) if (b.has(w)) n++;
+      const same = this.norm(CARDS[i].title) === this.norm(CARDS[j].title);
+      if (same || n / (a.size + b.size - n) >= 0.99) { (m[CARDS[i].id] = m[CARDS[i].id] || []).push(CARDS[j].id); (m[CARDS[j].id] = m[CARDS[j].id] || []).push(CARDS[i].id); }
+    }
+    return (this._m = m);
+  },
+  of(id) { return ((this._m || this.build())[id] || []).map(x => BY_ID[x]).filter(Boolean); },
+};
+
 function makeOpts(id) {
   const c = BY_ID[id];
   const sameKindGroup = k => c.img ? (k === 'Definition') === (c.kind === 'Definition') : (k === 'Konzept') === (c.kind === 'Konzept');
@@ -1302,7 +1357,7 @@ function viewQuiz() {
           const oc = BY_ID[o];
           let cl = '';
           if (quiz.picked) { if (o === id) cl = 'ok'; else if (o === quiz.picked) cl = 'bad'; }
-          return `<button class="opt ${cl}" data-opt="${o}" ${quiz.picked ? 'disabled' : ''}>${esc(oc.title)}${quiz.picked ? ` <span class="muted small">(${KIND_SHORT[oc.kind]} ${oc.nr})</span>` : ''}</button>`;
+          return `<button class="opt ${cl}" data-opt="${o}" ${quiz.picked ? 'disabled' : ''}>${esc(oc.title)}${cueOf(oc) ? ` <span class="muted small">· ${esc(cueOf(oc))}</span>` : ''}${quiz.picked ? ` <span class="muted small">(${KIND_SHORT[oc.kind]} ${oc.nr})</span>` : ''}</button>`;
         }).join('')}</div>
         ${quiz.picked ? `<div class="actionbar"><button class="btn primary big" data-act="quiznext">Weiter</button></div>` : ''}
       </div>`;
@@ -1310,7 +1365,7 @@ function viewQuiz() {
     // Prüfungstest
     return head + `<div class="card fc">
       <div class="row"><span class="kind" style="color:${KIND_COLOR[c.kind]}">${esc(c.kind)} ${c.nr}</span><div class="spacer"></div>${prioTag(c)}</div>
-      <div class="ttl">${esc(c.title)}</div>
+      <div class="ttl">${esc(c.title)}</div>${cueOf(c) ? `<div class="cue">${esc(cueOf(c))}</div>` : ''}
       <div class="meta">Kap. ${c.chap}${c.sec ? ' · ' + esc(c.sec) : ''}</div>
       ${qHTML(c)}
       ${!quiz.revealed ? `<div class="prompt">Prüfungssituation: ${c.img ? `Schreibe die ${c.kind === 'Definition' ? 'Definition' : 'Aussage'} so auf, wie du sie in der Prüfung hinschreiben würdest.` : promptFor(c)} Erst dann aufdecken.</div>
@@ -1356,7 +1411,7 @@ let cat = { q: '', chap: '', kind: '', prio: '', status: '' };
 function liHTML(c) {
   const st = statusOf(c), x = S.cards[c.id];
   const right = x && x.st ? (st.k === 'lernend' ? 'lernt' : Math.round(retrievability(x) * 100) + ' %') : '';
-  return `<div class="ir li2" data-card="${c.id}"><span class="ir-l"><b>${esc(c.title) || '—'}${(x || {}).flag ? ' ★' : ''}</b><small>${esc(KIND_SHORT[c.kind] + ' ' + c.nr)}</small></span><span class="ir-r"><svg class="chev" viewBox="0 0 8 14" aria-hidden="true"><path d="M1.5 1.5L6.5 7l-5 5.5"/></svg></span></div>`;
+  return `<div class="ir li2" data-card="${c.id}"><span class="ir-l"><b>${esc(c.title) || '—'}${(x || {}).flag ? ' ★' : ''}</b><small>${esc(KIND_SHORT[c.kind] + ' ' + c.nr)}${cueOf(c) ? ' · ' + esc(cueOf(c)) : ''}</small></span><span class="ir-r"><svg class="chev" viewBox="0 0 8 14" aria-hidden="true"><path d="M1.5 1.5L6.5 7l-5 5.5"/></svg></span></div>`;
 }
 function filteredCatalog() {
   const q = cat.q.trim().toLowerCase();
