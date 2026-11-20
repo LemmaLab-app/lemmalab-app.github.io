@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-20.15';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-20.16';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -143,7 +143,9 @@ function prioOf(c) { const x = S.cards[c.id]; return (x && x.prio) || c.prio; }
 /* ============================================================
  * Prüfungsdatum & Planung
  * ============================================================ */
-const TRACK_BUFFER = 21;   // Tage vor der Prüfung, ab denen nur noch gefestigt wird
+const MASTER_BEFORE = 30;  // Ziel: alles 1 Monat vor der Prüfung sicher beherrschen
+const CONSOLIDATE = 14;    // so lange braucht eine neue Karte mindestens, bis sie sitzt
+const TRACK_BUFFER = MASTER_BEFORE + CONSOLIDATE;   // bis dahin muss alles eingeführt sein
 function examTime() { return parseDate(S.settings.examDate || DEFAULT_SETTINGS.examDate); }
 function daysToExam() { return Math.ceil((dayStart(examTime()) - dayStart()) / DAY); }
 
@@ -1560,6 +1562,7 @@ function trackHTML() {
   const rows = [
     `<div class="ir ii track">${icon === 'check' ? `<span class="ico" style="background:${col}"><svg viewBox="0 0 24 24">${ICON.check}</svg></span>` : `<span class="ico" style="background:${col}"><svg viewBox="0 0 24 24">${ICON[icon]}</svg></span>`}<span class="ir-l"><b>${tr.title}</b>${tr.sub ? `<small>${esc(tr.sub)}</small>` : ''}</span></div>`,
     UI.row('Prüfung', `<span class="v">${new Date(tr.exam).toLocaleDateString('de-CH', { day: 'numeric', month: 'long', year: 'numeric' })}${tr.dte >= 0 ? ` · in ${tr.dte} Tagen` : ''}</span>`),
+    UI.row('Sicher beherrscht', `<span class="v">${CARDS.filter(c => { const x = S.cards[c.id]; return x && x.st === 2 && x.S >= 21; }).length} von ${CARDS.length}</span>`),
   ];
   if (tr.remaining && tr.dte >= 0) {
     rows.push(UI.row('Noch neu', `<span class="v">${tr.remaining} Karten</span>`));
@@ -1580,7 +1583,8 @@ function trackHTML() {
     });
     if (list.length) others = UI.group(list, { header: 'Andere Fächer', footer: 'Stand vom letzten Öffnen des jeweiligen Fachs.' });
   } catch (e) { }
-  return UI.group(rows, { header: 'Prüfung', footer: `Ziel: alle Karten ${TRACK_BUFFER} Tage vor der Prüfung eingeführt, damit genug Zeit zum Festigen bleibt.` }) + others;
+  const goal = tr.exam - MASTER_BEFORE * DAY, intro = tr.exam - TRACK_BUFFER * DAY;
+  return UI.group(rows, { header: 'Prüfung', footer: `Ziel: alles bis ${new Date(goal).toLocaleDateString('de-CH', { day: 'numeric', month: 'long' })} sicher beherrschen (1 Monat vor der Prüfung). Dafür sind alle Karten bis ${new Date(intro).toLocaleDateString('de-CH', { day: 'numeric', month: 'long' })} eingeführt, danach wird nur noch gefestigt.` }) + others;
 }
 document.addEventListener('click', e => { const b = e.target.closest('[data-fachgo]'); if (b && window.switchFach) window.switchFach(b.dataset.fachgo); });
 
@@ -2027,16 +2031,24 @@ function afterRender() {
   on('#cq', 'input', e => { cat.q = e.target.value; const pos = e.target.selectionStart; render(); const el = $('#cq'); el.focus(); el.setSelectionRange(pos, pos); });
   document.querySelectorAll('.seg [data-seg]').forEach(b => b.addEventListener('click', () => { cat.status = b.dataset.seg; render(); }));
   document.querySelectorAll('[data-unfilter]').forEach(b => b.addEventListener('click', () => { cat[b.dataset.unfilter] = ''; render(); }));
-  document.querySelectorAll('input[data-examfach]').forEach(inp => inp.addEventListener('change', e => {
-    const k = e.target.dataset.examfach, v = e.target.value; if (!v || !window.FachStore) return;
+  const examCommit = (inp, apply) => {
+    const lbl = inp.parentElement && inp.parentElement.querySelector('span');
+    let tm = null;
+    const run = () => { clearTimeout(tm); tm = null; if (inp.value && inp.value !== inp._done) { inp._done = inp.value; apply(inp.value); } };
+    const upd = () => { if (lbl && inp.value) { lbl.textContent = fmtDateLong(inp.value); lbl.parentElement.classList.remove('prov'); } clearTimeout(tm); tm = setTimeout(run, 900); };
+    inp._done = inp.value;
+    inp.addEventListener('input', upd); inp.addEventListener('change', upd); inp.addEventListener('blur', run);
+  };
+  const fmtDateLong = d => { try { return new Date(d + 'T12:00').toLocaleDateString('de-CH', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (e) { return d; } };
+  document.querySelectorAll('input[data-examfach]').forEach(inp => examCommit(inp, v => {
+    const k = inp.dataset.examfach; if (!v || !window.FachStore) return;
     let o = FachStore.read(k) || (typeof blankFor === 'function' ? blankFor(k) : { v: 1, cards: {}, log: [], settings: {} });
     o.settings = { ...(o.settings || {}), examDate: v, examSet: true, u: now() };
     FachStore.write(k, o);
     try { const all = JSON.parse(localStorage.getItem('lemmalab-track') || '{}'); if (all[k]) { all[k].exam = parseDate(v); localStorage.setItem('lemmalab-track', JSON.stringify(all)); } } catch (_) { }
     if (typeof Cloud !== 'undefined' && Cloud.user) { Cloud.lastSent = ''; Cloud.schedule(); }
-    render();
   }));
-  on('#sExam', 'change', e => { if (e.target.value) { S.settings.examDate = e.target.value; S.settings.examSet = true; touchSettings(); rescheduleForExam(); } });
+  { const i = $('#sExam'); if (i) examCommit(i, v => { S.settings.examDate = v; S.settings.examSet = true; rescheduleForExam(); touchSettings(); }); }
   on('#sNewMode', 'change', e => { S.settings.newMode = e.target.value; touchSettings(); render(); });
   on('#sNew', 'change', e => { S.settings.newPerDay = clamp(+e.target.value || 0, 0, 80); touchSettings(); });
   on('#sBudget', 'change', e => { S.settings.budget = clamp(+e.target.value || 0, 0, 300); touchSettings(); });
@@ -2053,7 +2065,6 @@ function afterRender() {
 function touchSettings() { S.settings.u = now(); save(['settings']); }   // wie in iOS: Änderungen gelten sofort, ohne Meldung
 function rescheduleForExam() {
   for (const c of CARDS) { const x = S.cards[c.id]; if (x && x.st === 2) { x.due = capDue(c.id, x.due); } }
-  save(['cards']);
 }
 
 document.addEventListener('click', e => {
