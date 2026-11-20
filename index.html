@@ -182,7 +182,10 @@ svg.chart{display:block;max-height:210px;margin:0 auto}
 .scanwrap{cursor:zoom-in}
 .zoombox{overflow:auto;margin:10px 0;border:1px solid var(--line);border-radius:10px;background:#fff;-webkit-overflow-scrolling:touch}
 .zoombox img{max-width:none}
-.zoomchip{position:absolute;right:6px;bottom:6px;font-size:11.5px;font-weight:600;background:rgba(27,34,48,.72);color:#fff;border-radius:7px;padding:3px 7px;pointer-events:none}
+.lightbox{position:fixed;inset:0;z-index:200;background:rgba(10,12,18,.88);display:flex;align-items:center;justify-content:center;padding:max(8px,env(safe-area-inset-top)) max(4px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(4px,env(safe-area-inset-left));cursor:zoom-out;animation:lbIn .15s ease-out}
+.lightbox .scanwrap{margin:0;cursor:zoom-out;border:0;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,.45);width:min(100%,calc((100vh - 16px) * var(--ar,1)));max-width:1400px}
+@keyframes lbIn{from{opacity:0}to{opacity:1}}
+.zoomchip{position:absolute;right:4px;top:4px;font-size:12px;line-height:1;font-weight:700;background:rgba(27,34,48,.38);color:#fff;border-radius:6px;padding:3px 4px;pointer-events:none}
 .actionbar{margin-top:16px}
 .modal.full .sheet{max-width:none;height:100%;max-height:none;border-radius:0;display:flex;flex-direction:column;padding-top:calc(14px + var(--safe-t))}
 .modal.full .zoombox{flex:1}
@@ -1107,9 +1110,9 @@ details.adv2+.ig,details.adv2+details{margin-top:30px}
 <div id="navbar" aria-hidden="true"><span id="navTitle"></span></div>
 <div class="toast" id="toast"></div>
 <script src="vendor/katex/katex.min.js"></script>
-<script src="fach.js?v=2026-11-20.1"></script>
-<script src="app.js?v=2026-11-20.1"></script>
+<script src="fach.js?v=2026-11-20.2"></script>
+<script src="app.js?v=2026-11-20.2"></script>
 <script src="vendor/supabase/supabase.js"></script>
-<script src="account.js?v=2026-11-20.1"></script>
+<script src="account.js?v=2026-11-20.2"></script>
 </body>
 </html>

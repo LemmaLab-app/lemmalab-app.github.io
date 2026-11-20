@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-20.1';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-20.2';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -994,10 +994,21 @@ function metaLine(c, long) {
   const src = `${c.src || 'Skript'} S. ${c.page}`;   // Lineare Algebra: Mitschrift oder Skript
   return long ? `Kap. ${c.chap} ${esc(c.chapTitle)} · ${esc(c.sec)} · ${src}` : `Kapitel ${c.chap} · ${src}`;
 }
+function openLightbox(sw) {
+  // Kopie des Bildes (inkl. Titelmaske) als Vollbild-Ansicht; kein Zoomen/Wischen, Antippen schliesst
+  const box = document.createElement('div');
+  box.className = 'lightbox'; box.setAttribute('role', 'dialog'); box.title = 'Antippen zum Schliessen';
+  const w = sw.cloneNode(true);
+  w.removeAttribute('data-zoom'); w.removeAttribute('title');
+  w.querySelectorAll('.zoomchip').forEach(x => x.remove());
+  const im = w.querySelector('img'); const r = im ? (+im.getAttribute('width') / +im.getAttribute('height')) || 1 : 1;
+  w.style.setProperty('--ar', r);
+  box.appendChild(w); document.body.appendChild(box);
+}
 function scanHTML(c, masked) {
   if (!c.img) return richHTML(c) + (masked ? '' : cardExtras(c));
   const m = masked && c.mask ? `<div class="mask" style="left:${c.mask[0] / c.w * 100}%;top:${c.mask[1] / c.h * 100}%;width:${(c.mask[2] - c.mask[0]) / c.w * 100}%;height:${(c.mask[3] - c.mask[1]) / c.h * 100}%"></div>` : '';
-  return `<div class="scanwrap" ${masked ? '' : `data-zoom="${c.id}" title="Antippen zum Vergrössern"`}><img class="scan" src="img/${c.img}" width="${c.w}" height="${c.h}" alt="${esc(c.kind + ' ' + c.nr)}" decoding="sync">${m}${masked ? '' : '<span class="zoomchip">⤢ Vergrössern</span>'}</div>`;
+  return `<div class="scanwrap" data-zoom="${c.id}" title="Antippen zum Vergrössern"><img class="scan" src="img/${c.img}" width="${c.w}" height="${c.h}" alt="${esc(c.kind + ' ' + c.nr)}" decoding="sync">${m}${masked ? '' : '<span class="zoomchip" aria-hidden="true">⤢</span>'}</div>`;
 }
 /* Prädikatenlogische Formulierung (KaTeX), falls vorhanden */
 const _texCache = {};
@@ -1795,14 +1806,18 @@ document.addEventListener('click', e => {
   if (trate) return quizAnswer(+trate.dataset.trate);
   const opt = t.closest('[data-opt]');
   if (opt && !opt.disabled) return quizAnswer(opt.dataset.opt);
-  // Antippen der Lernkarte dreht sie um (Vergrössern dann über «⤢ Vergrössern»)
+  // Antippen des Bildes vergrössert es (ganzes Bild, so gross wie der Bildschirm erlaubt); Antippen der Karte daneben dreht sie um
+  const lb = t.closest('.lightbox');
+  if (lb) { lb.remove(); return; }
+  const sw = t.closest('.scanwrap[data-zoom]');
+  if (sw) { openLightbox(sw); return; }
   const fcard = t.closest('.fc');
   if (fcard && !act && !t.closest('button,a,summary,details,input,textarea,select,label,.zoomchip,.lf') && !(window.getSelection && String(window.getSelection()).length)) {
     if (tab === 'heute' && session && session.cur) return flip();
     if (tab === 'quiz' && quiz && quiz.type === 'test') return qFlip();
   }
-  const z = t.closest('[data-zoom]');
-  if (z && !t.closest('.zoombox')) { const c = BY_ID[z.dataset.zoom]; modal(`<div class="row"><b>${esc(c.kind)} ${c.nr}</b><div class="spacer"></div><button class="btn" data-act="zin">＋</button><button class="btn" data-act="zout">－</button><button class="btn ghost" data-act="close">✕</button></div><div class="zoombox"><img class="scan" id="zimg" src="img/${c.img}" alt="" style="width:${zoomW}px"></div><div class="muted small">Seitlich wischen zum Lesen · Tipp: Handy quer halten.</div>`); $('#modal').classList.add('full'); return; }
+  const z = null;
+  if (z) { const c = BY_ID[z.dataset.zoom]; modal(`<div class="row"><b>${esc(c.kind)} ${c.nr}</b><div class="spacer"></div><button class="btn" data-act="zin">＋</button><button class="btn" data-act="zout">－</button><button class="btn ghost" data-act="close">✕</button></div><div class="zoombox"><img class="scan" id="zimg" src="img/${c.img}" alt="" style="width:${zoomW}px"></div><div class="muted small">Seitlich wischen zum Lesen · Tipp: Handy quer halten.</div>`); $('#modal').classList.add('full'); return; }
   const li = t.closest('[data-card]');
   if (li && !act) return openCard(li.dataset.card);
   const ca = t.closest('[data-cardact]');
@@ -1880,7 +1895,7 @@ document.addEventListener('keydown', e => {
     else if (!quiz.revealed && e.key === 'Enter') { e.preventDefault(); qReveal(); }
     else if (quiz.revealed && '123'.includes(e.key)) quizAnswer(+e.key);
   }
-  if (e.key === 'Escape') closeModal();
+  if (e.key === 'Escape') { const lb = document.querySelector('.lightbox'); if (lb) { lb.remove(); return; } closeModal(); }
 });
 
 /* ---------- Export / Import ---------- */
