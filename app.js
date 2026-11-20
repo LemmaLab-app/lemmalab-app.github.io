@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-20.28';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-20.29';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -196,10 +196,9 @@ function plannedNewPerDay() {
   const remaining = eligibleNew().length + newIntroducedToday();
   if (!remaining) return 0;
   // 1) Prognose: alles spätestens TRACK_BUFFER Tage vor der Prüfung eingeführt, mit 15 % Reserve
-  const days = Math.max(1, daysToExam() - TRACK_BUFFER);
-  let n = Math.ceil(remaining / (days * 0.85));
   // 2) Mindestens MIN_NEW() pro Tag – oder mehr, falls die Simulation zeigt, dass sonst das Ziel verfehlt wird
-  n = Math.max(MIN_NEW(), n, Forecast.needMin());
+  const minN = minNewToday();
+  let n = minN;
   // 3) Mehr, wenn die Wiederholungen heute wenig Platz brauchen
   const ds = dayStart();
   const load = dueReviews().length + S.log.filter(l => l[0] >= ds && l[3] === 2 && modeOf(l) !== 'q').length;
@@ -210,9 +209,17 @@ function plannedNewPerDay() {
   if (b > 0) {
     const pt = personalTimes();
     const free = b * 60 - load * pt.review;
-    n = Math.min(n, Math.max(MIN_NEW(), Math.floor(free / pt.newCost)));
+    n = Math.min(n, Math.max(minN, Math.floor(free / pt.newCost)));
   }
   return Math.min(clamp(n, MIN_NEW(), 40), remaining);
+}
+/* Was heute mindestens nötig ist, damit die Prognose hält (ohne Zuschlag «mehr, wenn Platz ist») */
+function minNewToday() {
+  const remaining = eligibleNew().length + newIntroducedToday();
+  if (!remaining) return 0;
+  if (S.settings.newMode === 'manual') return Math.min(S.settings.newPerDay, remaining);
+  const days = Math.max(1, daysToExam() - TRACK_BUFFER);
+  return Math.min(remaining, Math.max(MIN_NEW(), Math.ceil(remaining / (days * 0.85)), Forecast.needMin()));
 }
 /* (Forecast ist weiter unten definiert; plannedNewPerDay wird erst nach dem Laden aufgerufen) */
 
@@ -1009,11 +1016,11 @@ function goalNote() {
     const sub = v != null ? `Am ${when} voraussichtlich ${v} von ${N} sicher${ve != null && ve > v ? `, bis zur Prüfung ${ve}` : ''}` : tr.sub;
     // Empfehlung für heute: was mindestens noch nötig ist, damit der Plan (und damit das Ziel) hält
     // Minimum = Prognose-Bedarf (ohne den Zuschlag «mehr, wenn heute Platz ist»)
-    const remAll = eligibleNew().length + newIntroducedToday();
-    const minToday = S.settings.newMode === 'manual' ? S.settings.newPerDay
-      : Math.min(remAll, Math.max(MIN_NEW(), Math.ceil(remAll / (Math.max(1, daysToExam() - TRACK_BUFFER) * 0.85)), Forecast.needMin()));
-    const newLeft = Math.max(0, minToday - newIntroducedToday());
-    const revLeft = buildQueue().nRev;
+    // nie mehr als der Tagesplan selbst vorsieht – sonst stünde «erledigt» neben «noch X Karten»
+    const minToday = Math.min(minNewToday(), plannedNewPerDay());
+    const bq = buildQueue();
+    const newLeft = Math.min(bq.nNew, Math.max(0, minToday - newIntroducedToday()));
+    const revLeft = bq.nRev;
     const hint = newLeft || revLeft
       ? `Heute noch mindestens ${newLeft ? `${newLeft} neue Karte${newLeft === 1 ? '' : 'n'}` : ''}${newLeft && revLeft ? ' und ' : ''}${revLeft ? `${revLeft} Wiederholung${revLeft === 1 ? '' : 'en'}` : ''}`
       : 'Heute ist alles Nötige geschafft';
@@ -1075,7 +1082,7 @@ function viewHome() {
   </div>`;
   return `<div class="home"><div class="col">
   ${hero}
-  ${goalNoteHTML(false)}
+  ${ts.allDone ? '' : goalNoteHTML(false)}
   ${UI.group([
     UI.row('Wiederholungen', `<span class="v">${q.nRev}</span>`),
     UI.row('Neue Karten', `<span class="v">${q.nNew}</span>`),
