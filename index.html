@@ -73,7 +73,7 @@ pre.cpp .hc{color:var(--muted);font-style:italic}pre.cpp .hp{color:var(--lem)}
 html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-text-size-adjust:100%}
 button{font:inherit;color:inherit;cursor:pointer}
 input,select,textarea{font:inherit;color:inherit;font-size:16px}  /* ≥16px: iOS zoomt sonst beim Antippen hinein */
-html,body{overflow-x:hidden}
+html{overflow-x:hidden}body{overflow-x:clip}
 .grid>*{min-width:0}
 .li .t b,.fc .ttl{overflow-wrap:anywhere}
 a{color:var(--accent)}
@@ -1219,6 +1219,14 @@ body.focus #view.a-tab .study-head,body.focus #view.a-tab .fc>:not(.actionbar){a
 .gnote{border-radius:16px;text-align:left;line-height:1.4}
 .ghint{font-weight:600;font-size:13.5px}
 .home .solo + .ig{margin-top:-6px}
+
+/* iOS: fest positionierte Leisten werden nach dem Scrollen teils versetzt getroffen (Tippen geht ins Leere
+   bzw. markiert Text). Bewertungsknöpfe darum im Fluss, unten angeheftet (sticky) statt fixed. */
+body.focus #view:has(> .swipeact){display:flex;flex-direction:column;min-height:calc(100dvh - 8px - var(--safe-t) - max(var(--safe-b),12px) - 10px)}
+body.focus .actionbar.swipeact{position:sticky!important;bottom:calc(max(var(--safe-b),12px) + 6px)!important;left:auto!important;right:auto!important;transform:none!important;width:auto!important;margin:auto 0 0!important;padding:16px 0 0!important;z-index:30}
+body.focus .app:has(.swipeact){padding-bottom:calc(max(var(--safe-b),12px) + 10px)!important}
+.swipeact,.swipeact *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.rb{touch-action:manipulation}
 </style>
 </head>
 <body>
@@ -1238,9 +1246,9 @@ body.focus #view.a-tab .study-head,body.focus #view.a-tab .fc>:not(.actionbar){a
 <div id="navbar" aria-hidden="true"><span id="navTitle"></span></div>
 <div class="toast" id="toast"></div>
 <script src="vendor/katex/katex.min.js"></script>
-<script src="fach.js?v=2026-11-20.27"></script>
-<script src="app.js?v=2026-11-20.27"></script>
+<script src="fach.js?v=2026-11-20.28"></script>
+<script src="app.js?v=2026-11-20.28"></script>
 <script src="vendor/supabase/supabase.js"></script>
-<script src="account.js?v=2026-11-20.27"></script>
+<script src="account.js?v=2026-11-20.28"></script>
 </body>
 </html>
