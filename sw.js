@@ -649,7 +649,7 @@ self.addEventListener('fetch', e => {
   if (isCore) {
     e.respondWith(
       // immer beim Server nachfragen (If-None-Match → meist 304), nie eine alte Kopie aus dem Browser-Cache
-      fetch(req.mode === 'navigate' ? req.url : req, { cache: 'no-cache' }).then(res => {
+      fetch(req.mode === 'navigate' ? req.url : req, { cache: 'no-cache' }).then(res => res.redirected ? fetch(req) : res).then(res => {
         if (res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req.mode === 'navigate' ? 'index.html' : req, copy)); }
         return res;
       }).catch(() => caches.match(req.mode === 'navigate' ? 'index.html' : req, { ignoreSearch: true }))
