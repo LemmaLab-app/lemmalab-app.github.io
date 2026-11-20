@@ -1152,6 +1152,17 @@ body.focus #view.a-tab .study-head,body.focus #view.a-tab .fc>:not(.actionbar){a
 .fc .cue{font-size:17px;font-weight:500;color:var(--ink);opacity:.72;margin:2px 0 4px;letter-spacing:-.01em}
 .fc .sim{display:inline-block;font-size:12.5px;font-weight:500;color:color-mix(in srgb,var(--hard) 85%,var(--ink));background:color-mix(in srgb,var(--hard) 12%,transparent);border-radius:8px;padding:4px 9px;margin:4px 0 6px}
 @media (min-width:768px) and (min-height:560px){.fc .cue{font-size:19px}}
+
+/* Querformat (Handy): Tab-Leiste als kompakte Kapsel unten in der Mitte */
+@media (orientation:landscape) and (max-height:559px){
+  nav.tabs{left:50%!important;right:auto!important;transform:translateX(-50%)!important;width:min(470px,60vw)!important;
+    padding:4px!important;bottom:calc(max(var(--safe-b),8px) + 2px)!important;border-radius:999px!important}
+  nav.tabs .in{flex-direction:row!important;gap:0!important}
+  nav.tabs button{flex:1 1 0!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;gap:1px!important;font-size:10px!important;padding:5px 0 4px!important;min-width:0}
+  nav.tabs button svg{width:21px!important;height:21px!important}
+  .app{padding-bottom:calc(max(var(--safe-b),8px) + 74px)!important}
+  #navbar{display:none!important}
+}
 </style>
 </head>
 <body>
@@ -1171,9 +1182,9 @@ body.focus #view.a-tab .study-head,body.focus #view.a-tab .fc>:not(.actionbar){a
 <div id="navbar" aria-hidden="true"><span id="navTitle"></span></div>
 <div class="toast" id="toast"></div>
 <script src="vendor/katex/katex.min.js"></script>
-<script src="fach.js?v=2026-11-20.9"></script>
-<script src="app.js?v=2026-11-20.9"></script>
+<script src="fach.js?v=2026-11-20.10"></script>
+<script src="app.js?v=2026-11-20.10"></script>
 <script src="vendor/supabase/supabase.js"></script>
-<script src="account.js?v=2026-11-20.9"></script>
+<script src="account.js?v=2026-11-20.10"></script>
 </body>
 </html>
