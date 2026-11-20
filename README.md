@@ -1,6 +1,6 @@
 <p align="center"><img src="icons/icon-512.png" width="140" alt="LemmaLab"></p>
 
-# LemmaLab – Analysis 1, Physik 1, Informatik & Lineare Algebra lernen
+# LemmaLab – Analysis 1, Physik 1, Informatik & Lineare Algebra 1 & 2 lernen
 
 Private Lernhilfe, nur für den Eigengebrauch, ohne Gewähr.
 
@@ -22,12 +22,14 @@ bzw. *Einstellungen → Fach*). Jedes Fach hat eigene Karten, eigenen Lernplan, 
   Jede Code-Karte ist mit g++ geprüft: `node tools/test_informatik.mjs` (ohne `-w`, sonst unterdrückt g++ z. B. Narrowing-Fehler).
   Prioritäten sind (noch) eine Einschätzung, keine Auswertung alter Prüfungen. Quelle: `informatik.js` (von Hand gepflegt;
   `C(…)` = Kurzform für Code-Karten, ⟦…⟧ = Inline-Code, ⟪…⟫ = Code-Block).
-- **Lineare Algebra** (LA I & II als ein Fach, Prüfung nach LA II): 358 Karten, wie bei Analysis exakt ausgeschnitten.
+- **Lineare Algebra 1 & 2** (als ein Fach, Prüfung nach LA II): 358 Karten, wie bei Analysis exakt ausgeschnitten.
   Vorrang hat die **Mitschrift der Vorlesung** (99 Einträge aus §0–§10: algebraische Strukturen, Vektorräume, Basen,
   Unterräume/Quotienten, Dualraum, Hom(V,W), Basiswechsel, duale Abbildung, Kern/Bild/Rang; Karopapier entfernt).
   Stoff, der in der Mitschrift noch fehlt, kommt aus dem Skript von Menny Akka Ginosar (259 Einträge: Rang und LGS,
   Determinanten, Eigenwerte, Skalarprodukte, Spektralsätze, Bilinearformen, Jordan-Normalform, Annulator, Tensorprodukt);
-  diese Karten sind eine Prioritätsstufe tiefer eingeordnet. Prioritäten aus alten Prüfungen LA I/II.
+  diese Karten sind eine Prioritätsstufe tiefer eingeordnet und kommen beim Lernen erst dazu, wenn alle
+  Mitschrift-Karten eingeführt und 80 % davon gefestigt sind (Stabilität ≥ 7 Tage; `focusSrc` in `fach.js`).
+  Neue Mitschrift-Wochen haben automatisch wieder Vorrang. Tempo lockerer (`pace`), da Prüfung erst im Sommer. Prioritäten aus alten Prüfungen LA I/II.
   Quelle: `linalg.js` (erzeugt mit `tools/linalg/`, siehe dortiges README).
 
 ## Funktionen

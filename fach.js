@@ -25,7 +25,8 @@ window.FAECHER = {
     gist: 'lemmalab-informatik.json', syncPrefix: 'inf1-', examDate: '2027-01-25', accent: 'inf',
   },
   la: {
-    name: 'Lineare Algebra', short: 'Lin. Algebra', sub: 'LA I & II: Mitschrift & Skript',
+    name: 'Lineare Algebra 1 & 2', short: 'LinAlg 1 & 2', sub: 'Mitschrift zuerst, dann Skript',
+    focusSrc: 'Mitschrift',   // Mitschrift dieses Jahres hat Vorrang vor dem Skript (Vorjahr)
     ls: 'lemmalab-la-v1',
     scripts: ['linalg.js'],
     gist: 'lemmalab-linalg.json', syncPrefix: 'la-', examDate: '2027-08-09', accent: 'la',

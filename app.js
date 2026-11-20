@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-20.8';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-20.10';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -156,13 +156,30 @@ function retrievability(x, t = now()) {
   return FSRS.R(Math.max(0, (t - x.last) / DAY), x.S * Calib.k());
 }
 
-function eligibleNew() {
-  return CARDS.filter(c => {
+function eligibleNew(all) {   // all = auch noch gesperrte Skript-Karten (für Planung/Prognose)
+  let list = CARDS.filter(c => {
     const x = S.cards[c.id];
     if (x && (x.st || x.susp)) return false;
     if (prioOf(c) === 1 && !S.settings.includeRand) return false;
     return true;
-  }).sort((a, b) => (prioOf(b) - prioOf(a)) || (a.ord - b.ord));
+  });
+  // Lineare Algebra: Mitschrift dieses Jahres zuerst. Skript-Karten kommen erst dazu, wenn die ganze Mitschrift
+  // eingeführt und gut beherrscht ist (neue Mitschrift-Wochen haben automatisch wieder Vorrang).
+  const F = FACH_CFG.focusSrc;
+  if (F) {
+    const fs = focusState();
+    if (!fs.open && !all) list = list.filter(c => c.src === F);
+  }
+  return list.sort((a, b) => (F ? (b.src === F) - (a.src === F) : 0) || (prioOf(b) - prioOf(a)) || (a.ord - b.ord));
+}
+const FOCUS_SHARE = 0.8, FOCUS_STAB = 7;   // 80 % der Mitschrift-Karten gefestigt (Stabilität ≥ 7 Tage)
+function focusState() {
+  const F = FACH_CFG.focusSrc;
+  const pool = CARDS.filter(c => c.src === F && !(S.cards[c.id] || {}).susp && (prioOf(c) > 1 || S.settings.includeRand));
+  let left = 0, ok = 0;
+  for (const c of pool) { const x = S.cards[c.id]; if (!x || !x.st) left++; else if (x.st === 2 && x.S >= FOCUS_STAB) ok++; }
+  const need = Math.ceil(pool.length * FOCUS_SHARE);
+  return { total: pool.length, left, ok, need, open: left === 0 && ok >= need };
 }
 
 function newIntroducedToday() {
@@ -195,7 +212,7 @@ function MIN_NEW() { const t = Tune.get(); return t && Number.isFinite(t.minNew)
 function plannedNewPerDay() {
   if (S.settings.newMode === 'manual') return S.settings.newPerDay;
   // Gerechnet mit dem Stand zu Tagesbeginn (heute Eingeführtes/Wiederholtes zählt mit), damit die Zahl über den Tag gleich bleibt.
-  const remaining = eligibleNew().length + newIntroducedToday();
+  const remaining = eligibleNew(true).length + newIntroducedToday();
   if (!remaining) return 0;
   // 1) Prognose: alles spätestens TRACK_BUFFER Tage vor der Prüfung eingeführt, mit 15 % Reserve
   // 2) Mindestens MIN_NEW() pro Tag – oder mehr, falls die Simulation zeigt, dass sonst das Ziel verfehlt wird
@@ -217,7 +234,7 @@ function plannedNewPerDay() {
 }
 /* Was heute mindestens nötig ist, damit die Prognose hält (ohne Zuschlag «mehr, wenn Platz ist») */
 function minNewToday() {
-  const remaining = eligibleNew().length + newIntroducedToday();
+  const remaining = eligibleNew(true).length + newIntroducedToday();
   if (!remaining) return 0;
   if (S.settings.newMode === 'manual') return Math.min(S.settings.newPerDay, remaining);
   const days = Math.max(1, daysToExam() - TRACK_BUFFER);
@@ -1112,7 +1129,8 @@ function viewHome() {
     UI.row('Prüfung', `<span class="v">${dte > 0 ? `in ${dte} Tagen` : dte === 0 ? 'heute' : 'vorbei'}</span>`),
     UI.row('Prüfungsbereit', `<span class="v">${Math.round(rd.exam * 100)} %</span>`),
     UI.row('Eingeführt', `<span class="v">${introduced} von ${CARDS.length}</span>`),
-  ], { header: 'Stand' })}
+    ...(FACH_CFG.focusSrc ? (() => { const fs = focusState(); return [UI.row('Mitschrift gefestigt', `<span class="v">${fs.ok} von ${fs.total}</span>`)]; })() : []),
+  ], { header: 'Stand', footer: FACH_CFG.focusSrc ? (() => { const fs = focusState(); return fs.open ? 'Mitschrift gut beherrscht – jetzt kommen auch Karten aus dem Skript (Vorjahr) dazu. Neue Mitschrift-Wochen haben wieder Vorrang.' : `Zuerst die Mitschrift: Karten aus dem Skript (Vorjahr) kommen dazu, sobald alle Mitschrift-Karten eingeführt und ${Math.round(FOCUS_SHARE * 100)} % davon gefestigt sind (noch ${Math.max(0, fs.need - fs.ok)}).`; })() : '' })}
   ${UI.group([
     UI.item('cards', '#0a84ff', '10 neue Karten', 'Zusätzlich zum Tagesplan', '', { act: 'extra' }),
     weak.length ? UI.item('wave', '#ff9f0a', 'Schwache Karten üben', `${weak.length} Karte${weak.length === 1 ? '' : 'n'} wackeln`, '', { act: 'weak' }) : '',
@@ -1703,7 +1721,7 @@ function openCard(id) {
  * eingeführt, damit genug Zeit zum Festigen bleibt. Verglichen wird das nötige
  * Tempo mit deinem Tempo der letzten 7 Tage. */
 function trackStatus() {
-  const dte = daysToExam(), remaining = eligibleNew().length;
+  const dte = daysToExam(), remaining = eligibleNew(true).length;
   const overdue = CARDS.filter(c => { const x = S.cards[c.id]; return x && x.st === 2 && !x.susp && x.due < dayStart(); }).length;
   const created = S.created || (S.log[0] && S.log[0][0]) || now();
   const span = clamp(Math.ceil((now() - Math.max(created, now() - 7 * DAY)) / DAY), 1, 7);
@@ -1968,7 +1986,7 @@ function timeStatsHTML() {
 }
 function planText() {
   const dte = daysToExam();
-  const remaining = eligibleNew();
+  const remaining = eligibleNew(true);
   const rem5 = remaining.filter(c => prioOf(c) === 5).length, rem4 = remaining.filter(c => prioOf(c) === 4).length;
   const npd = plannedNewPerDay();
   const intro7 = CARDS.filter(c => { const x = S.cards[c.id]; return x && x.intro && x.intro > now() - 7 * DAY; }).length;
@@ -2031,7 +2049,7 @@ const Forecast = {
     const exam = examTime(), d0 = soll && start ? dayStart(start) : dayStart(), nDays = Math.max(1, Math.ceil((dayStart(exam) - d0) / DAY));
     const pool0 = soll
       ? CARDS.filter(c => !(S.cards[c.id] || {}).susp && (prioOf(c) !== 1 || S.settings.includeRand)).sort((a, b) => (prioOf(b) - prioOf(a)) || (a.ord - b.ord)).map(c => c.id)
-      : eligibleNew().map(c => c.id);
+      : eligibleNew(true).map(c => c.id);
     const manual = S.settings.newMode === 'manual';
     const pace = this.pace();
     const mastered = new Array(nDays + 1).fill(0), reviews = new Array(nDays + 1).fill(0), intro = new Array(nDays + 1).fill(0);
@@ -2110,7 +2128,7 @@ const Forecast = {
     };
     idle(go, { timeout: 2000 });
   },
-  needKey() { return [this.sig(), dayKey(now()), S.settings.examDate, S.settings.includeRand, Model.ver, Math.floor(eligibleNew().length / 20)].join('|'); },
+  needKey() { return [this.sig(), dayKey(now()), S.settings.examDate, S.settings.includeRand, Model.ver, Math.floor(eligibleNew(true).length / 20)].join('|'); },
   needMin() {
     this.load();
     const key = this.needKey();
@@ -2122,7 +2140,7 @@ const Forecast = {
     if (key === this._nk) return this._need;
     this._nk = key; this._need = MIN_NEW();
     const exam = examTime(), goal = exam - MASTER_BEFORE * DAY;
-    if (!eligibleNew().length || goal <= now()) return this._need;
+    if (!eligibleNew(true).length || goal <= now()) return this._need;
     const N = CARDS.filter(c => prioOf(c) !== 1 || S.settings.includeRand).length;
     // Ein Teil der Karten ist immer gerade frisch vergessen und wieder im Aufbau – 100 % gibt es nie.
     // Darum: kleinste Untergrenze, die (fast) so viel erreicht wie das Maximum von 40 pro Tag.
