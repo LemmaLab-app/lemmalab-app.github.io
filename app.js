@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-20.30';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-20.31';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -738,6 +738,8 @@ setInterval(() => {
   else if (!session && !quiz && tab === 'heute') { Motion.set('tab'); render(); }
 }, 1000);
 const WAIT_SOON = 60e3;   // so kurz vor der Fälligkeit darf eine Lernkarte schon kommen
+const LEARN_AHEAD = 20 * 60e3;   // so früh darf eine andere Lernkarte kommen, damit nicht dieselbe zweimal hintereinander kommt
+let lastShownId = null;          // zuletzt gezeigte Karte (auch über Sitzungen hinweg, z. B. «Weiter lernen»)
 function laterReady(id, t) { return S.cards[id].due <= t + WAIT_SOON && (session.shown || 0) >= ((session.gap || {})[id] || 0); }
 function nextCard(force) {
   const t = now();
@@ -748,10 +750,15 @@ function nextCard(force) {
     session.later = session.later.filter(id => !ready.includes(id));
     session.queue.push(...ready);
   }
+  const last = lastShownId;
   if (!session.queue.length && session.later.length) {
     session.later.sort((a, b) => S.cards[a].due - S.cards[b].due);
-    const id = session.later[0], wait = S.cards[id].due - t;
-    if (force || wait <= WAIT_SOON) session.queue.push(session.later.shift());
+    // Ist als Nächstes ausgerechnet die gerade gezeigte Karte dran, lieber eine andere
+    // Lernkarte etwas früher nehmen (bis LEARN_AHEAD) – sonst käme dieselbe direkt nochmals.
+    let i = 0;
+    if (session.later[0] === last && session.later.length > 1 && S.cards[session.later[1]].due - t <= LEARN_AHEAD) i = 1;
+    const id = session.later[i], wait = S.cards[id].due - t;
+    if (force || i === 1 || wait <= WAIT_SOON) session.queue.push(session.later.splice(i, 1)[0]);
     else {
       // sonst kurz warten statt dieselbe Karte gleich nochmals zu zeigen
       session.cur = null; session.revealed = false; session.waiting = true;
@@ -759,7 +766,17 @@ function nextCard(force) {
       Motion.set('tab'); render(); return;
     }
   }
+  // Nie zweimal dieselbe Karte direkt hintereinander, solange es eine andere gibt
+  if (last && session.queue[0] === last) {
+    if (session.queue.length > 1) [session.queue[0], session.queue[1]] = [session.queue[1], session.queue[0]];
+    else {
+      const alt = session.later.filter(id => id !== last && S.cards[id].due - t <= LEARN_AHEAD)
+        .sort((a, b) => S.cards[a].due - S.cards[b].due)[0];
+      if (alt) { session.later = session.later.filter(id => id !== alt); session.queue.unshift(alt); }
+    }
+  }
   session.cur = session.queue.shift() || null;
+  if (session.cur) lastShownId = session.cur;
   if (session.cur) session.shown = (session.shown || 0) + 1;
   session.revealed = false;
   Timer.start();
@@ -812,7 +829,7 @@ function undo() {
   for (let i = S.log.length - 1; i >= 0; i--) { if (S.log[i][1] === u.id) { S.log.splice(i, 1); break; } }
   session.queue = u.queue; session.later = u.later; session.done = u.done;
   if (session.cur) session.queue.unshift(session.cur);
-  session.cur = u.id; session.revealed = true; Timer.start(); Timer.front = 0;
+  session.cur = u.id; lastShownId = u.id; session.revealed = true; Timer.start(); Timer.front = 0;
   save();
   Motion.set('back');
   render();

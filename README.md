@@ -14,12 +14,14 @@ bzw. *Einstellungen → Fach*). Jedes Fach hat eigene Karten, eigenen Lernplan, 
   Prioritäten aus der Auswertung der Prüfungen HS23–FS26 und des Probeexams HS26 (Thermodynamik, starrer Körper,
   Stösse, Schwingungen und Gravitation = Kern). Karten mit *✎ Nicht auf der Formelsammlung* zeigen, was man selbst
   auf die Formelsammlung schreiben sollte. Quelle: `physik.js` (von Hand gepflegt, Formeln mit KaTeX).
-- **Informatik** (C++): 102 Karten in 10 Kapiteln (Ganzzahlen, Kontrollfluss, Fliesskomma, Funktionen, Referenzen,
-  Vektoren/Strings, Rekursion/EBNF, Klassen/Operatoren, Zeiger/dynamischer Speicher, Vererbung). Kern sind 62
-  **Code-Karten «Was passiert?»**: der Code steht schon vor dem Aufdecken da, man bestimmt die Ausgabe – oder erkennt den
-  versteckten Fehler (Kompilierfehler, undefiniertes Verhalten, Endlosschleife, logischer Fehler), wie in der Prüfung.
-  Jede Code-Karte ist mit g++ geprüft: `node tools/test_informatik.mjs`. Prioritäten sind (noch) eine Einschätzung,
-  keine Auswertung alter Prüfungen. Quelle: `informatik.js` (von Hand gepflegt; ⟦…⟧ = Inline-Code, ⟪…⟫ = Code-Block).
+- **Informatik** (C++): 379 Karten in 14 Kapiteln, gegliedert wie der «C++ Fehlerkatalog» bzw. das Vorlesungsskript
+  (Programmaufbau, Ausdrücke, Fundamentaltypen, Kontrollstrukturen, Funktionen, Vektoren, Referenzen, Strings, Rekursion,
+  Klassen, Container/Iteratoren, Zeiger/Arrays, dynamischer Speicher, Vererbung). Kern sind 311 **Code-Karten «Was passiert?»**:
+  der Code steht schon vor dem Aufdecken da, man bestimmt die Ausgabe – oder erkennt den versteckten Fehler in einer der
+  Kategorien CE, UB, SO, LZ, EN, LF (oder «korrekt – Falle!»), wie in der Prüfung.
+  Jede Code-Karte ist mit g++ geprüft: `node tools/test_informatik.mjs` (ohne `-w`, sonst unterdrückt g++ z. B. Narrowing-Fehler).
+  Prioritäten sind (noch) eine Einschätzung, keine Auswertung alter Prüfungen. Quelle: `informatik.js` (von Hand gepflegt;
+  `C(…)` = Kurzform für Code-Karten, ⟦…⟧ = Inline-Code, ⟪…⟫ = Code-Block).
 - **Lineare Algebra** (LA I & II als ein Fach, Prüfung nach LA II): 358 Karten, wie bei Analysis exakt ausgeschnitten.
   Vorrang hat die **Mitschrift der Vorlesung** (99 Einträge aus §0–§10: algebraische Strukturen, Vektorräume, Basen,
   Unterräume/Quotienten, Dualraum, Hom(V,W), Basiswechsel, duale Abbildung, Kern/Bild/Rang; Karopapier entfernt).
