@@ -52,7 +52,8 @@ window.FachStore = {
 window.switchFach = id => {
   if (!window.FAECHER[id] || id === window.FACH) return;
   try { localStorage.setItem(window.FACH_KEY, id); } catch (e) { }
-  location.replace(location.pathname + '?fach=' + id + '#heute');   // neue Adresse → Seite lädt neu
+  document.documentElement.classList.add('leaving');
+  setTimeout(() => location.replace(location.pathname + '?fach=' + id + '#heute'), 110);   // neue Adresse → Seite lädt neu
 };
 
 (() => {

@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-20.29';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-20.30';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -2061,8 +2061,36 @@ const Forecast = {
   /* kleinste Untergrenze neuer Karten pro Tag, mit der die Simulation das Ziel
    * (≥ 97 % sicher beherrscht 1 Monat vor der Prüfung) erreicht; einmal pro Tag berechnet */
   _nk: '', _need: MIN_NEW_BASE,
+  /* Die Simulation braucht je nach Gerät 0.1–0.3 s. Damit nichts ruckelt (Start, Fachwechsel, nach jeder
+   * Bewertung), wird das letzte Ergebnis sofort angezeigt (auch über Neuladen hinweg gespeichert) und die
+   * Neuberechnung im Leerlauf nachgeholt – nie während einer Lernsitzung. */
+  LS: 'lemmalab-fc-' + FACH, _loaded: false, _pend: {},
+  load() {
+    if (this._loaded) return; this._loaded = true;
+    try { const o = JSON.parse(localStorage.getItem(this.LS) || 'null'); if (o) { this._need = o.need; this._best = o.best; this._staleNeed = o.nk; this._res = o.res; this._staleKey = o.key; } } catch (e) { }
+  },
+  persist() { try { localStorage.setItem(this.LS, JSON.stringify({ need: this._need, best: this._best, nk: this._nk || this._staleNeed, res: this._res, key: this._key || this._staleKey })); } catch (e) { } },
+  later(what, fn) {
+    if (this._pend[what]) return; this._pend[what] = true;
+    const idle = window.requestIdleCallback || (f => setTimeout(f, 200));
+    const go = () => {
+      if (session || quiz || document.querySelector('.modal')) { setTimeout(() => idle(go, { timeout: 2000 }), 3000); return; }
+      this._pend[what] = false;
+      const before = JSON.stringify([this._need, this._res && this._res.plan && this._res.plan.map(p => Math.round(p.v))]);
+      fn(); this.persist();
+      if (JSON.stringify([this._need, this._res && this._res.plan && this._res.plan.map(p => Math.round(p.v))]) !== before && (tab === 'heute' || tab === 'statistik') && !session && !quiz) render();
+    };
+    idle(go, { timeout: 2000 });
+  },
+  needKey() { return [dayKey(now()), S.settings.examDate, S.settings.includeRand, Model.ver, Math.floor(eligibleNew().length / 20)].join('|'); },
   needMin() {
-    const key = [dayKey(now()), S.settings.examDate, S.settings.includeRand, Model.ver, Math.floor(eligibleNew().length / 20)].join('|');
+    this.load();
+    const key = this.needKey();
+    if (key === this._nk) return this._need;
+    if (this._staleNeed != null || this._nk) { this.later('need', () => this.computeNeed(this.needKey())); return this._need; }
+    return this.computeNeed(key);
+  },
+  computeNeed(key) {
     if (key === this._nk) return this._need;
     this._nk = key; this._need = MIN_NEW();
     const exam = examTime(), goal = exam - MASTER_BEFORE * DAY;
@@ -2076,11 +2104,19 @@ const Forecast = {
     this._best = best;
     return this._need;
   },
+  runKey() { return [S.log.length, Model.ver, S.settings.examDate, S.settings.newMode, S.settings.newPerDay, S.settings.includeRand, dayKey(now()), Object.keys(S.cards).length].join('|'); },
   run() {
-    const key = [S.log.length, Model.ver, S.settings.examDate, S.settings.newMode, S.settings.newPerDay, S.settings.includeRand, dayKey(now()), Object.keys(S.cards).length].join('|');
+    this.load();
+    const key = this.runKey();
+    if (key === this._key && this._res) return this._res;
+    if (this._res && this._res.plan) { this.later('run', () => this.compute(this.runKey())); return this._res; }
+    return this.compute(key);
+  },
+  compute(key) {
     if (key === this._key && this._res) return this._res;
     this._key = key;
-    return (this._res = { hist: this.history(), plan: this.simulate('plan', 6, this.needMin()), pace: this.simulate('pace') });
+    if (this.needKey() !== this._nk) this.computeNeed(this.needKey());
+    return (this._res = { hist: this.history(), plan: this.simulate('plan', 6, this._need), pace: this.simulate('pace') });
   },
 };
 

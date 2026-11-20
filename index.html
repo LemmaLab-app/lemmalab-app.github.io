@@ -1227,6 +1227,13 @@ body.focus .actionbar.swipeact{position:sticky!important;bottom:calc(max(var(--s
 body.focus .app:has(.swipeact){padding-bottom:calc(max(var(--safe-b),12px) + 10px)!important}
 .swipeact,.swipeact *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .rb{touch-action:manipulation}
+
+/* Mac/Desktop: Die Seitenleiste liegt über ruhigem Hintergrund – Unschärfe dahinter kostet nur Leistung (Ruckeln beim Scrollen) */
+@media (min-width:768px) and (min-height:560px) and (hover:hover){
+  nav.tabs{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;background:var(--panel)!important}
+}
+/* Fachwechsel: kurz ausblenden statt hartem Sprung */
+html.leaving body{opacity:0;transition:opacity .12s ease}
 </style>
 </head>
 <body>
@@ -1246,9 +1253,9 @@ body.focus .app:has(.swipeact){padding-bottom:calc(max(var(--safe-b),12px) + 10p
 <div id="navbar" aria-hidden="true"><span id="navTitle"></span></div>
 <div class="toast" id="toast"></div>
 <script src="vendor/katex/katex.min.js"></script>
-<script src="fach.js?v=2026-11-20.29"></script>
-<script src="app.js?v=2026-11-20.29"></script>
+<script src="fach.js?v=2026-11-20.30"></script>
+<script src="app.js?v=2026-11-20.30"></script>
 <script src="vendor/supabase/supabase.js"></script>
-<script src="account.js?v=2026-11-20.29"></script>
+<script src="account.js?v=2026-11-20.30"></script>
 </body>
 </html>
