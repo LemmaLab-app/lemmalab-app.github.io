@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-20.26';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-20.27';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -394,7 +394,7 @@ const Tune = {
     return UI.group([
       UI.action('Daten für Claude exportieren', 'tuneexport'),
       `<label class="ir ia"><span class="ir-l">Korrektur von Claude einspielen</span><input type="file" id="tuneFile" accept=".json,application/json" class="hide"></label>`,
-      UI.action('Korrektur-Text einfügen', 'tunepaste'),
+      UI.action('Korrektur als Text einfügen', 'tunepaste'),
     ], { header: 'KI-Analyse', footer: 'Die Datei enthält deinen Lernverlauf aller Fächer und den Auftrag für Claude. Einfach im Chat hochladen und «Analysiere» schreiben, dann die Korrektur-Datei hier einspielen. Gilt auf allen Geräten.' })
       + (any ? UI.group([rows, notes.length ? `<div class="ir"><span class="ir-l"><small>${notes.map(esc).join('<br>')}</small></span></div>` : '', UI.action('Korrektur entfernen', 'tunereset')], { header: 'Aktive Korrekturen' }) : '');
   },
@@ -776,6 +776,7 @@ function qFlip() {
 }
 
 function rate(g, o = {}) {
+  if (Motion.busy && performance.now() - (Motion.busyAt || 0) > 1000) Motion.busy = false;
   if (!session || !session.cur || !session.revealed || Motion.busy) return;
   if (swipeMode() && !o.flown) return Swipe.fly(g);
   const id = session.cur, c = BY_ID[id], before = { ...cs(id) };
@@ -920,7 +921,7 @@ const Motion = {
   leave(cls, fn) {
     const fc = $('.fc');
     if (!fc || this.reduced()) return fn();
-    this.busy = true;
+    this.busy = true; this.busyAt = performance.now();
     fc.classList.add(cls);
     setTimeout(() => { this.busy = false; fn(); }, 170);
   },
@@ -1349,7 +1350,7 @@ const Swipe = {
     const W = () => fc.offsetWidth || innerWidth;
     const setP = dx => { const p = clamp(dx / (W() * .32), -1, 1); fc.style.setProperty('--pos', Math.max(0, p)); fc.style.setProperty('--neg', Math.max(0, -p)); };
     fc.addEventListener('pointerdown', e => {
-      if (e.button || Motion.busy || e.target.closest('button,a,summary,input,textarea,.lf')) return;
+      if (e.button || (Motion.busy && performance.now() - (Motion.busyAt || 0) < 1000) || e.target.closest('button,a,summary,input,textarea,.lf')) return;
       st = { x: e.clientX, y: e.clientY, t: performance.now(), drag: false, id: e.pointerId };
     });
     fc.addEventListener('pointermove', e => {
@@ -1381,10 +1382,11 @@ const Swipe = {
   },
   /* Karte hinausfliegen lassen, dann bewerten */
   fly(g, dy = 0) {
+    if (Motion.busy && performance.now() - (Motion.busyAt || 0) > 1000) Motion.busy = false;
     if (Motion.busy) return;
     const fc = $('.fc');
     if (!fc || Motion.reduced()) return rate(g, { flown: true });
-    Motion.busy = true;
+    Motion.busy = true; Motion.busyAt = performance.now();
     const dir = g === 1 ? -1 : 1;
     fc.classList.add('fly');
     fc.style.setProperty('--pos', dir > 0 ? 1 : 0); fc.style.setProperty('--neg', dir < 0 ? 1 : 0);
