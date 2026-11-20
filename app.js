@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-20.10';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-20.11';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -554,8 +554,9 @@ function buildQueue() {
     if (ni < news.length) mixed.push(news[ni++]);
     if (ri >= reviews.length) while (ni < news.length) mixed.push(news[ni++]);
   }
-  const learnDue = learning.filter(id => S.cards[id].due <= t + 20 * MIN);
-  const learnLater = learning.filter(id => S.cards[id].due > t + 20 * MIN);
+  // Lernkarten erst, wenn ihre Wartezeit (fast) vorbei ist
+  const learnDue = learning.filter(id => S.cards[id].due <= t + 60e3);
+  const learnLater = learning.filter(id => S.cards[id].due > t + 60e3);
   return { queue: [...learnDue, ...mixed], later: learnLater, nNew: news.length, nRev: reviews.length };
 }
 
@@ -590,6 +591,20 @@ function preloadQuiz() {
   if (!quiz) return;
   Pre.ids(quiz.items.slice(quiz.i, quiz.i + 4));
 }
+/* Countdown: <span class="cd" data-until="…">4:12</span> zählt jede Sekunde herunter */
+const fmtCountdown = ms => { const s = Math.max(0, Math.ceil(ms / 1000)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return h ? `${h}:${String(m).padStart(2, '0')}:${String(x).padStart(2, '0')}` : `${m}:${String(x).padStart(2, '0')}`; };
+const cdHTML = until => `<span class="cd" data-until="${until}">${fmtCountdown(until - now())}</span>`;
+setInterval(() => {
+  let fired = false;
+  document.querySelectorAll('.cd[data-until]').forEach(el => {
+    const left = +el.dataset.until - now();
+    el.textContent = fmtCountdown(left);
+    if (left <= 0 && !el.dataset.done) { el.dataset.done = 1; fired = true; }
+  });
+  if (!fired) return;
+  if (session && session.waiting) nextCard();
+  else if (!session && !quiz && tab === 'heute') { Motion.set('tab'); render(); }
+}, 1000);
 const WAIT_SOON = 60e3;   // so kurz vor der Fälligkeit darf eine Lernkarte schon kommen
 function laterReady(id, t) { return S.cards[id].due <= t + WAIT_SOON && (session.shown || 0) >= ((session.gap || {})[id] || 0); }
 function nextCard(force) {
@@ -861,6 +876,15 @@ function doneHeroHTML(ts) {
     <div class="ds">Morgen ${tomorrow} Karte${tomorrow === 1 ? '' : 'n'}</div>
   </div>`;
 }
+function pauseHTML(until, n, forceAct, extra = '') {
+  return `<div class="solo pause">
+    <div class="pause-k">Kurze Pause</div>
+    <div class="pause-t">${cdHTML(until)}</div>
+    <div class="solo-s">bis ${n === 1 ? 'die nächste Karte' : `die nächsten ${n} Karten`} wieder dran ${n === 1 ? 'ist' : 'sind'}.<br>Etwas Abstand hilft beim Merken.</div>
+    ${extra}
+    <div class="solo-actions"><button class="linkbtn2" data-act="${forceAct}">Trotzdem jetzt wiederholen</button></div>
+  </div>`;
+}
 function weakIds() {
   return CARDS.filter(c => { const x = S.cards[c.id]; return x && x.st && !x.susp && ((x.lapses || 0) >= 2 || retrievability(x) < 0.85); })
     .sort((a, b) => retrievability(S.cards[a.id]) - retrievability(S.cards[b.id])).map(c => c.id);
@@ -878,7 +902,10 @@ function viewHome() {
   const minToday = Math.round(todayLog.reduce((a, l) => a + l[4], 0) / 600);
   const weak = weakIds(), ahead = aheadIds();
   const total = todayLog.length + q.queue.length;
-  const hero = ts.allDone || !q.queue.length
+  const waitIds = q.later.filter(id => S.cards[id].due < dayStart() + DAY);
+  const hero = !q.queue.length && waitIds.length
+    ? pauseHTML(Math.min(...waitIds.map(id => S.cards[id].due)) - WAIT_SOON, waitIds.length, 'startforce')
+    : ts.allDone || !q.queue.length
     ? `<div class="solo">${ts.allDone ? doneHeroHTML(ts) : `<div class="donehero"><div class="dt">Gleich geht's weiter</div><div class="ds">${q.later.length} Karte${q.later.length === 1 ? '' : 'n'} kommen in wenigen Minuten wieder.</div></div>`}</div>`
     : `<div class="solo">
     ${ringSVG(todayLog.length, total, 168)}
@@ -891,7 +918,7 @@ function viewHome() {
   ${UI.group([
     UI.row('Wiederholungen', `<span class="v">${q.nRev}</span>`),
     UI.row('Neue Karten', `<span class="v">${q.nNew}</span>`),
-    UI.row('Heute gelernt', `<span class="v">${todayLog.length} Karten · ${minToday} Min</span>`),
+    UI.row('Heute gelernt', `<span class="v">${todayLog.length} Karte${todayLog.length === 1 ? '' : 'n'} · ${minToday} Min</span>`),
   ], { header: 'Heute' })}
   </div><div class="col">
   ${UI.group([
@@ -1092,11 +1119,8 @@ function historyLine(c) {
 function viewStudy() {
   const s = session;
   if (!s.cur && s.waiting && s.later.length) {
-    const mins = Math.max(1, Math.ceil((Math.min(...s.later.map(id => S.cards[id].due)) - now()) / 60e3));
-    return `<div class="solo"><div class="donehero"><div class="dt">Kurze Pause</div>
-      <div class="ds">${s.later.length === 1 ? 'Eine Karte kommt' : s.later.length + ' Karten kommen'} in ${mins} Minute${mins === 1 ? '' : 'n'} wieder.<br>Etwas Abstand hilft beim Merken.</div></div>
-      <button class="btn primary big solo-btn" data-act="forcelater">Jetzt wiederholen</button>
-      <div class="solo-actions"><button class="linkbtn2" data-act="home">Später</button></div></div>`;
+    const until = Math.min(...s.later.map(id => S.cards[id].due)) - WAIT_SOON;
+    return pauseHTML(until, s.later.length, 'forcelater', `<button class="btn primary big solo-btn" data-act="home">Fertig für jetzt</button>`);
   }
   if (!s.cur) {
     const L = S.log.slice(s.logFrom).filter(l => modeOf(l) !== 'q');
@@ -1971,6 +1995,7 @@ document.addEventListener('click', e => {
     case 'update': e.preventDefault(); checkUpdate(true); break;
     case 'ahead': startSession(aheadIds().slice(0, 20)); break;
     case 'forcelater': if (session) nextCard(true); break;
+    case 'startforce': startSession(); if (session && !session.cur) nextCard(true); break;
     case 'weak': { const ids = weakIds().slice(0, 20); if (ids.length) startSession(ids); break; }
     case 'reveal': reveal(); break;
     case 'undo': undo(); break;
