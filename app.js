@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-20.2118';   // bei jeder Änderung neu setzen: sh tools/bump.sh (UTC-Zeit, nie von Hand runterzählen)
+const APP_VERSION = '2026-11-20.2122';   // bei jeder Änderung neu setzen: sh tools/bump.sh (UTC-Zeit, nie von Hand runterzählen)
 
 /* ============================================================
  * Grundlagen
@@ -48,7 +48,14 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 const now = () => Date.now();
 
+const _ds = new Map();                   // Cache pro Stunde (Simulation ruft das sehr oft auf)
 function dayStart(t = now()) {           // Beginn des Lerntags (04:00) von t
+  const h = Math.floor(t / HOUR);
+  let r = _ds.get(h);
+  if (r === undefined) { if (_ds.size > 20000) _ds.clear(); r = dayStart0(h * HOUR); _ds.set(h, r); }
+  return r;
+}
+function dayStart0(t) {
   const d = new Date(t - DAY_START_HOUR * HOUR);
   d.setHours(0, 0, 0, 0);
   return d.getTime() + DAY_START_HOUR * HOUR;
@@ -57,7 +64,8 @@ function dayKey(t = now()) {
   const d = new Date(dayStart(t));
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
-function parseDate(s) { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d, 8).getTime(); }
+const _pd = new Map();
+function parseDate(s) { let v = _pd.get(s); if (v === undefined) { const [y, m, d] = s.split('-').map(Number); v = new Date(y, m - 1, d, 8).getTime(); _pd.set(s, v); } return v; }
 function fmtSec(sec) { sec = Math.round(sec); if (sec < 60) return sec + ' s'; if (sec < 3600) return Math.floor(sec / 60) + ' Min ' + String(sec % 60).padStart(2, '0') + ' s'; return Math.floor(sec / 3600) + ' Std ' + Math.round(sec % 3600 / 60) + ' Min'; }
 function fmtDate(t) { return new Date(t).toLocaleDateString('de-CH', { day: 'numeric', month: 'short' }); }
 function fmtIvl(ms) {
@@ -2125,7 +2133,8 @@ const Forecast = {
   persist() { try { localStorage.setItem(this.LS, JSON.stringify({ sig: this.sig(), need: this._need, best: this._best, nk: this._nk || this._staleNeed, res: this._res, key: this._key || this._staleKey })); } catch (e) { } },
   later(what, fn) {
     if (this._pend[what]) return; this._pend[what] = true;
-    const idle = window.requestIdleCallback || (f => setTimeout(f, 200));
+    const idle0 = window.requestIdleCallback || (f => setTimeout(f, 200));
+    const idle = (f, o) => setTimeout(() => idle0(f, o), 1500);   // erst wenn die Seite steht
     const go = () => {
       if (session || quiz || document.querySelector('.modal')) { setTimeout(() => idle(go, { timeout: 2000 }), 3000); return; }
       this._pend[what] = false;
@@ -2141,7 +2150,7 @@ const Forecast = {
     const key = this.needKey();
     if (key === this._nk) return this._need;
     if (this._staleNeed != null || this._nk) { this.later('need', () => this.computeNeed(this.needKey())); return this._need; }
-    return this.computeNeed(key);
+    const r = this.computeNeed(key); this.persist(); return r;
   },
   computeNeed(key) {
     if (key === this._nk) return this._need;
@@ -2163,7 +2172,7 @@ const Forecast = {
     const key = this.runKey();
     if (key === this._key && this._res) return this._res;
     if (this._res && this._res.plan) { this.later('run', () => this.compute(this.runKey())); return this._res; }
-    return this.compute(key);
+    const r = this.compute(key); this.persist(); return r;
   },
   compute(key) {
     if (key === this._key && this._res) return this._res;
