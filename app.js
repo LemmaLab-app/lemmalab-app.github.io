@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-20.2';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-20.3';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -995,15 +995,73 @@ function metaLine(c, long) {
   return long ? `Kap. ${c.chap} ${esc(c.chapTitle)} · ${esc(c.sec)} · ${src}` : `Kapitel ${c.chap} · ${src}`;
 }
 function openLightbox(sw) {
-  // Kopie des Bildes (inkl. Titelmaske) als Vollbild-Ansicht; kein Zoomen/Wischen, Antippen schliesst
+  // Kopie des Bildes (inkl. Titelmaske) als Vollbild-Ansicht. Zwei Finger (bzw. Trackpad) zoomen, ein Finger verschiebt
+  // das vergrösserte Bild, Doppeltippen zoomt rein/raus, einfaches Antippen schliesst.
   const box = document.createElement('div');
-  box.className = 'lightbox'; box.setAttribute('role', 'dialog'); box.title = 'Antippen zum Schliessen';
+  box.className = 'lightbox'; box.setAttribute('role', 'dialog'); box.title = 'Antippen zum Schliessen · zwei Finger zum Zoomen';
   const w = sw.cloneNode(true);
   w.removeAttribute('data-zoom'); w.removeAttribute('title');
   w.querySelectorAll('.zoomchip').forEach(x => x.remove());
   const im = w.querySelector('img'); const r = im ? (+im.getAttribute('width') / +im.getAttribute('height')) || 1 : 1;
   w.style.setProperty('--ar', r);
   box.appendChild(w); document.body.appendChild(box);
+  let s = 1, tx = 0, ty = 0, base = null, moved = false, closeT = 0;
+  const pts = new Map(); let pinch = null, last = null;
+  const apply = (anim) => { w.style.transition = anim ? 'transform .2s ease' : 'none'; w.style.transform = `translate(${tx}px,${ty}px) scale(${s})`; };
+  const getBase = () => { if (!base) { const b = w.getBoundingClientRect(); base = { x: b.left - tx, y: b.top - ty, w: b.width / s, h: b.height / s }; } return base; };
+  const zoomAt = (px, py, ns) => {
+    const b = getBase(); ns = clamp(ns, 1, 6);
+    const cx = (px - b.x - tx) / s, cy = (py - b.y - ty) / s;
+    s = ns; tx = px - b.x - cx * s; ty = py - b.y - cy * s;
+    if (s <= 1.01) { s = 1; tx = 0; ty = 0; }
+  };
+  const bound = () => {   // Bild nicht ganz aus dem Bildschirm schieben
+    const b = getBase(), W = window.innerWidth, H = window.innerHeight;
+    const sw2 = b.w * s, sh2 = b.h * s;
+    const fit = (t, o, len, view) => len <= view ? clamp(t, -o, view - o - len) : clamp(t, view - o - len, -o);
+    tx = fit(tx, b.x, sw2, W); ty = fit(ty, b.y, sh2, H);
+  };
+  box.addEventListener('pointerdown', e => {
+    if (!pts.size) { moved = false; pinch = null; }
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY });
+    try { box.setPointerCapture(e.pointerId); } catch (err) { }
+    getBase(); last = { x: e.clientX, y: e.clientY };
+  });
+  box.addEventListener('pointermove', e => {
+    const p = pts.get(e.pointerId); if (!p) return;
+    p.x = e.clientX; p.y = e.clientY;
+    if (Math.hypot(p.x - p.x0, p.y - p.y0) > 8) moved = true;
+    if (pts.size >= 2) {
+      const [a, b] = [...pts.values()];
+      const m = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, d = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+      if (pinch) { zoomAt(pinch.m.x, pinch.m.y, s * d / pinch.d); tx += m.x - pinch.m.x; ty += m.y - pinch.m.y; bound(); apply(); }
+      pinch = { m, d }; moved = true;
+    } else if (s > 1 && last) {
+      tx += e.clientX - last.x; ty += e.clientY - last.y; bound(); apply();
+    }
+    last = { x: e.clientX, y: e.clientY };
+  });
+  const up = e => {
+    pts.delete(e.pointerId); pinch = null;
+    const rest = [...pts.values()][0]; last = rest ? { x: rest.x, y: rest.y } : null;
+    if (!pts.size && s <= 1.01) { s = 1; tx = 0; ty = 0; apply(true); }
+  };
+  box.addEventListener('pointerup', up); box.addEventListener('pointercancel', up);
+  box.addEventListener('wheel', e => {   // Mac-Trackpad: Pinch = ctrl+Scroll; sonst verschieben, wenn vergrössert
+    e.preventDefault();
+    if (e.ctrlKey) zoomAt(e.clientX, e.clientY, s * Math.exp(-e.deltaY * 0.01));
+    else if (s > 1) { tx -= e.deltaX; ty -= e.deltaY; }
+    bound(); apply();
+  }, { passive: false });
+  box.addEventListener('click', e => {
+    e.stopPropagation();
+    if (moved) { moved = false; return; }
+    if (closeT) {   // Doppeltippen: zoomen bzw. zurück
+      clearTimeout(closeT); closeT = 0;
+      zoomAt(e.clientX, e.clientY, s > 1 ? 1 : 2.5); bound(); apply(true); return;
+    }
+    closeT = setTimeout(() => { closeT = 0; box.remove(); }, 260);
+  });
 }
 function scanHTML(c, masked) {
   if (!c.img) return richHTML(c) + (masked ? '' : cardExtras(c));
@@ -1807,8 +1865,7 @@ document.addEventListener('click', e => {
   const opt = t.closest('[data-opt]');
   if (opt && !opt.disabled) return quizAnswer(opt.dataset.opt);
   // Antippen des Bildes vergrössert es (ganzes Bild, so gross wie der Bildschirm erlaubt); Antippen der Karte daneben dreht sie um
-  const lb = t.closest('.lightbox');
-  if (lb) { lb.remove(); return; }
+  if (t.closest('.lightbox')) return;
   const sw = t.closest('.scanwrap[data-zoom]');
   if (sw) { openLightbox(sw); return; }
   const fcard = t.closest('.fc');
