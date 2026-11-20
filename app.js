@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-20.22';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-20.23';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -24,11 +24,11 @@ const LS_KEY = FACH_CFG.ls;              // pro Fach eigener Lernstand
 } catch (e) { } })();
 
 const PRIO = {
-  5: { name: 'Kern',      color: 'var(--p5)', ret: 0.95, w: 5 },
-  4: { name: 'Wichtig',   color: 'var(--p4)', ret: 0.93, w: 3 },
-  3: { name: 'Solide',    color: 'var(--p3)', ret: 0.90, w: 2 },
-  2: { name: 'Ergänzung', color: 'var(--p2)', ret: 0.87, w: 1 },
-  1: { name: 'Rand',      color: 'var(--p1)', ret: 0.85, w: 0.4 },
+  5: { name: 'Kern',      color: 'var(--p5)', ret: 0.97, w: 5 },
+  4: { name: 'Wichtig',   color: 'var(--p4)', ret: 0.96, w: 3 },
+  3: { name: 'Solide',    color: 'var(--p3)', ret: 0.95, w: 2 },
+  2: { name: 'Ergänzung', color: 'var(--p2)', ret: 0.93, w: 1 },
+  1: { name: 'Rand',      color: 'var(--p1)', ret: 0.90, w: 0.4 },
 };
 const KIND_COLOR = { Definition: 'var(--def)', Satz: 'var(--satz)', Theorem: 'var(--satz)', Lemma: 'var(--lem)', Proposition: 'var(--prop)', Korollar: 'var(--kor)',
   Gesetz: 'var(--satz)', Formel: 'var(--prop)', Konzept: 'var(--kor)', Rezept: 'var(--lem)', Regel: 'var(--satz)', Code: 'var(--prop)',
@@ -221,11 +221,17 @@ function dueReviews(until = dayStart() + DAY) {
 
 /* Prüfungs-Deckel: kein Intervall läuft über die Prüfung hinaus – letzte
  * Wiederholung wird auf die letzten 1–5 Tage vor der Prüfung verteilt. */
-function capDue(id, due) {
+function capDue(id, due, t = now()) {
+  // 1) Kontrolle vor dem Ziel-Stichtag (1 Monat vor der Prüfung): jede Karte kommt in den
+  //    letzten 1–5 Tagen davor nochmals dran – so ist am Stichtag alles frisch geprüft.
+  const goal = dayStart(examTime() - MASTER_BEFORE * DAY);
+  const gLast = goal - (6 + hash(id + 'g') % 5) * DAY + 6 * HOUR;
+  if (due > gLast && gLast > t + DAY && due > goal) return gLast;
+  // 2) Letzte Wiederholung in den letzten 1–5 Tagen vor der Prüfung
   const ex = dayStart(examTime());
-  if (ex <= now()) return due;
+  if (ex <= t) return due;
   const last = ex - (1 + hash(id) % 5) * DAY + 6 * HOUR;
-  if (due > last && last > now() + DAY) return last;
+  if (due > last && last > t + DAY) return last;
   return due;
 }
 
@@ -884,13 +890,13 @@ function goalNote() {
     const tr = trackStatus(); if (tr.level === 'done') return null;
     const exam = examTime(), goal = exam - MASTER_BEFORE * DAY;
     const N = CARDS.filter(c => prioOf(c) !== 1 || S.settings.includeRand).length;
-    let v = null;
-    if (goal > now() + DAY) { const r = Forecast.run(); for (const p of r.plan) if (p.t <= goal) v = Math.round(p.v); }
+    let v = null, ve = null;
+    if (goal > now() + DAY) { const r = Forecast.run(); for (const p of r.plan) { if (p.t <= goal) v = Math.round(p.v); if (p.t < dayStart(exam)) ve = Math.round(p.v); } }
     const okF = v != null && v >= (Forecast._best || N) - Math.max(3, N * 0.02);
     const level = tr.level === 'bad' ? 'bad' : (tr.level === 'warn' || (v != null && !okF)) ? 'warn' : tr.level === 'start' ? 'start' : 'ok';
     const title = level === 'ok' ? 'Auf Kurs für die Prüfung' : level === 'warn' ? 'Knapp für die Prüfung' : level === 'bad' ? 'Hinter dem Plan' : 'Lernplan bis zur Prüfung';
     const when = new Date(goal).toLocaleDateString('de-CH', { day: 'numeric', month: 'short' });
-    const sub = v != null ? `Am ${when} voraussichtlich ${v} von ${N} sicher` : tr.sub;
+    const sub = v != null ? `Am ${when} voraussichtlich ${v} von ${N} sicher${ve != null && ve > v ? `, bis zur Prüfung ${ve}` : ''}` : tr.sub;
     // Empfehlung für heute: was mindestens noch nötig ist, damit der Plan (und damit das Ziel) hält
     // Minimum = Prognose-Bedarf (ohne den Zuschlag «mehr, wenn heute Platz ist»)
     const remAll = eligibleNew().length + newIntroducedToday();
@@ -1856,8 +1862,11 @@ function barChart(vals, lbl, hi = 0) {
  * Simuliert jeden kommenden Tag bis zur Prüfung mit dem echten Algorithmus:
  * neue Karten nach Tagesplan (bzw. nach deinem bisherigen Tempo), fällige
  * Wiederholungen mit Erfolgswahrscheinlichkeit R(t, S), Neu-Lernen bei Fehlern.
- * Mittel aus mehreren Durchläufen. «Sicher beherrscht» = Stabilität ≥ 21 Tage. */
+ * Mittel aus mehreren Durchläufen. «Sicher beherrscht» siehe isSafe. */
 const MASTER_S = 21;
+// sicher = Stabilität ≥ 21 Tage – oder schon einmal so weit gewesen, nach einem Aussetzer
+// neu gelernt und seither wieder bestätigt (Stabilität ≥ 7 Tage)
+const isSafe = (x, ever) => x.st === 2 && (x.S >= MASTER_S || (ever && x.S >= 7));
 const Forecast = {
   _key: '', _res: null,
   rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; },
@@ -1872,7 +1881,7 @@ const Forecast = {
   },
   history() {
     const tl = Replay.run().timeline, ev = [];
-    for (const arr of Object.values(tl)) { let was = false; for (const e of arr) { const m = e.st === 2 && e.S >= MASTER_S; if (m !== was) { ev.push([e.t, m ? 1 : -1]); was = m; } } }
+    for (const arr of Object.values(tl)) { let was = false, ever = false; for (const e of arr) { if (e.st === 2 && e.S >= MASTER_S) ever = true; const m = isSafe(e, ever); if (m !== was) { ev.push([e.t, m ? 1 : -1]); was = m; } } }
     ev.sort((a, b) => a[0] - b[0]);
     const first = S.log.length ? dayStart(S.log[0][0]) : dayStart();
     const out = []; let k = 0, n = 0;
@@ -1886,10 +1895,10 @@ const Forecast = {
     const pace = this.pace();
     const mastered = new Array(nDays + 1).fill(0), reviews = new Array(nDays + 1).fill(0), intro = new Array(nDays + 1).fill(0);
     // wie capDue: letzte Wiederholung in den letzten 1–5 Tagen vor der Prüfung, aber nur einmal
-    const capT = (id, due, t) => { const last = dayStart(exam) - (1 + hash(id) % 5) * DAY + 6 * HOUR; return due > last && last > t + DAY ? last : due; };
+    const capT = (id, due, t) => capDue(id, due, t);
     for (let run = 0; run < runs; run++) {
       const rand = this.rng(1234 + run * 7919);
-      const st = {};
+      const st = {}, ever = {};
       for (const c of CARDS) { const x = S.cards[c.id]; if (x && x.st && !x.susp) st[c.id] = { ...x }; }
       const pool = pool0.slice(); let carry = 0;
       for (let d = 0; d <= nDays; d++) {
@@ -1925,7 +1934,7 @@ const Forecast = {
           for (let j = 0; j < 4 && x.st !== 2; j++) x = schedule(c, x, 3, t + (j + 1) * 10 * MIN, { replay: true });
           x.due = capT(id, x.due, t); st[id] = x;
         }
-        let m = 0; for (const id in st) if (st[id].st === 2 && st[id].S >= MASTER_S) m++;
+        let m = 0; for (const id in st) { const x = st[id]; if (x.st === 2 && x.S >= MASTER_S) ever[id] = 1; if (isSafe(x, ever[id])) m++; }
         mastered[d] += m / runs; reviews[d] += nRev / runs; intro[d] += n / runs;
       }
     }
@@ -1974,6 +1983,7 @@ function masteryChart() {
   const area = `${path(histPts)} L${X(today.t).toFixed(1)} ${Y(0)} L${X(histPts[0].t).toFixed(1)} ${Y(0)} Z`;
   const atGoal = arr => { let best = arr[0]; for (const p of arr) if (p.t <= goal) best = p; return Math.round(best.v); };
   const planGoal = atGoal(plan), paceGoal = atGoal(pace);
+  const atExam = Math.round((plan.filter(p => p.t < dayStart(exam)).pop() || plan[plan.length - 1]).v);
   const months = []; { const d = new Date(t0); d.setDate(1); d.setMonth(d.getMonth() + 1); for (; d.getTime() < exam; d.setMonth(d.getMonth() + 1)) months.push(d.getTime()); }
   const fmt = (t, o = { day: 'numeric', month: 'short' }) => new Date(t).toLocaleDateString('de-CH', o);
   const grid = [0, 0.25, 0.5, 0.75, 1].map(f => `<line x1="${L}" x2="${W - R}" y1="${Y(N * f)}" y2="${Y(N * f)}" class="g${f === 1 ? ' top' : ''}"/>${f % 0.5 === 0 ? `<text x="${L - 8}" y="${Y(N * f) + 4}" text-anchor="end">${Math.round(N * f)}</text>` : ''}`).join('');
@@ -2009,7 +2019,7 @@ function masteryChart() {
       <div class="ftip" style="display:none"></div>
     </div>
     <div class="flegend"><span><i class="lh"></i>Bisher</span><span><i class="lp"></i>Plan</span>${showPace ? '<span><i class="lc"></i>Bisheriges Tempo</span>' : ''}</div>
-    <div class="muted small fnote">Simuliert mit deinem Algorithmus und deinem Lernverlauf. Ein paar Karten sind immer gerade frisch vergessen und wieder im Aufbau – darum nie ganz 100&nbsp;%.</div>
+    <div class="muted small fnote">Simuliert mit deinem Algorithmus und deinem Lernverlauf. Jede Karte kommt kurz vor dem Stichtag nochmals zur Kontrolle. Was du dort vergisst, holst du in der Festigungsphase nach – bis zur Prüfung voraussichtlich ${atExam} von ${N}. Ganz 100&nbsp;% kann kein Gedächtnis garantieren.</div>
     <div class="fsub"><div class="fk2">Wiederholungen pro Tag</div><div class="fk3">Spitze ${Math.round(peak.rev)} am ${fmt(peak.t)}</div></div>
     <svg class="frev" viewBox="0 0 ${W} 64" width="100%" aria-hidden="true"><g transform="translate(0,0)">${bars}</g></svg>
   </div>`;
