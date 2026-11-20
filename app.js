@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-20.4';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-20.5';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -1778,7 +1778,8 @@ function fachSummary(id) {
   return n ? `${n} Karte${n === 1 ? "" : "n"} begonnen${due ? ` · ${due} heute fällig` : ''}` : 'noch nicht begonnen';
 }
 const FACH_COL = { ana1: '#3a2bb5', phy1: '#b4531f', inf1: '#1f7a5a', la: '#9b2c6e' };
-const FACH_ICON = { ana1: '∫', phy1: 'Φ', inf1: '{ }', la: '⊕' };
+// Eigene Symbole (einheitlicher Strich statt Schriftzeichen): Integral, Atom, Code, Matrix
+const FACH_ICON = {"ana1": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path stroke-width=\"2.4\" d=\"M15.5 4.2c-.6-.8-1.5-1.2-2.4-1-1.3.3-1.8 1.6-2 3l-1.8 11.6c-.2 1.4-.8 2.7-2 3-.9.2-1.8-.2-2.4-1\"/></svg>", "phy1": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"1.6\" fill=\"currentColor\" stroke=\"none\"/><ellipse cx=\"12\" cy=\"12\" rx=\"9.5\" ry=\"3.8\"/><ellipse cx=\"12\" cy=\"12\" rx=\"9.5\" ry=\"3.8\" transform=\"rotate(60 12 12)\"/><ellipse cx=\"12\" cy=\"12\" rx=\"9.5\" ry=\"3.8\" transform=\"rotate(-60 12 12)\"/></svg>", "inf1": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M8 7l-5 5 5 5M16 7l5 5-5 5M13.5 4.5l-3 15\"/></svg>", "la": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M7 3.5H4.5v17H7M17 3.5h2.5v17H17\"/><circle cx=\"9.5\" cy=\"8.5\" r=\"1.3\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"14.5\" cy=\"8.5\" r=\"1.3\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"9.5\" cy=\"15.5\" r=\"1.3\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"14.5\" cy=\"15.5\" r=\"1.3\" fill=\"currentColor\" stroke=\"none\"/></svg>"};
 function fachPillHTML(extra) {
   // Fach-Umschalter im Stil von iOS (Liquid Glass): Kapsel mit Fach-Symbol, Name und Auf/Ab-Pfeil
   return `<button class="fachpill glass${extra ? ' ' + extra : ''}" data-act="fachpick" title="Fach wechseln" aria-haspopup="menu">
