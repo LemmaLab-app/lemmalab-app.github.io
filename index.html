@@ -1179,7 +1179,7 @@ body.focus #view.a-tab .study-head,body.focus #view.a-tab .fc>:not(.actionbar){a
 @keyframes drawLine{from{stroke-dashoffset:2000}to{stroke-dashoffset:0}}
 
 /* Prognose (Simulation) */
-.fcard{padding:20px 18px 14px;max-width:760px}
+.fcard{padding:20px 18px 14px;margin-bottom:10px}
 .fk{font-size:13px;color:var(--muted);font-weight:500}
 .fv{font-family:var(--sfd);font-size:40px;font-weight:700;letter-spacing:-.03em;line-height:1.1;margin:2px 0 2px;font-variant-numeric:tabular-nums}
 .fv span{font-size:17px;font-weight:600;color:var(--muted);letter-spacing:-.01em}
@@ -1236,6 +1236,10 @@ body.focus .app:has(.swipeact){padding-bottom:calc(max(var(--safe-b),12px) + 10p
 }
 /* Fachwechsel: kurz ausblenden statt hartem Sprung */
 html.leaving body{opacity:0;transition:opacity .12s ease}
+/* Abstände: Lernen-Knopf nicht an die Karte darunter stossen */
+.solo{margin-bottom:12px}
+/* Lange Formeln nie über den Rand: notfalls seitlich wischen */
+.katex-display{max-width:100%;overflow-x:auto;overflow-y:hidden;padding:2px 0}
 </style>
 </head>
 <body>
@@ -1255,9 +1259,9 @@ html.leaving body{opacity:0;transition:opacity .12s ease}
 <div id="navbar" aria-hidden="true"><span id="navTitle"></span></div>
 <div class="toast" id="toast"></div>
 <script src="vendor/katex/katex.min.js"></script>
-<script src="fach.js?v=2026-11-20.10"></script>
-<script src="app.js?v=2026-11-20.10"></script>
+<script src="fach.js?v=2026-11-20.11"></script>
+<script src="app.js?v=2026-11-20.11"></script>
 <script src="vendor/supabase/supabase.js"></script>
-<script src="account.js?v=2026-11-20.10"></script>
+<script src="account.js?v=2026-11-20.11"></script>
 </body>
 </html>
