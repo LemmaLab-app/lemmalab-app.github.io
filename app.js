@@ -1100,7 +1100,6 @@ function viewHome() {
   const estMin = Math.max(1, Math.round((q.nRev * pt.review + q.nNew * pt.newCost + Math.max(0, learning) * pt.learn) / 60));
   const ts = todayStatus();
   const dte = daysToExam();
-  const rd = readiness();
   const introduced = CARDS.filter(c => S.cards[c.id] && S.cards[c.id].st).length;
   const minToday = Math.round(todayLog.reduce((a, l) => a + l[4], 0) / 600);
   const weak = weakIds(), ahead = aheadIds();
@@ -1127,8 +1126,9 @@ function viewHome() {
   </div><div class="col">
   ${UI.group([
     UI.row('Prüfung', `<span class="v">${dte > 0 ? `in ${dte} Tagen` : dte === 0 ? 'heute' : 'vorbei'}</span>`),
-    UI.row('Prüfungsbereit', `<span class="v">${Math.round(rd.exam * 100)} %</span>`),
-    UI.row('Eingeführt', `<span class="v">${introduced} von ${CARDS.length}</span>`),
+    ...(() => { const ss = standShare(); return [
+      UI.row('Sicher beherrscht', `<span class="v">${Math.round(ss.pSafe * 100)} % · ${ss.safe} von ${ss.N}</span>`),
+      UI.row('Eingeführt', `<span class="v">${Math.round(ss.pIntro * 100)} % · ${ss.intro} von ${ss.N}</span>`)]; })(),
     ...(FACH_CFG.focusSrc ? (() => { const fs = focusState(); return [UI.row('Mitschrift gefestigt', `<span class="v">${fs.ok} von ${fs.total}</span>`)]; })() : []),
   ], { header: 'Stand', footer: FACH_CFG.focusSrc ? (() => { const fs = focusState(); return fs.open ? 'Mitschrift gut beherrscht – jetzt kommen auch Karten aus dem Skript (Vorjahr) dazu. Neue Mitschrift-Wochen haben wieder Vorrang.' : `Zuerst die Mitschrift: Karten aus dem Skript (Vorjahr) kommen dazu, sobald alle Mitschrift-Karten eingeführt und ${Math.round(FOCUS_SHARE * 100)} % davon gefestigt sind (noch ${Math.max(0, fs.need - fs.ok)}).`; })() : '' })}
   ${UI.group([
@@ -1747,7 +1747,7 @@ const TRACK_COL = { ok: '#30a46c', warn: '#ff9f0a', bad: '#ff453a', start: '#8e8
 function saveTrackSummary(tr) {
   try {
     const all = JSON.parse(localStorage.getItem('lemmalab-track') || '{}');
-    all[FACH] = { level: tr.level, title: tr.title, exam: tr.exam, ready: Math.round(readiness().exam * 100), at: now() };
+    all[FACH] = { level: tr.level, title: tr.title, exam: tr.exam, ready: Math.round(standShare().pSafe * 100), at: now() };
     localStorage.setItem('lemmalab-track', JSON.stringify(all));
   } catch (e) { }
 }
@@ -1758,7 +1758,7 @@ function trackHTML() {
   const rows = [
     `<div class="ir ii track">${icon === 'check' ? `<span class="ico" style="background:${col}"><svg viewBox="0 0 24 24">${ICON.check}</svg></span>` : `<span class="ico" style="background:${col}"><svg viewBox="0 0 24 24">${ICON[icon]}</svg></span>`}<span class="ir-l"><b>${tr.title}</b>${tr.sub ? `<small>${esc(tr.sub)}</small>` : ''}</span></div>`,
     UI.row('Prüfung', `<span class="v">${new Date(tr.exam).toLocaleDateString('de-CH', { day: 'numeric', month: 'long', year: 'numeric' })}${tr.dte >= 0 ? ` · in ${tr.dte} Tagen` : ''}</span>`),
-    UI.row('Sicher beherrscht', `<span class="v">${CARDS.filter(c => { const x = S.cards[c.id]; return x && x.st === 2 && x.S >= 21; }).length} von ${CARDS.length}</span>`),
+    ...(() => { const ss = standShare(); return [UI.row('Sicher beherrscht', `<span class="v">${Math.round(ss.pSafe * 100)} % · ${ss.safe} von ${ss.N}</span>`)]; })(),
   ];
   if (tr.remaining && tr.dte >= 0) {
     rows.push(UI.row('Noch neu', `<span class="v">${tr.remaining} Karten</span>`));
@@ -1775,7 +1775,7 @@ function trackHTML() {
       const t = all[k], ex = new Date(parseDate(F[k].examDate) || 0);
       const exam = t && t.exam ? new Date(t.exam) : ex;
       const right = t ? `<span class="v" style="color:${TRACK_COL[t.level]}">${esc(t.title)}</span>` : '<span class="v">noch nicht geöffnet</span>';
-      return `<button type="button" class="ir ia ii" data-fachgo="${k}"><span class="ir-l"><b style="color:var(--ink)">${esc(F[k].name)}</b><small>Prüfung ${exam.toLocaleDateString('de-CH', { day: 'numeric', month: 'short', year: 'numeric' })}${t ? ` · ${t.ready} % bereit` : ''}</small></span><span class="ir-r">${right}<svg class="chev" viewBox="0 0 8 14" aria-hidden="true"><path d="M1.5 1.5L6.5 7l-5 5.5"/></svg></span></button>`;
+      return `<button type="button" class="ir ia ii" data-fachgo="${k}"><span class="ir-l"><b style="color:var(--ink)">${esc(F[k].name)}</b><small>Prüfung ${exam.toLocaleDateString('de-CH', { day: 'numeric', month: 'short', year: 'numeric' })}${t ? ` · ${t.ready} % sicher` : ''}</small></span><span class="ir-r">${right}<svg class="chev" viewBox="0 0 8 14" aria-hidden="true"><path d="M1.5 1.5L6.5 7l-5 5.5"/></svg></span></button>`;
     });
     if (list.length) others = UI.group(list, { header: 'Andere Fächer', footer: 'Stand vom letzten Öffnen des jeweiligen Fachs.' });
   } catch (e) { }
@@ -1793,6 +1793,13 @@ document.addEventListener('click', e => { const b = e.target.closest('[data-fach
   }
 })();
 
+/* Stand: sicher beherrscht (= Stabilität ≥ 21 Tage, wie in der Prognose) und eingeführt, je Anteil aller Karten */
+function standShare() {
+  const cs = CARDS.filter(c => prioOf(c) !== 1 || S.settings.includeRand), N = cs.length || 1;
+  let safe = 0, intro = 0;
+  for (const c of cs) { const x = S.cards[c.id]; if (!x || !x.st) continue; intro++; if (x.st === 2 && x.S >= MASTER_S) safe++; }
+  return { safe, intro, N, pSafe: safe / N, pIntro: intro / N };
+}
 function readiness() {
   let wsum = 0, rExam = 0, rNow = 0;
   for (const c of CARDS) {
@@ -1826,7 +1833,6 @@ function stackBar(g) {
   return `<div class="bar">${seg(g.sitzt, 'var(--good)')}${seg(g.jung, 'var(--easy)')}${seg(g.lern, 'var(--hard)')}</div>`;
 }
 function viewStats() {
-  const rd = readiness();
   const t = now();
   const logs = S.log;
   const days = {};
@@ -1868,8 +1874,9 @@ function viewStats() {
   ${trackHTML()}
   ${masteryChart()}
   <div class="grid g2">
-    <div class="card kpi"><div class="l">Prüfungsbereit</div><div class="v">${Math.round(rd.exam * 100)}%</div></div>
-    <div class="card kpi"><div class="l">Sitzt sicher</div><div class="v">${sitzt}<span class="of"> / ${CARDS.length}</span></div></div>
+    ${(() => { const ss = standShare(); return `
+    <div class="card kpi"><div class="l">Sicher beherrscht</div><div class="v">${Math.round(ss.pSafe * 100)}%<span class="of"> · ${ss.safe} / ${ss.N}</span></div></div>
+    <div class="card kpi"><div class="l">Eingeführt</div><div class="v">${Math.round(ss.pIntro * 100)}%<span class="of"> · ${ss.intro} / ${ss.N}</span></div></div>`; })()}
     <div class="card kpi"><div class="l">Gewusst</div><div class="v">${retention == null ? '–' : Math.round(retention * 100) + '%'}</div></div>
     <div class="card kpi"><div class="l">Serie</div><div class="v">${streak}<span class="of"> Tage</span></div></div>
   </div>
