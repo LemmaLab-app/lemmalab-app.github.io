@@ -19,7 +19,7 @@ window.FAECHER = {
     gist: 'lemmalab-physik1.json', syncPrefix: 'phy1-', examDate: '2027-01-25', accent: 'phy',
   },
   inf1: {
-    name: 'Informatik 1', short: 'Informatik 1', sub: 'C++: Konzepte & Code-Tracing',
+    name: 'Informatik', short: 'Informatik', sub: 'C++: Konzepte & Code-Tracing',
     ls: 'lemmalab-inf1-v1',
     scripts: ['informatik.js'],
     gist: 'lemmalab-informatik.json', syncPrefix: 'inf1-', examDate: '2027-01-25', accent: 'inf',

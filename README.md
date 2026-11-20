@@ -1,6 +1,6 @@
 <p align="center"><img src="icons/icon-512.png" width="140" alt="LemmaLab"></p>
 
-# LemmaLab – Analysis 1, Physik 1, Informatik 1 & Lineare Algebra 1 & 2 lernen
+# LemmaLab – Analysis 1, Physik 1, Informatik & Lineare Algebra 1 & 2 lernen
 
 Private Lernhilfe, nur für den Eigengebrauch, ohne Gewähr.
 
