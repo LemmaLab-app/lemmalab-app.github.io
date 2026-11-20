@@ -75,3 +75,7 @@ Karte umdrehen (in beide Richtungen): Leertaste oder Karte antippen. Tastatur: 1
 - `data.js`, `img/` – Karten (automatisch erzeugt)
 - `tools/extract.py` – schneidet die Einträge aus dem Skript-PDF aus; `tools/build_data.py` – erzeugt `data.js`;
   `tools/meta.py` – Prioritäten, ergänzte Titel und Merkhinweise (hier anpassen)
+
+## Version erhöhen
+
+Nach jeder Änderung `sh tools/bump.sh` ausführen. Das setzt `APP_VERSION` (app.js) und alle `?v=` (index.html) auf die aktuelle UTC-Zeit und baut `sw.js` neu. Nie von Hand eine Nummer setzen – sonst erkennen Geräte das Update nicht.
