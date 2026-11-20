@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-20.21';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-20.22';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -891,16 +891,24 @@ function goalNote() {
     const title = level === 'ok' ? 'Auf Kurs für die Prüfung' : level === 'warn' ? 'Knapp für die Prüfung' : level === 'bad' ? 'Hinter dem Plan' : 'Lernplan bis zur Prüfung';
     const when = new Date(goal).toLocaleDateString('de-CH', { day: 'numeric', month: 'short' });
     const sub = v != null ? `Am ${when} voraussichtlich ${v} von ${N} sicher` : tr.sub;
-    const today = plannedNewPerDay();
-    const hint = level === 'bad' || level === 'warn' ? `Heute ${today} neue Karten lernen, um aufzuholen` : '';
+    // Empfehlung für heute: was mindestens noch nötig ist, damit der Plan (und damit das Ziel) hält
+    // Minimum = Prognose-Bedarf (ohne den Zuschlag «mehr, wenn heute Platz ist»)
+    const remAll = eligibleNew().length + newIntroducedToday();
+    const minToday = S.settings.newMode === 'manual' ? S.settings.newPerDay
+      : Math.min(remAll, Math.max(MIN_NEW, Math.ceil(remAll / (Math.max(1, daysToExam() - TRACK_BUFFER) * 0.85)), Forecast.needMin()));
+    const newLeft = Math.max(0, minToday - newIntroducedToday());
+    const revLeft = buildQueue().nRev;
+    const hint = newLeft || revLeft
+      ? `Heute noch mindestens ${newLeft ? `${newLeft} neue Karte${newLeft === 1 ? '' : 'n'}` : ''}${newLeft && revLeft ? ' und ' : ''}${revLeft ? `${revLeft} Wiederholung${revLeft === 1 ? '' : 'en'}` : ''}`
+      : 'Heute ist alles Nötige geschafft';
     return { level, title, sub, hint, col: TRACK_COL[level] };
   } catch (e) { return null; }
 }
 function goalNoteHTML(compact) {
   const g = goalNote(); if (!g) return '';
   const icon = g.level === 'ok' ? 'check' : g.level === 'start' ? 'calendar' : 'alert';
-  if (compact) return `<button type="button" class="gnote" data-act="tab:statistik"><span class="gd" style="background:${g.col}"></span>${esc(g.title)} · ${esc(g.sub)}</button>`;
-  return UI.group([UI.item(icon, g.col, esc(g.title), esc(g.sub) + (g.hint ? `<br><span style="color:${g.col}">${esc(g.hint)}</span>` : ''), '', { act: 'tab:statistik' })]);
+  if (compact) return `<button type="button" class="gnote" data-act="tab:statistik"><span class="gd" style="background:${g.col}"></span><span>${esc(g.title)} · ${esc(g.sub)}${g.hint ? `<br><b>${esc(g.hint)}</b>` : ''}</span></button>`;
+  return UI.group([UI.item(icon, g.col, esc(g.title), esc(g.sub) + (g.hint ? `<br><b class="ghint" style="color:${g.level === 'ok' ? 'var(--ink)' : g.col}">${esc(g.hint)}</b>` : ''), '', { act: 'tab:statistik' })]);
 }
 function doneHeroHTML(ts) {
   const tomorrow = CARDS.filter(c => { const x = S.cards[c.id]; return x && x.st && !x.susp && x.due < dayStart() + 2 * DAY; }).length;
