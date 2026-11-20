@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-20.17';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-20.20';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -197,8 +197,8 @@ function plannedNewPerDay() {
   // 1) Prognose: alles spätestens TRACK_BUFFER Tage vor der Prüfung eingeführt, mit 15 % Reserve
   const days = Math.max(1, daysToExam() - TRACK_BUFFER);
   let n = Math.ceil(remaining / (days * 0.85));
-  // 2) Mindestens MIN_NEW pro Tag
-  n = Math.max(MIN_NEW, n);
+  // 2) Mindestens MIN_NEW pro Tag – oder mehr, falls die Simulation zeigt, dass sonst das Ziel verfehlt wird
+  n = Math.max(MIN_NEW, n, Forecast.needMin());
   // 3) Mehr, wenn die Wiederholungen heute wenig Platz brauchen
   const ds = dayStart();
   const load = dueReviews().length + S.log.filter(l => l[0] >= ds && l[3] === 2 && modeOf(l) !== 'q').length;
@@ -213,6 +213,7 @@ function plannedNewPerDay() {
   }
   return Math.min(clamp(n, MIN_NEW, 40), remaining);
 }
+/* (Forecast ist weiter unten definiert; plannedNewPerDay wird erst nach dem Laden aufgerufen) */
 
 function dueReviews(until = dayStart() + DAY) {
   return CARDS.filter(c => { const x = S.cards[c.id]; return x && x.st >= 1 && !x.susp && x.due <= until; });
@@ -1817,55 +1818,192 @@ function barChart(vals, lbl, hi = 0) {
       ${(vals.length <= 7 || i % 2 === 0) ? `<text x="${x + (bw - gap) / 2}" y="${H - 6}" text-anchor="middle">${lbl(i)}</text>` : ''}`;
   }).join('')}</svg>`;
 }
-/* ---------- Prognose-Graph: Soll vs. Ist «sicher beherrscht» ----------
- * Soll: Einführung gleichmässig vom Start bis zum Einführungs-Stichtag (Prüfung − 44 T);
- *       jede Karte sitzt CONSOLIDATE Tage nach der Einführung → alles bis Prüfung − 30 T.
- * Ist:  Anzahl Karten mit Stabilität ≥ 21 Tagen, Tag für Tag aus dem Lernverlauf. */
+/* ---------- Prognose: Simulation statt Gerade ----------
+ * Simuliert jeden kommenden Tag bis zur Prüfung mit dem echten Algorithmus:
+ * neue Karten nach Tagesplan (bzw. nach deinem bisherigen Tempo), fällige
+ * Wiederholungen mit Erfolgswahrscheinlichkeit R(t, S), Neu-Lernen bei Fehlern.
+ * Mittel aus mehreren Durchläufen. «Sicher beherrscht» = Stabilität ≥ 21 Tage. */
 const MASTER_S = 21;
+const Forecast = {
+  _key: '', _res: null,
+  rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; },
+  pFail(id) {
+    const d = Community.data && Community.data.cards && Community.data.cards[id];
+    return d && d[1] >= 5 ? clamp(d[2], 0.05, 0.9) : 0.3;
+  },
+  pace() {
+    const created = S.created || (S.log[0] && S.log[0][0]) || now();
+    const span = clamp((now() - Math.max(created, now() - 14 * DAY)) / DAY, 1, 14);
+    return CARDS.filter(c => { const x = S.cards[c.id]; return x && x.intro && x.intro > now() - span * DAY; }).length / span;
+  },
+  history() {
+    const tl = Replay.run().timeline, ev = [];
+    for (const arr of Object.values(tl)) { let was = false; for (const e of arr) { const m = e.st === 2 && e.S >= MASTER_S; if (m !== was) { ev.push([e.t, m ? 1 : -1]); was = m; } } }
+    ev.sort((a, b) => a[0] - b[0]);
+    const first = S.log.length ? dayStart(S.log[0][0]) : dayStart();
+    const out = []; let k = 0, n = 0;
+    for (let d = first; d <= dayStart(); d += DAY) { const end = Math.min(d + DAY - 1, now()); while (k < ev.length && ev[k][0] <= end) n += ev[k++][1]; out.push({ t: d, v: n }); }
+    return out;
+  },
+  simulate(mode, runs = 6, minNew = MIN_NEW) {
+    const exam = examTime(), d0 = dayStart(), nDays = Math.max(1, Math.ceil((dayStart(exam) - d0) / DAY));
+    const pool0 = eligibleNew().map(c => c.id);
+    const manual = S.settings.newMode === 'manual';
+    const pace = this.pace();
+    const mastered = new Array(nDays + 1).fill(0), reviews = new Array(nDays + 1).fill(0), intro = new Array(nDays + 1).fill(0);
+    // wie capDue: letzte Wiederholung in den letzten 1–5 Tagen vor der Prüfung, aber nur einmal
+    const capT = (id, due, t) => { const last = dayStart(exam) - (1 + hash(id) % 5) * DAY + 6 * HOUR; return due > last && last > t + DAY ? last : due; };
+    for (let run = 0; run < runs; run++) {
+      const rand = this.rng(1234 + run * 7919);
+      const st = {};
+      for (const c of CARDS) { const x = S.cards[c.id]; if (x && x.st && !x.susp) st[c.id] = { ...x }; }
+      const pool = pool0.slice(); let carry = 0;
+      for (let d = 0; d <= nDays; d++) {
+        const t = d0 + d * DAY + 18 * HOUR, end = d0 + (d + 1) * DAY;
+        // Wiederholungen
+        let nRev = 0;
+        for (const id in st) {
+          let x = st[id];
+          if (x.due >= end) continue;
+          const c = BY_ID[id];
+          if (x.st === 2) {
+            const r = FSRS.R(Math.max(0, (t - x.last) / DAY), x.S);
+            x = schedule(c, x, rand() < r ? 3 : 1, t, { replay: true }); nRev++;
+          }
+          for (let k = 0; k < 4 && x.st !== 2; k++) x = schedule(c, x, 3, t + (k + 1) * 10 * MIN, { replay: true });
+          x.due = capT(id, x.due, t); st[id] = x;
+        }
+        // neue Karten
+        let n;
+        const rule = (rem, revs) => {
+          const days = Math.max(1, Math.ceil((exam - TRACK_BUFFER * DAY - t) / DAY));
+          let k = Math.max(minNew, Math.ceil(rem / (days * 0.85)));
+          if (revs < 25) k = Math.max(k, 20); else if (revs < 50) k = Math.max(k, 16);
+          return Math.min(k, 40);
+        };
+        if (mode === 'pace') { if (d > 0) { carry += pace; n = Math.floor(carry); carry -= n; } else n = 0; }
+        else if (manual) n = d === 0 ? Math.max(0, S.settings.newPerDay - newIntroducedToday()) : S.settings.newPerDay;
+        else n = d === 0 ? Math.max(0, rule(pool.length + newIntroducedToday(), nRev) - newIntroducedToday()) : rule(pool.length, nRev);
+        n = Math.min(n, pool.length);
+        for (let k = 0; k < n; k++) {
+          const id = pool.shift(), c = BY_ID[id];
+          let x = schedule(c, { st: 0 }, rand() < this.pFail(id) ? 1 : 3, t, { replay: true });
+          for (let j = 0; j < 4 && x.st !== 2; j++) x = schedule(c, x, 3, t + (j + 1) * 10 * MIN, { replay: true });
+          x.due = capT(id, x.due, t); st[id] = x;
+        }
+        let m = 0; for (const id in st) if (st[id].st === 2 && st[id].S >= MASTER_S) m++;
+        mastered[d] += m / runs; reviews[d] += nRev / runs; intro[d] += n / runs;
+      }
+    }
+    return mastered.map((v, d) => ({ t: d0 + d * DAY, v, rev: reviews[d], intro: intro[d] }));
+  },
+  /* kleinste Untergrenze neuer Karten pro Tag, mit der die Simulation das Ziel
+   * (≥ 97 % sicher beherrscht 1 Monat vor der Prüfung) erreicht; einmal pro Tag berechnet */
+  _nk: '', _need: MIN_NEW,
+  needMin() {
+    const key = [dayKey(now()), S.settings.examDate, S.settings.includeRand, Model.ver, Math.floor(eligibleNew().length / 20)].join('|');
+    if (key === this._nk) return this._need;
+    this._nk = key; this._need = MIN_NEW;
+    const exam = examTime(), goal = exam - MASTER_BEFORE * DAY;
+    if (!eligibleNew().length || goal <= now()) return this._need;
+    const N = CARDS.filter(c => prioOf(c) !== 1 || S.settings.includeRand).length;
+    // Ein Teil der Karten ist immer gerade frisch vergessen und wieder im Aufbau – 100 % gibt es nie.
+    // Darum: kleinste Untergrenze, die (fast) so viel erreicht wie das Maximum von 40 pro Tag.
+    const res = [MIN_NEW, 16, 20, 28, 40].map(m => { const sim = this.simulate('plan', 4, m); let v = 0; for (const p of sim) if (p.t <= goal) v = p.v; return [m, v]; });
+    const best = Math.max(...res.map(r => r[1])), tol = Math.max(3, N * 0.02);
+    this._need = (res.find(r => r[1] >= best - tol) || res[0])[0];
+    this._best = best;
+    return this._need;
+  },
+  run() {
+    const key = [S.log.length, Model.ver, S.settings.examDate, S.settings.newMode, S.settings.newPerDay, S.settings.includeRand, dayKey(now()), Object.keys(S.cards).length].join('|');
+    if (key === this._key && this._res) return this._res;
+    this._key = key;
+    return (this._res = { hist: this.history(), plan: this.simulate('plan', 6, this.needMin()), pace: this.simulate('pace') });
+  },
+};
+
 function masteryChart() {
   const exam = examTime();
-  const goal = exam - MASTER_BEFORE * DAY, introEnd = exam - TRACK_BUFFER * DAY;
+  if (exam <= now() + 3 * DAY) return '';
+  const goal = exam - MASTER_BEFORE * DAY;
   const N = CARDS.filter(c => prioOf(c) !== 1 || S.settings.includeRand).length;
-  const first = S.log.length ? S.log[0][0] : now();
-  const t0 = dayStart(Math.min(first, now()));
-  if (exam <= t0 + 7 * DAY) return '';
-  // Soll-Kurve
-  const introAt = t => N * clamp((t - t0) / Math.max(DAY, introEnd - t0), 0, 1);
-  const soll = t => Math.round(introAt(t - CONSOLIDATE * DAY));
-  // Ist-Kurve (pro Tag)
-  const tl = Replay.run().timeline;
-  const events = [];
-  for (const arr of Object.values(tl)) { let was = false; for (const e of arr) { const m = e.st === 2 && e.S >= MASTER_S; if (m !== was) { events.push([e.t, m ? 1 : -1]); was = m; } } }
-  events.sort((a, b) => a[0] - b[0]);
-  const today = dayStart() + DAY - 1, ist = [];
-  let k = 0, cnt = 0;
-  for (let d = t0 + DAY - 1; d <= today + 1; d += DAY) { while (k < events.length && events[k][0] <= d) cnt += events[k++][1]; ist.push([Math.min(d, now()), cnt]); }
-  // Zeichnen
-  const W = 420, H = 210, L = 34, R = 10, T = 14, B = 30;
-  const x = t => L + (t - t0) / (exam - t0) * (W - L - R), y = v => T + (1 - v / N) * (H - T - B);
-  const sollPts = []; for (let i = 0; i <= 80; i++) { const t = t0 + (exam - t0) * i / 80; sollPts.push(`${x(t).toFixed(1)},${y(soll(t)).toFixed(1)}`); }
-  const istPts = ist.map(([t, v]) => `${x(t).toFixed(1)},${y(v).toFixed(1)}`);
-  const lastIst = ist.length ? ist[ist.length - 1][1] : 0, sollNow = soll(now());
-  const fmt = t => new Date(t).toLocaleDateString('de-CH', { day: 'numeric', month: 'short' });
-  const xt = now();
-  const grid = [0, 0.5, 1].map(f => `<line x1="${L}" x2="${W - R}" y1="${y(N * f)}" y2="${y(N * f)}" stroke="var(--line)" stroke-width=".6"/><text x="${L - 6}" y="${y(N * f) + 3.5}" text-anchor="end">${Math.round(N * f)}</text>`).join('');
-  const svg = `<svg class="chart mchart" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Soll und Ist der sicher beherrschten Karten">
-    ${grid}
-    <rect x="${x(goal)}" y="${T}" width="${Math.max(0, x(exam) - x(goal))}" height="${H - T - B}" fill="color-mix(in srgb,var(--good) 8%,transparent)"/>
-    <line x1="${x(xt)}" x2="${x(xt)}" y1="${T}" y2="${H - B}" stroke="var(--muted)" stroke-width=".8" stroke-dasharray="2 3"/>
-    <polyline points="${sollPts.join(' ')}" fill="none" stroke="var(--muted)" stroke-width="2" stroke-dasharray="5 4" stroke-linecap="round" stroke-linejoin="round"/>
-    <polyline class="ist" points="${istPts.join(' ')}" fill="none" stroke="var(--accent)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
-    <circle cx="${x(xt)}" cy="${y(lastIst)}" r="4" fill="var(--accent)"/>
-    <text x="${x(t0)}" y="${H - 10}" text-anchor="start">${fmt(t0)}</text>
-    <text x="${x(xt)}" y="${H - 10}" text-anchor="middle">heute</text>
-    <text x="${x(goal)}" y="${H - 10}" text-anchor="middle">${fmt(goal)}</text>
-    <text x="${x(exam)}" y="${H - 10}" text-anchor="end">Prüfung</text>
-  </svg>`;
-  const diff = lastIst - sollNow;
-  return `<h2>Prognose</h2><div class="card">
-    <div class="legend"><span><i style="background:var(--accent)"></i>Tatsächlich: ${lastIst}</span><span><i class="dash"></i>Plan: ${sollNow}</span><span style="margin-left:auto;color:${diff >= 0 ? 'var(--good)' : 'var(--again)'}">${diff >= 0 ? '+' : ''}${diff}</span></div>
-    ${svg}
-    <div class="muted small">Sicher beherrschte Karten (mindestens 3 Wochen zuverlässig abrufbar). Grün: der letzte Monat vor der Prüfung, bis dahin soll alles sitzen.</div></div>`;
+  const { hist, plan, pace } = Forecast.run();
+  const t0 = hist.length ? hist[0].t : dayStart();
+  const narrow = innerWidth < 600, W = narrow ? 360 : 600, H = narrow ? 210 : 250, L = narrow ? 30 : 38, R = narrow ? 10 : 16, T = 18, B = 30;
+  const X = t => L + (t - t0) / Math.max(DAY, exam - t0) * (W - L - R);
+  const Y = v => T + (1 - Math.min(v, N) / N) * (H - T - B);
+  const path = pts => pts.map((p, i) => `${i ? 'L' : 'M'}${X(p.t).toFixed(1)} ${Y(p.v).toFixed(1)}`).join(' ');
+  const histPts = hist.length ? hist : [{ t: dayStart(), v: 0 }];
+  const today = histPts[histPts.length - 1];
+  const planPts = [today, ...plan.slice(1)], pacePts = [today, ...pace.slice(1)];
+  const area = `${path(histPts)} L${X(today.t).toFixed(1)} ${Y(0)} L${X(histPts[0].t).toFixed(1)} ${Y(0)} Z`;
+  const atGoal = arr => { let best = arr[0]; for (const p of arr) if (p.t <= goal) best = p; return Math.round(best.v); };
+  const planGoal = atGoal(plan), paceGoal = atGoal(pace);
+  const months = []; { const d = new Date(t0); d.setDate(1); d.setMonth(d.getMonth() + 1); for (; d.getTime() < exam; d.setMonth(d.getMonth() + 1)) months.push(d.getTime()); }
+  const fmt = (t, o = { day: 'numeric', month: 'short' }) => new Date(t).toLocaleDateString('de-CH', o);
+  const grid = [0, 0.25, 0.5, 0.75, 1].map(f => `<line x1="${L}" x2="${W - R}" y1="${Y(N * f)}" y2="${Y(N * f)}" class="g${f === 1 ? ' top' : ''}"/>${f % 0.5 === 0 ? `<text x="${L - 8}" y="${Y(N * f) + 4}" text-anchor="end">${Math.round(N * f)}</text>` : ''}`).join('');
+  const mLines = months.map(m => `<text x="${X(m)}" y="${H - 9}" text-anchor="middle">${fmt(m, { month: 'short' })}</text><line x1="${X(m)}" x2="${X(m)}" y1="${H - B}" y2="${H - B + 4}" class="g"/>`).join('');
+  const showPace = Math.abs(paceGoal - planGoal) >= 3 && hist.length > 3;
+  const data = { t0, exam, N, L, R, W, H, T, B, hist: histPts.map(p => [p.t, Math.round(p.v)]), plan: plan.map(p => [p.t, Math.round(p.v), Math.round(p.rev)]), pace: showPace ? pace.map(p => [p.t, Math.round(p.v)]) : [] };
+  // Wiederholungen pro Tag (Plan)
+  const revMax = Math.max(10, ...plan.map(p => p.rev));
+  const bw = (W - L - R) / Math.max(1, (exam - t0) / DAY);
+  const bars = plan.map(p => { const h = p.rev / revMax * 54; return `<rect x="${(X(p.t) - bw * 0.35).toFixed(1)}" y="${(60 - h).toFixed(1)}" width="${Math.max(1.2, bw * 0.7).toFixed(1)}" height="${h.toFixed(1)}" rx="${Math.min(2, bw * 0.3).toFixed(1)}"/>`; }).join('');
+  const peak = plan.reduce((a, p) => p.rev > a.rev ? p : a, plan[0]);
+  const ok = planGoal >= (Forecast._best || N) - Math.max(3, N * 0.02) && planGoal >= N * 0.85;
+  return `<h2>Prognose</h2>
+  <div class="card fcard">
+    <div class="fhead">
+      <div><div class="fk">Am ${fmt(goal, { day: 'numeric', month: 'long' })} sicher beherrscht</div>
+        <div class="fv">${planGoal}<span> von ${N}</span></div>
+        <div class="fs" style="color:${ok ? 'var(--good)' : 'var(--hard)'}">${ok ? 'Mit dem Tagesplan erreichst du das Ziel' : 'Mehr Tempo nötig'}${showPace ? ` · im bisherigen Tempo ${paceGoal}` : ''}</div></div>
+    </div>
+    <div class="fwrap" data-fc='${JSON.stringify(data)}'>
+      <svg class="fchart" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Prognose der sicher beherrschten Karten">
+        <defs><linearGradient id="fgA" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".28"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
+        <rect x="${X(goal)}" y="${T}" width="${Math.max(0, X(exam) - X(goal))}" height="${H - T - B}" class="gz"/>
+        <text x="${(X(goal) + X(exam)) / 2}" y="${T + 13}" text-anchor="middle" class="gzl">Festigen</text>
+        ${grid}${mLines}
+        <path d="${area}" fill="url(#fgA)"/>
+        ${showPace ? `<path d="${path(pacePts)}" class="lpace"/>` : ''}
+        <path d="${path(planPts)}" class="lplan"/>
+        <path d="${path(histPts)}" class="lhist"/>
+        <circle cx="${X(today.t)}" cy="${Y(today.v)}" r="5" class="dot"/>
+        <g class="scrub" style="display:none"><line class="sl" y1="${T}" y2="${H - B}"/><circle class="sc" r="4.5"/></g>
+      </svg>
+      <div class="ftip" style="display:none"></div>
+    </div>
+    <div class="flegend"><span><i class="lh"></i>Bisher</span><span><i class="lp"></i>Plan</span>${showPace ? '<span><i class="lc"></i>Bisheriges Tempo</span>' : ''}</div>
+    <div class="muted small fnote">Simuliert mit deinem Algorithmus und deinem Lernverlauf. Ein paar Karten sind immer gerade frisch vergessen und wieder im Aufbau – darum nie ganz 100&nbsp;%.</div>
+    <div class="fsub"><div class="fk2">Wiederholungen pro Tag</div><div class="fk3">Spitze ${Math.round(peak.rev)} am ${fmt(peak.t)}</div></div>
+    <svg class="frev" viewBox="0 0 ${W} 64" width="100%" aria-hidden="true"><g transform="translate(0,0)">${bars}</g></svg>
+  </div>`;
+}
+/* Antippen/Überfahren zeigt die Werte an diesem Tag (wie in der Health-App) */
+document.addEventListener('pointermove', e => fcScrub(e), { passive: true });
+document.addEventListener('pointerdown', e => fcScrub(e), { passive: true });
+document.addEventListener('pointerleave', () => { document.querySelectorAll('.fwrap .scrub,.fwrap .ftip').forEach(el => el.style.display = 'none'); }, true);
+function fcScrub(e) {
+  const w = e.target.closest && e.target.closest('.fwrap');
+  document.querySelectorAll('.fwrap').forEach(o => { if (o !== w) { o.querySelector('.scrub').style.display = 'none'; o.querySelector('.ftip').style.display = 'none'; } });
+  if (!w) return;
+  const d = w._d || (w._d = JSON.parse(w.dataset.fc));
+  const svg = w.querySelector('svg'), r = svg.getBoundingClientRect();
+  const sx = (e.clientX - r.left) / r.width * d.W;
+  const t = d.t0 + clamp((sx - d.L) / (d.W - d.L - d.R), 0, 1) * (d.exam - d.t0);
+  const near = arr => { let b = null; for (const p of arr) if (!b || Math.abs(p[0] - t) < Math.abs(b[0] - t)) b = p; return b; };
+  const h = d.hist.length && t <= d.hist[d.hist.length - 1][0] + DAY / 2 ? near(d.hist) : null;
+  const p = near(d.plan), c = d.pace.length ? near(d.pace) : null;
+  const pt = h || p;
+  const X = tt => d.L + (tt - d.t0) / (d.exam - d.t0) * (d.W - d.L - d.R), Y = v => d.T + (1 - Math.min(v, d.N) / d.N) * (d.H - d.T - d.B);
+  const g = w.querySelector('.scrub'); g.style.display = '';
+  g.querySelector('.sl').setAttribute('x1', X(pt[0])); g.querySelector('.sl').setAttribute('x2', X(pt[0]));
+  g.querySelector('.sc').setAttribute('cx', X(pt[0])); g.querySelector('.sc').setAttribute('cy', Y(pt[1]));
+  const tip = w.querySelector('.ftip'); tip.style.display = '';
+  tip.innerHTML = `<b>${new Date(pt[0]).toLocaleDateString('de-CH', { weekday: 'short', day: 'numeric', month: 'short' })}</b><br>${h ? `Sicher: ${h[1]}` : `Plan: ${p[1]}`}${!h && c ? ` · Tempo: ${c[1]}` : ''}${!h && p[2] != null ? `<br>${p[2]} Wiederholungen` : ''}`;
+  const px = X(pt[0]) / d.W * r.width;
+  tip.style.left = clamp(px - tip.offsetWidth / 2, 0, r.width - tip.offsetWidth) + 'px';
 }
 
 function lineChart(vals, o = {}) {
