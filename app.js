@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-20.23';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-20.24';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -149,7 +149,7 @@ const TRACK_BUFFER = MASTER_BEFORE + CONSOLIDATE;   // bis dahin muss alles eing
 function examTime() { return parseDate(S.settings.examDate || DEFAULT_SETTINGS.examDate); }
 function daysToExam() { return Math.ceil((dayStart(examTime()) - dayStart()) / DAY); }
 
-function retFor(c) { return PRIO[prioOf(c)].ret; }
+function retFor(c) { const p = prioOf(c), t = Tune.get(); return (t && t.ret && t.ret[p]) || PRIO[p].ret; }
 
 function retrievability(x, t = now()) {
   if (!x || !x.st || !x.S) return 0;
@@ -188,7 +188,8 @@ function personalTimes() {
   return (_ptCache = { review, fresh, learn, steps, newCost: fresh + steps * learn, newFactor: 1, fromData: srs.length >= 20 });
 }
 
-const MIN_NEW = 12;   // so viele neue Karten pro Tag mindestens (Ziel: alles so schnell wie möglich beherrschen)
+const MIN_NEW_BASE = 12;
+function MIN_NEW() { const t = Tune.get(); return t && Number.isFinite(t.minNew) ? t.minNew : MIN_NEW_BASE; }   // so viele neue Karten pro Tag mindestens (Ziel: alles so schnell wie möglich beherrschen)
 function plannedNewPerDay() {
   if (S.settings.newMode === 'manual') return S.settings.newPerDay;
   // Gerechnet mit dem Stand zu Tagesbeginn (heute Eingeführtes/Wiederholtes zählt mit), damit die Zahl über den Tag gleich bleibt.
@@ -197,8 +198,8 @@ function plannedNewPerDay() {
   // 1) Prognose: alles spätestens TRACK_BUFFER Tage vor der Prüfung eingeführt, mit 15 % Reserve
   const days = Math.max(1, daysToExam() - TRACK_BUFFER);
   let n = Math.ceil(remaining / (days * 0.85));
-  // 2) Mindestens MIN_NEW pro Tag – oder mehr, falls die Simulation zeigt, dass sonst das Ziel verfehlt wird
-  n = Math.max(MIN_NEW, n, Forecast.needMin());
+  // 2) Mindestens MIN_NEW() pro Tag – oder mehr, falls die Simulation zeigt, dass sonst das Ziel verfehlt wird
+  n = Math.max(MIN_NEW(), n, Forecast.needMin());
   // 3) Mehr, wenn die Wiederholungen heute wenig Platz brauchen
   const ds = dayStart();
   const load = dueReviews().length + S.log.filter(l => l[0] >= ds && l[3] === 2 && modeOf(l) !== 'q').length;
@@ -209,9 +210,9 @@ function plannedNewPerDay() {
   if (b > 0) {
     const pt = personalTimes();
     const free = b * 60 - load * pt.review;
-    n = Math.min(n, Math.max(MIN_NEW, Math.floor(free / pt.newCost)));
+    n = Math.min(n, Math.max(MIN_NEW(), Math.floor(free / pt.newCost)));
   }
-  return Math.min(clamp(n, MIN_NEW, 40), remaining);
+  return Math.min(clamp(n, MIN_NEW(), 40), remaining);
 }
 /* (Forecast ist weiter unten definiert; plannedNewPerDay wird erst nach dem Laden aufgerufen) */
 
@@ -304,14 +305,104 @@ const Calib = {
 };
 
 /* ============================================================
+ * Korrektur von aussen (KI-Analyse)
+ * Analyse-Datei (alle Fächer) exportieren → auswerten lassen → Korrektur-Datei einspielen.
+ * Die Korrektur liegt in settings.tune des jeweiligen Fachs und wird mit dem Konto abgeglichen:
+ *   ret     Zielsicherheit pro Priorität {5: .97, …}
+ *   w       21 FSRS-6-Parameter (ersetzen Standard/persönliches Training)
+ *   minNew  Untergrenze neuer Karten pro Tag
+ *   dCard   Schwierigkeits-Korrektur pro Karte {id: −3…3} (+ = schwerer)
+ * ============================================================ */
+const Tune = {
+  get(st = S) { const t = st && st.settings && st.settings.tune; return t && typeof t === 'object' && t.at ? t : null; },
+  clean(o) {
+    const t = { id: String(o.id || '').slice(0, 60), note: String(o.note || '').slice(0, 600), at: now() };
+    if (o.ret && typeof o.ret === 'object') { const r = {}; for (const p of [1, 2, 3, 4, 5]) { const v = +o.ret[p]; if (v >= 0.7 && v <= 0.99) r[p] = v; } if (Object.keys(r).length) t.ret = r; }
+    if (Array.isArray(o.w)) {
+      if (o.w.length !== 21 || o.w.some((v, i) => !Number.isFinite(+v) || +v < FSRS6_BOUNDS[i][0] || +v > FSRS6_BOUNDS[i][1])) throw new Error('w: 21 Werte innerhalb der FSRS-6-Grenzen nötig');
+      t.w = o.w.map(Number);
+    }
+    if (o.minNew != null) { const v = Math.round(+o.minNew); if (!(v >= 0 && v <= 40)) throw new Error('minNew: 0–40'); t.minNew = v; }
+    if (o.dCard && typeof o.dCard === 'object') { const d = {}; for (const [k, v] of Object.entries(o.dCard).slice(0, 3000)) if (Number.isFinite(+v) && +v) d[String(k).slice(0, 80)] = clamp(+v, -3, 3); if (Object.keys(d).length) t.dCard = d; }
+    return t;
+  },
+  exportString() {
+    const subjects = {};
+    for (const k of Object.keys(window.FAECHER || { [FACH]: 1 })) { const o = k === FACH ? S : (window.FachStore && FachStore.read(k)); if (o && ((o.log || []).length || Object.keys(o.cards || {}).length)) subjects[k] = o; }
+    return JSON.stringify({ app: 'lemmalab-analyse', version: APP_VERSION, exported: new Date().toISOString(), active: FACH,
+      model: { status: Model.status(), community: Community.data ? { at: Community.data.at, ff0: Community.data.ff0, cards: Community.data.cards } : null }, subjects });
+  },
+  exportFile() {
+    const s = this.exportString();
+    try {
+      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([s], { type: 'application/json' }));
+      a.download = `lemmalab-analyse-${new Date().toISOString().slice(0, 10)}.json`; document.body.appendChild(a); a.click(); a.remove();
+    } catch (e) { showText(s); }
+  },
+  /* {app:'lemmalab-tune', id, note, subjects:{ana1:{…}, phy1:{…}}} – Fach mit null entfernt dessen Korrektur */
+  apply(o) {
+    if (!o || o.app !== 'lemmalab-tune' || !o.subjects || typeof o.subjects !== 'object') throw new Error('keine gültige Korrektur-Datei');
+    const ids = Object.keys(window.FAECHER || { [FACH]: 1 }), done = [];
+    const next = {};
+    for (const [k, v] of Object.entries(o.subjects)) { if (!ids.includes(k)) throw new Error('unbekanntes Fach: ' + k); next[k] = v === null ? null : this.clean({ id: o.id, note: o.note, ...v }); }
+    for (const [k, t] of Object.entries(next)) {
+      const st = k === FACH ? S : (FachStore.read(k) || (typeof blankFor === 'function' ? blankFor(k) : null));
+      if (!st) continue;
+      if (t) st.settings.tune = t; else delete st.settings.tune;
+      st.settings.u = now();
+      if (k !== FACH) FachStore.write(k, st);
+      done.push(((window.FAECHER || {})[k] || {}).name || k);
+    }
+    this.refresh(); return done;
+  },
+  reset() {
+    for (const k of Object.keys(window.FAECHER || { [FACH]: 1 })) {
+      const st = k === FACH ? S : FachStore.read(k);
+      if (st && st.settings && st.settings.tune) { delete st.settings.tune; st.settings.u = now(); if (k !== FACH) FachStore.write(k, st); }
+    }
+    this.refresh();
+  },
+  refresh() { Forecast._key = ''; Forecast._nk = ''; Model.sync(); save(['settings']); },
+  summary(t) {
+    if (!t) return 'Keine';
+    const parts = [];
+    if (t.ret) parts.push('Zielsicherheit ' + [5, 4, 3, 2, 1].filter(p => t.ret[p]).map(p => `${PRIO[p].name} ${Math.round(t.ret[p] * 100)} %`).join(', '));
+    if (t.w) parts.push('Modell-Parameter');
+    if (t.minNew != null) parts.push(`mind. ${t.minNew} neue/Tag`);
+    if (t.dCard) parts.push(`${Object.keys(t.dCard).length} Karten-Schwierigkeiten`);
+    return parts.join(' · ') || 'Keine Änderungen';
+  },
+  html() {
+    const rows = Object.entries(window.FAECHER || { [FACH]: { name: FACH } }).map(([k, f]) => {
+      const t = this.get(k === FACH ? S : FachStore.read(k));
+      return `<div class="ir"><span class="ir-l"><b>${esc(f.name || k)}</b><small>${esc(this.summary(t))}${t ? ` · ${new Date(t.at).toLocaleDateString('de-CH')}` : ''}</small></span></div>`;
+    }).join('');
+    const notes = [...new Set(Object.keys(window.FAECHER || { [FACH]: 1 }).map(k => (this.get(k === FACH ? S : FachStore.read(k)) || {}).note).filter(Boolean))];
+    const any = Object.keys(window.FAECHER || { [FACH]: 1 }).some(k => this.get(k === FACH ? S : FachStore.read(k)));
+    return UI.group([
+      UI.action('Analyse-Datei sichern', 'tuneexport'),
+      `<label class="ir ia"><span class="ir-l">Korrektur-Datei einspielen</span><input type="file" id="tuneFile" accept=".json,application/json" class="hide"></label>`,
+      UI.action('Korrektur-Text einfügen', 'tunepaste'),
+    ], { header: 'KI-Analyse deines Kontos', footer: 'Die Analyse-Datei enthält deinen Lernverlauf aller Fächer. Lade sie im Chat mit Claude hoch; die Korrektur, die du zurückbekommst, spielst du hier ein. Sie gilt auf allen Geräten.' })
+      + UI.group([rows, notes.length ? `<div class="ir"><span class="ir-l"><small>${notes.map(esc).join('<br>')}</small></span></div>` : '', any ? UI.action('Korrektur entfernen', 'tunereset') : ''], { header: 'Aktive Korrekturen' });
+  },
+};
+document.addEventListener('change', e => { if (e.target && e.target.id === 'tuneFile') { const f = e.target.files[0]; if (f) f.text().then(tuneImportText); e.target.value = ''; } });
+function tuneImportText(txt) {
+  try { const done = Tune.apply(JSON.parse(txt)); closeModal(); toast(`Korrektur eingespielt: ${done.join(', ')}`); render(); }
+  catch (e) { toast('Fehler: ' + e.message); }
+}
+
+/* ============================================================
  * Modell: Standard-FSRS-6 oder persönlich trainierte Parameter
  * ============================================================ */
 const Model = {
   ver: 'd', _key: '',
   personal() { const st = S.settings; return st.calib !== false && Array.isArray(st.fsrsW) && st.fsrsW.length === 21 && !!(st.fsrsMeta && st.fsrsMeta.adopted); },
   apply() {
-    const w = this.personal() ? S.settings.fsrsW : FSRS6_DEFAULT;
-    const key = w.join(',') + '|' + Community.ver + '|' + (S.settings.community === false ? 0 : 1);
+    const t = Tune.get();
+    const w = t && t.w ? t.w : this.personal() ? S.settings.fsrsW : FSRS6_DEFAULT;
+    const key = w.join(',') + '|' + Community.ver + '|' + (S.settings.community === false ? 0 : 1) + '|' + (t ? t.at : 0);
     if (key === this._key) return false;
     this._key = key; FSRS = makeFSRS(w.slice()); this.ver = hash(key).toString(36);
     return true;
@@ -325,6 +416,8 @@ const Model = {
   sync() { if (this.apply() && S.log.length) this.rebuild(); },
   status() {
     const m = S.settings.fsrsMeta || {}, n = Trainer.count();
+    const t = Tune.get();
+    if (t && t.w) return `Von aussen korrigiert (${new Date(t.at).toLocaleDateString('de-CH')})`;
     if (S.settings.calib === false) return 'Aus – Standardwerte';
     if (this.personal()) return `Persönlich trainiert auf ${n.toLocaleString('de-CH')} Wiederholungen${m.gain > 0 ? ` · ${Math.round(m.gain * 100)} % genauer` : ''}`;
     if (m.at) return `Standardwerte passen noch besser (${n} Wiederholungen)`;
@@ -444,6 +537,10 @@ const Community = {
   KEY: 'lemmalab-community' + (FACH === 'ana1' ? '' : '-' + FACH), ver: '0', data: null,
   init() { try { this.data = JSON.parse(localStorage.getItem(this.KEY) || 'null'); } catch (e) { } this.ver = this.data ? String(this.data.at) : '0'; },
   delta(id) {
+    const t = Tune.get(), own = (t && t.dCard && t.dCard[id]) || 0;   // Korrektur von aussen
+    return clamp(this.base(id) + own, -3, 3);
+  },
+  base(id) {
     if (S.settings.community === false || !this.data || !this.data.cards) return 0;
     const c = this.data.cards[id]; if (!c || c[1] < 5) return 0;
     const lg = p => Math.log(p / (1 - p)), cl = p => Math.min(0.95, Math.max(0.05, p));
@@ -901,7 +998,7 @@ function goalNote() {
     // Minimum = Prognose-Bedarf (ohne den Zuschlag «mehr, wenn heute Platz ist»)
     const remAll = eligibleNew().length + newIntroducedToday();
     const minToday = S.settings.newMode === 'manual' ? S.settings.newPerDay
-      : Math.min(remAll, Math.max(MIN_NEW, Math.ceil(remAll / (Math.max(1, daysToExam() - TRACK_BUFFER) * 0.85)), Forecast.needMin()));
+      : Math.min(remAll, Math.max(MIN_NEW(), Math.ceil(remAll / (Math.max(1, daysToExam() - TRACK_BUFFER) * 0.85)), Forecast.needMin()));
     const newLeft = Math.max(0, minToday - newIntroducedToday());
     const revLeft = buildQueue().nRev;
     const hint = newLeft || revLeft
@@ -1888,7 +1985,7 @@ const Forecast = {
     for (let d = first; d <= dayStart(); d += DAY) { const end = Math.min(d + DAY - 1, now()); while (k < ev.length && ev[k][0] <= end) n += ev[k++][1]; out.push({ t: d, v: n }); }
     return out;
   },
-  simulate(mode, runs = 6, minNew = MIN_NEW) {
+  simulate(mode, runs = 6, minNew = MIN_NEW()) {
     const exam = examTime(), d0 = dayStart(), nDays = Math.max(1, Math.ceil((dayStart(exam) - d0) / DAY));
     const pool0 = eligibleNew().map(c => c.id);
     const manual = S.settings.newMode === 'manual';
@@ -1942,17 +2039,17 @@ const Forecast = {
   },
   /* kleinste Untergrenze neuer Karten pro Tag, mit der die Simulation das Ziel
    * (≥ 97 % sicher beherrscht 1 Monat vor der Prüfung) erreicht; einmal pro Tag berechnet */
-  _nk: '', _need: MIN_NEW,
+  _nk: '', _need: MIN_NEW_BASE,
   needMin() {
     const key = [dayKey(now()), S.settings.examDate, S.settings.includeRand, Model.ver, Math.floor(eligibleNew().length / 20)].join('|');
     if (key === this._nk) return this._need;
-    this._nk = key; this._need = MIN_NEW;
+    this._nk = key; this._need = MIN_NEW();
     const exam = examTime(), goal = exam - MASTER_BEFORE * DAY;
     if (!eligibleNew().length || goal <= now()) return this._need;
     const N = CARDS.filter(c => prioOf(c) !== 1 || S.settings.includeRand).length;
     // Ein Teil der Karten ist immer gerade frisch vergessen und wieder im Aufbau – 100 % gibt es nie.
     // Darum: kleinste Untergrenze, die (fast) so viel erreicht wie das Maximum von 40 pro Tag.
-    const res = [MIN_NEW, 16, 20, 28, 40].map(m => { const sim = this.simulate('plan', 4, m); let v = 0; for (const p of sim) if (p.t <= goal) v = p.v; return [m, v]; });
+    const res = [MIN_NEW(), 16, 20, 28, 40].map(m => { const sim = this.simulate('plan', 4, m); let v = 0; for (const p of sim) if (p.t <= goal) v = p.v; return [m, v]; });
     const best = Math.max(...res.map(r => r[1])), tol = Math.max(3, N * 0.02);
     this._need = (res.find(r => r[1] >= best - tol) || res[0])[0];
     this._best = best;
@@ -2359,6 +2456,9 @@ document.addEventListener('click', e => {
     case 'gistoff': confirmBox('Abgleich auf diesem Gerät trennen? Der Fortschritt bleibt lokal und im Gist erhalten.', () => Gist.disconnect()); break;
     case 'gistsync': Gist.pull().then(() => Gist.push()); break;
     case 'exportfile': exportFile(); break;
+    case 'tuneexport': Tune.exportFile(); break;
+    case 'tunepaste': modal(`<h3>Korrektur einspielen</h3><p class="small muted">Korrektur-Text von Claude einfügen.</p><textarea class="note" id="tuneText" style="min-height:180px"></textarea><div class="row"><div class="spacer"></div><button class="btn" data-act="close">Abbrechen</button><button class="btn primary" id="tuneBtn">Einspielen</button></div>`); $('#tuneBtn').onclick = () => tuneImportText($('#tuneText').value); break;
+    case 'tunereset': confirmBox('Alle Korrekturen entfernen? Danach gelten wieder Standard- bzw. persönlich trainierte Werte.', () => { Tune.reset(); toast('Korrekturen entfernt'); render(); }); break;
     case 'importpaste': importPaste(); break;
     case 'resetall': confirmBox('Wirklich den gesamten Fortschritt löschen? Das kann nicht rückgängig gemacht werden.', () => { const st = S.settings; S = blankState(); S.settings = st; S.settings.u = now(); S.settings.resetAt = now(); Sync.wroteOnce = false; save(); render(); toast('Zurückgesetzt'); }); break;
   }

@@ -304,9 +304,10 @@ function viewAdmin() {
   if (!Cloud.ready) return head + `<div class="card muted">Anmeldung wird geprüft …</div>`;
   if (!isAdmin()) return head + `<div class="card">Dieser Bereich ist nur für Admin-Konten.</div>`;
   if (!Admin.data && !Admin.loading && !Admin.err) setTimeout(() => Admin.load(), 0);
-  if (Admin.err) return head + `<div class="card" style="color:var(--again)">${esc(Admin.err)}</div>`;
+  const tune = typeof Tune !== 'undefined' ? Tune.html() : '';
+  if (Admin.err) return head + tune + `<div class="card" style="color:var(--again)">${esc(Admin.err)}</div>`;
   const d = Admin.data;
-  if (!d) return head + `<div class="card muted">Statistik wird geladen …</div>`;
+  if (!d) return head + tune + `<div class="card muted">Statistik wird geladen …</div>`;
   const u = d.users || {}, T = d.totals || {}, daily = d.daily || [];
   const num = x => Number(x || 0).toLocaleString('de-CH');
   const pct = x => x == null ? '–' : Math.round(x * 100) + '%';
@@ -322,7 +323,7 @@ function viewAdmin() {
   const row = (c, right) => { const k = BY_ID[c.id]; return `<li data-card="${esc(c.id)}" style="cursor:pointer;display:flex;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)">${kindTag(k)}<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(k.title || '')}</span><span class="small muted" style="white-space:nowrap">${right}</span></li>`; };
   const list = (arr, f, empty) => arr.length ? `<ul style="list-style:none;margin:0;padding:0">${arr.map(c => row(c, f(c))).join('')}</ul>` : `<div class="small muted">${empty}</div>`;
 
-  return head + `
+  return head + tune + `
   <div class="small muted" style="margin:-4px 0 12px">Nur zusammengefasste Zahlen aller Konten · Stand ${new Date(d.generated || Admin.at).toLocaleString('de-CH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>
   <h2>Nutzer</h2>
   <div class="grid g4">${kpi(num(u.total), 'Konten')}${kpi(num(u.active1), 'aktiv (24 h)')}${kpi(num(u.active7), 'aktiv (7 T)')}${kpi(num(u.active30), 'aktiv (30 T)')}</div>
