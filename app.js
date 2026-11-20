@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-20.11';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-20.12';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -890,6 +890,7 @@ function weakIds() {
     .sort((a, b) => retrievability(S.cards[a.id]) - retrievability(S.cards[b.id])).map(c => c.id);
 }
 function viewHome() {
+  try { saveTrackSummary(trackStatus()); } catch (e) { }
   const q = buildQueue();
   const todayLog = S.log.filter(l => l[0] >= dayStart());
   const pt = personalTimes();
@@ -1510,6 +1511,81 @@ function openCard(id) {
 /* ============================================================
  * Statistik & Analyse
  * ============================================================ */
+/* ---------- Auf Kurs für die Prüfung? ----------
+ * Ziel (wie der Lernplan): alle Karten spätestens 3 Wochen vor der Prüfung
+ * eingeführt, damit genug Zeit zum Festigen bleibt. Verglichen wird das nötige
+ * Tempo mit deinem Tempo der letzten 7 Tage. */
+const TRACK_BUFFER = 21;
+function trackStatus() {
+  const dte = daysToExam(), remaining = eligibleNew().length;
+  const overdue = CARDS.filter(c => { const x = S.cards[c.id]; return x && x.st === 2 && !x.susp && x.due < dayStart(); }).length;
+  const created = S.created || (S.log[0] && S.log[0][0]) || now();
+  const span = clamp(Math.ceil((now() - Math.max(created, now() - 7 * DAY)) / DAY), 1, 7);
+  const recent = CARDS.filter(c => { const x = S.cards[c.id]; return x && x.intro && x.intro > now() - span * DAY; }).length;
+  const pace = recent / span;
+  const daysLeft = Math.max(1, dte - TRACK_BUFFER);
+  const need = remaining / daysLeft;
+  const finish = pace > 0 ? now() + remaining / pace * DAY : null;
+  let level, title, sub;
+  if (dte < 0) { level = 'done'; title = 'Prüfung vorbei'; sub = ''; }
+  else if (!remaining) {
+    level = overdue > 30 ? 'warn' : 'ok';
+    title = overdue > 30 ? 'Wiederholungen aufholen' : 'Auf Kurs';
+    sub = overdue > 30 ? `${overdue} Wiederholungen sind überfällig` : 'Alle Karten eingeführt, jetzt festigen';
+  } else if (!S.log.length) { level = 'start'; title = 'Noch nicht begonnen'; sub = `${Math.ceil(need)} neue Karten pro Tag reichen`; }
+  else if (pace >= need * 0.98) { level = 'ok'; title = 'Auf Kurs'; sub = `Alle Karten bis ${fmtDate(finish)} eingeführt`; }
+  else if (pace >= need * 0.7) { level = 'warn'; title = 'Knapp'; sub = `Etwas mehr Tempo: ${Math.ceil(need)} statt ${pace.toFixed(1)} neue pro Tag`; }
+  else { level = 'bad'; title = 'Hinter Plan'; sub = `Nötig sind ${Math.ceil(need)} neue Karten pro Tag`; }
+  return { level, title, sub, dte, remaining, need, pace, finish, overdue, exam: examTime() };
+}
+const TRACK_COL = { ok: '#30a46c', warn: '#ff9f0a', bad: '#ff453a', start: '#8e8e93', done: '#8e8e93' };
+/* Zusammenfassung pro Fach speichern, damit die Übersicht alle Fächer zeigen kann */
+function saveTrackSummary(tr) {
+  try {
+    const all = JSON.parse(localStorage.getItem('lemmalab-track') || '{}');
+    all[FACH] = { level: tr.level, title: tr.title, exam: tr.exam, ready: Math.round(readiness().exam * 100), at: now() };
+    localStorage.setItem('lemmalab-track', JSON.stringify(all));
+  } catch (e) { }
+}
+function trackHTML() {
+  const tr = trackStatus(); saveTrackSummary(tr);
+  const col = TRACK_COL[tr.level];
+  const icon = tr.level === 'ok' ? 'check' : tr.level === 'start' ? 'calendar' : tr.level === 'done' ? 'calendar' : 'alert';
+  const rows = [
+    `<div class="ir ii track">${icon === 'check' ? `<span class="ico" style="background:${col}"><svg viewBox="0 0 24 24">${ICON.check}</svg></span>` : `<span class="ico" style="background:${col}"><svg viewBox="0 0 24 24">${ICON[icon]}</svg></span>`}<span class="ir-l"><b>${tr.title}</b>${tr.sub ? `<small>${esc(tr.sub)}</small>` : ''}</span></div>`,
+    UI.row('Prüfung', `<span class="v">${new Date(tr.exam).toLocaleDateString('de-CH', { day: 'numeric', month: 'long', year: 'numeric' })}${tr.dte >= 0 ? ` · in ${tr.dte} Tagen` : ''}</span>`),
+  ];
+  if (tr.remaining && tr.dte >= 0) {
+    rows.push(UI.row('Noch neu', `<span class="v">${tr.remaining} Karten</span>`));
+    rows.push(UI.row('Nötiges Tempo', `<span class="v">${Math.ceil(tr.need)} pro Tag</span>`));
+    if (S.log.length) rows.push(UI.row('Dein Tempo', `<span class="v">${tr.pace.toFixed(1)} pro Tag</span>`));
+  }
+  // alle Fächer
+  let others = '';
+  try {
+    const all = JSON.parse(localStorage.getItem('lemmalab-track') || '{}');
+    const F = window.FAECHER || {};
+    const list = Object.keys(F).filter(k => k !== FACH).map(k => {
+      const t = all[k], ex = new Date(parseDate(F[k].examDate) || 0);
+      const exam = t && t.exam ? new Date(t.exam) : ex;
+      const right = t ? `<span class="v" style="color:${TRACK_COL[t.level]}">${esc(t.title)}</span>` : '<span class="v">noch nicht geöffnet</span>';
+      return `<button type="button" class="ir ia ii" data-fachgo="${k}"><span class="ir-l"><b style="color:var(--ink)">${esc(F[k].name)}</b><small>Prüfung ${exam.toLocaleDateString('de-CH', { day: 'numeric', month: 'short', year: 'numeric' })}${t ? ` · ${t.ready} % bereit` : ''}</small></span><span class="ir-r">${right}<svg class="chev" viewBox="0 0 8 14" aria-hidden="true"><path d="M1.5 1.5L6.5 7l-5 5.5"/></svg></span></button>`;
+    });
+    if (list.length) others = UI.group(list, { header: 'Andere Fächer', footer: 'Stand vom letzten Öffnen des jeweiligen Fachs.' });
+  } catch (e) { }
+  return UI.group(rows, { header: 'Prüfung', footer: `Ziel: alle Karten ${TRACK_BUFFER} Tage vor der Prüfung eingeführt, damit genug Zeit zum Festigen bleibt.` }) + others;
+}
+document.addEventListener('click', e => { const b = e.target.closest('[data-fachgo]'); if (b && window.switchFach) window.switchFach(b.dataset.fachgo); });
+
+/* Prüfungsdatum: alte Standardwerte auf den erstmöglichen Termin umstellen (solange nicht selbst gesetzt) */
+(() => {
+  const old = (window.FACH_OLD_EXAM || {})[FACH] || [];
+  if (S && S.settings && !S.settings.examSet && old.includes(S.settings.examDate) && FACH_CFG.examDate) {
+    S.settings.examDate = FACH_CFG.examDate;
+    try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (e) { }
+  }
+})();
+
 function readiness() {
   let wsum = 0, rExam = 0, rNow = 0;
   for (const c of CARDS) {
@@ -1582,6 +1658,7 @@ function viewStats() {
   const grp = (title, arr, lbl) => `<div class="card"><h3>${title}</h3>
     <table class="t">${arr.map(g => `<tr><td style="width:40%">${lbl(g.k)}</td><td>${stackBar(g)}</td><td class="num muted" style="width:52px">${g.r == null ? '–' : Math.round(g.r * 100) + '%'}</td></tr>`).join('')}</table></div>`;
   return `
+  ${trackHTML()}
   <div class="grid g2">
     <div class="card kpi"><div class="l">Prüfungsbereit</div><div class="v">${Math.round(rd.exam * 100)}%</div></div>
     <div class="card kpi"><div class="l">Sitzt sicher</div><div class="v">${sitzt}<span class="of"> / ${CARDS.length}</span></div></div>
@@ -1936,7 +2013,7 @@ function afterRender() {
   on('#cq', 'input', e => { cat.q = e.target.value; const pos = e.target.selectionStart; render(); const el = $('#cq'); el.focus(); el.setSelectionRange(pos, pos); });
   document.querySelectorAll('.seg [data-seg]').forEach(b => b.addEventListener('click', () => { cat.status = b.dataset.seg; render(); }));
   document.querySelectorAll('[data-unfilter]').forEach(b => b.addEventListener('click', () => { cat[b.dataset.unfilter] = ''; render(); }));
-  on('#sExam', 'change', e => { if (e.target.value) { S.settings.examDate = e.target.value; touchSettings(); rescheduleForExam(); } });
+  on('#sExam', 'change', e => { if (e.target.value) { S.settings.examDate = e.target.value; S.settings.examSet = true; touchSettings(); rescheduleForExam(); } });
   on('#sNewMode', 'change', e => { S.settings.newMode = e.target.value; touchSettings(); render(); });
   on('#sNew', 'change', e => { S.settings.newPerDay = clamp(+e.target.value || 0, 0, 80); touchSettings(); });
   on('#sBudget', 'change', e => { S.settings.budget = clamp(+e.target.value || 0, 0, 300); touchSettings(); });
