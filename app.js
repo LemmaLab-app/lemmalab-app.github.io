@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-20.14';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-20.15';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -186,25 +186,30 @@ function personalTimes() {
   return (_ptCache = { review, fresh, learn, steps, newCost: fresh + steps * learn, newFactor: 1, fromData: srs.length >= 20 });
 }
 
+const MIN_NEW = 12;   // so viele neue Karten pro Tag mindestens (Ziel: alles so schnell wie möglich beherrschen)
 function plannedNewPerDay() {
   if (S.settings.newMode === 'manual') return S.settings.newPerDay;
-  // Ziel wie in der Prognose: alles spätestens TRACK_BUFFER Tage vor der Prüfung eingeführt.
-  // Gerechnet mit dem Stand zu Tagesbeginn (heute Eingeführte zählen mit), damit die Zahl über den Tag gleich bleibt.
-  // 15 % Reserve für Tage, an denen du nicht lernst. Wer zurückfällt, bekommt automatisch mehr pro Tag.
+  // Gerechnet mit dem Stand zu Tagesbeginn (heute Eingeführtes/Wiederholtes zählt mit), damit die Zahl über den Tag gleich bleibt.
   const remaining = eligibleNew().length + newIntroducedToday();
   if (!remaining) return 0;
+  // 1) Prognose: alles spätestens TRACK_BUFFER Tage vor der Prüfung eingeführt, mit 15 % Reserve
   const days = Math.max(1, daysToExam() - TRACK_BUFFER);
-  let n = Math.max(3, Math.ceil(remaining / (days * 0.85)));
-  if (dueReviews().length > 150) n = Math.ceil(n * 0.6);   // Überlastung vermeiden
-  n = clamp(n, 1, 40);
-  // Zeitbudget: neue Karten nur so viele, wie neben den Wiederholungen ins Budget passen
+  let n = Math.ceil(remaining / (days * 0.85));
+  // 2) Mindestens MIN_NEW pro Tag
+  n = Math.max(MIN_NEW, n);
+  // 3) Mehr, wenn die Wiederholungen heute wenig Platz brauchen
+  const ds = dayStart();
+  const load = dueReviews().length + S.log.filter(l => l[0] >= ds && l[3] === 2 && modeOf(l) !== 'q').length;
+  if (load < 25) n = Math.max(n, 20);
+  else if (load < 50) n = Math.max(n, 16);
+  // Zeitbudget (falls gesetzt) begrenzt nach oben, aber nie unter das Minimum
   const b = +S.settings.budget || 0;
   if (b > 0) {
     const pt = personalTimes();
-    const free = b * 60 - dueReviews().length * pt.review;
-    n = Math.min(n, Math.max(3, Math.floor(free / pt.newCost)));
+    const free = b * 60 - load * pt.review;
+    n = Math.min(n, Math.max(MIN_NEW, Math.floor(free / pt.newCost)));
   }
-  return n;
+  return Math.min(clamp(n, MIN_NEW, 40), remaining);
 }
 
 function dueReviews(until = dayStart() + DAY) {
