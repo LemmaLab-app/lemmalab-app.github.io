@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-20.8';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-20.120.8';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -1130,7 +1130,6 @@ function viewStudy() {
     </div>
     <div class="ttl">${esc(c.title) || esc(c.kind + ' ' + c.nr)}</div>
     ${cueOf(c) ? `<div class="cue">${esc(cueOf(c))}</div>` : ''}
-    ${Similar.of(c.id).length ? `<div class="sim">Nicht verwechseln mit ${Similar.of(c.id).map(o => `${esc(KIND_SHORT[o.kind] || o.kind)} ${o.nr}${cueOf(o) ? ` (${esc(cueOf(o))})` : ''}`).join(', ')}</div>` : ''}
     <div class="meta">${metaLine(c)}</div>
     ${qHTML(c)}
     ${!s.revealed ? `
