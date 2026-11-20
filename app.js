@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-20.24';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-20.25';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -380,11 +380,11 @@ const Tune = {
     const notes = [...new Set(Object.keys(window.FAECHER || { [FACH]: 1 }).map(k => (this.get(k === FACH ? S : FachStore.read(k)) || {}).note).filter(Boolean))];
     const any = Object.keys(window.FAECHER || { [FACH]: 1 }).some(k => this.get(k === FACH ? S : FachStore.read(k)));
     return UI.group([
-      UI.action('Analyse-Datei sichern', 'tuneexport'),
-      `<label class="ir ia"><span class="ir-l">Korrektur-Datei einspielen</span><input type="file" id="tuneFile" accept=".json,application/json" class="hide"></label>`,
+      UI.action('Daten für Claude exportieren', 'tuneexport'),
+      `<label class="ir ia"><span class="ir-l">Korrektur von Claude einspielen</span><input type="file" id="tuneFile" accept=".json,application/json" class="hide"></label>`,
       UI.action('Korrektur-Text einfügen', 'tunepaste'),
-    ], { header: 'KI-Analyse deines Kontos', footer: 'Die Analyse-Datei enthält deinen Lernverlauf aller Fächer. Lade sie im Chat mit Claude hoch; die Korrektur, die du zurückbekommst, spielst du hier ein. Sie gilt auf allen Geräten.' })
-      + UI.group([rows, notes.length ? `<div class="ir"><span class="ir-l"><small>${notes.map(esc).join('<br>')}</small></span></div>` : '', any ? UI.action('Korrektur entfernen', 'tunereset') : ''], { header: 'Aktive Korrekturen' });
+    ], { header: 'KI-Analyse', footer: 'Exportiert deinen Lernverlauf aller Fächer. Datei im Chat mit Claude hochladen, die Korrektur-Datei hier einspielen. Gilt auf allen Geräten.' })
+      + (any ? UI.group([rows, notes.length ? `<div class="ir"><span class="ir-l"><small>${notes.map(esc).join('<br>')}</small></span></div>` : '', UI.action('Korrektur entfernen', 'tunereset')], { header: 'Aktive Korrekturen' }) : '');
   },
 };
 document.addEventListener('change', e => { if (e.target && e.target.id === 'tuneFile') { const f = e.target.files[0]; if (f) f.text().then(tuneImportText); e.target.value = ''; } });
@@ -2199,6 +2199,8 @@ function viewSettings() {
   const fmtDateLong = d => { try { return new Date(d + 'T12:00').toLocaleDateString('de-CH', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (e) { return d; } };
   return `<div class="settings">
   ${typeof accountSettingsHTML === 'function' ? accountSettingsHTML() : ''}
+
+  ${typeof isAdmin === 'function' && isAdmin() ? Tune.html() : ''}
 
   ${UI.group([UI.item('cards', 'var(--accent)', esc(FACH_CFG.name), `${CARDS.length} Karten · ${esc(FACH_CFG.sub || '')}`, 'Wechseln', { act: 'fachpick' })],
     { header: 'Fach', footer: 'Jedes Fach hat eigene Karten, einen eigenen Lernplan und ein eigenes Prüfungsdatum. Der Fortschritt bleibt beim Wechseln erhalten.' })}
