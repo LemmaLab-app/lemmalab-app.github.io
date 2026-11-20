@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-20.32';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-20.33';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -2023,9 +2023,13 @@ const Forecast = {
     for (let d = first; d <= dayStart(); d += DAY) { const end = Math.min(d + DAY - 1, now()); while (k < ev.length && ev[k][0] <= end) n += ev[k++][1]; out.push({ t: d, v: n }); }
     return out;
   },
-  simulate(mode, runs = 6, minNew = MIN_NEW()) {
-    const exam = examTime(), d0 = dayStart(), nDays = Math.max(1, Math.ceil((dayStart(exam) - d0) / DAY));
-    const pool0 = eligibleNew().map(c => c.id);
+  simulate(mode, runs = 6, minNew = MIN_NEW(), start) {
+    // mode 'soll': ab dem ersten Lerntag mit leerem Stand, als wäre von Anfang an der Tagesplan befolgt worden
+    const soll = mode === 'soll';
+    const exam = examTime(), d0 = soll && start ? dayStart(start) : dayStart(), nDays = Math.max(1, Math.ceil((dayStart(exam) - d0) / DAY));
+    const pool0 = soll
+      ? CARDS.filter(c => !(S.cards[c.id] || {}).susp && (prioOf(c) !== 1 || S.settings.includeRand)).sort((a, b) => (prioOf(b) - prioOf(a)) || (a.ord - b.ord)).map(c => c.id)
+      : eligibleNew().map(c => c.id);
     const manual = S.settings.newMode === 'manual';
     const pace = this.pace();
     const mastered = new Array(nDays + 1).fill(0), reviews = new Array(nDays + 1).fill(0), intro = new Array(nDays + 1).fill(0);
@@ -2034,7 +2038,7 @@ const Forecast = {
     for (let run = 0; run < runs; run++) {
       const rand = this.rng(1234 + run * 7919);
       const st = {}, ever = {};
-      for (const c of CARDS) { const x = S.cards[c.id]; if (x && x.st && !x.susp) st[c.id] = { ...x }; }
+      if (!soll) for (const c of CARDS) { const x = S.cards[c.id]; if (x && x.st && !x.susp) st[c.id] = { ...x }; }
       const pool = pool0.slice(); let carry = 0;
       for (let d = 0; d <= nDays; d++) {
         const t = d0 + d * DAY + 18 * HOUR, end = d0 + (d + 1) * DAY;
@@ -2060,6 +2064,7 @@ const Forecast = {
           return Math.min(k, 40);
         };
         if (mode === 'pace') { if (d > 0) { carry += pace; n = Math.floor(carry); carry -= n; } else n = 0; }
+        else if (soll) n = manual ? S.settings.newPerDay : rule(pool.length, nRev);
         else if (manual) n = d === 0 ? Math.max(0, S.settings.newPerDay - newIntroducedToday()) : S.settings.newPerDay;
         else n = d === 0 ? Math.max(0, rule(pool.length + newIntroducedToday(), nRev) - newIntroducedToday()) : rule(pool.length, nRev);
         n = Math.min(n, pool.length);
@@ -2081,12 +2086,13 @@ const Forecast = {
   /* Die Simulation braucht je nach Gerät 0.1–0.3 s. Damit nichts ruckelt (Start, Fachwechsel, nach jeder
    * Bewertung), wird das letzte Ergebnis sofort angezeigt (auch über Neuladen hinweg gespeichert) und die
    * Neuberechnung im Leerlauf nachgeholt – nie während einer Lernsitzung. */
-  LS: 'lemmalab-fc-' + FACH, _loaded: false, _pend: {},
+  LS: 'lemmalab-fc2-' + FACH, _loaded: false, _pend: {},
   /* Kennung des Kartensatzes: ändert sich die Anzahl oder der Inhalt eines Fachs (z. B. neue Karten),
    * wird das gespeicherte Ergebnis verworfen statt mit der alten Kartenzahl angezeigt. */
   sig() { return this._sig || (this._sig = CARDS.length + '-' + hash(CARDS.map(c => c.id).join('|'))); },
   load() {
     if (this._loaded) return; this._loaded = true;
+    try { localStorage.removeItem('lemmalab-fc-' + FACH); } catch (e) { }   // alte Version ohne Soll-Linie
     try { const o = JSON.parse(localStorage.getItem(this.LS) || 'null'); if (o && o.sig === this.sig()) { this._need = o.need; this._best = o.best; this._staleNeed = o.nk; this._res = o.res; this._staleKey = o.key; } } catch (e) { }
   },
   persist() { try { localStorage.setItem(this.LS, JSON.stringify({ sig: this.sig(), need: this._need, best: this._best, nk: this._nk || this._staleNeed, res: this._res, key: this._key || this._staleKey })); } catch (e) { } },
@@ -2136,7 +2142,9 @@ const Forecast = {
     if (key === this._key && this._res) return this._res;
     this._key = key;
     if (this.needKey() !== this._nk) this.computeNeed(this.needKey());
-    return (this._res = { hist: this.history(), plan: this.simulate('plan', 6, this._need), pace: this.simulate('pace') });
+    const hist = this.history();
+    return (this._res = { hist, plan: this.simulate('plan', 6, this._need), pace: this.simulate('pace'),
+      soll: this.simulate('soll', 4, this._need, hist.length ? hist[0].t : dayStart()) });
   },
 };
 
@@ -2145,7 +2153,7 @@ function masteryChart() {
   if (exam <= now() + 3 * DAY) return '';
   const goal = exam - MASTER_BEFORE * DAY;
   const N = CARDS.filter(c => prioOf(c) !== 1 || S.settings.includeRand).length;
-  const { hist, plan, pace } = Forecast.run();
+  const { hist, plan, pace, soll = plan } = Forecast.run();
   const t0 = hist.length ? hist[0].t : dayStart();
   const narrow = innerWidth < 600, W = narrow ? 360 : 600, H = narrow ? 210 : 250, L = narrow ? 30 : 38, R = narrow ? 10 : 16, T = 18, B = 30;
   const X = t => L + (t - t0) / Math.max(DAY, exam - t0) * (W - L - R);
@@ -2153,47 +2161,52 @@ function masteryChart() {
   const path = pts => pts.map((p, i) => `${i ? 'L' : 'M'}${X(p.t).toFixed(1)} ${Y(p.v).toFixed(1)}`).join(' ');
   const histPts = hist.length ? hist : [{ t: dayStart(), v: 0 }];
   const today = histPts[histPts.length - 1];
-  const planPts = [today, ...plan.slice(1)], pacePts = [today, ...pace.slice(1)];
+  // Prognose = Fortsetzung von «Bisher»: im bisherigen Tempo (ab 3 Lerntagen), sonst nach Tagesplan
+  const usePace = hist.length >= 3;
+  const proj = usePace ? pace : plan;
+  const projPts = [today, ...proj.slice(1)];
   const area = `${path(histPts)} L${X(today.t).toFixed(1)} ${Y(0)} L${X(histPts[0].t).toFixed(1)} ${Y(0)} Z`;
   const atGoal = arr => { let best = arr[0]; for (const p of arr) if (p.t <= goal) best = p; return Math.round(best.v); };
-  const planGoal = atGoal(plan), paceGoal = atGoal(pace);
-  const atExam = Math.round((plan.filter(p => p.t < dayStart(exam)).pop() || plan[plan.length - 1]).v);
+  const projGoal = atGoal(proj), sollGoal = atGoal(soll), planGoal = atGoal(plan);
+  const atExam = Math.round((proj.filter(p => p.t < dayStart(exam)).pop() || proj[proj.length - 1]).v);
   const months = []; { const d = new Date(t0); d.setDate(1); d.setMonth(d.getMonth() + 1); for (; d.getTime() < exam; d.setMonth(d.getMonth() + 1)) months.push(d.getTime()); }
   const fmt = (t, o = { day: 'numeric', month: 'short' }) => new Date(t).toLocaleDateString('de-CH', o);
   const grid = [0, 0.25, 0.5, 0.75, 1].map(f => `<line x1="${L}" x2="${W - R}" y1="${Y(N * f)}" y2="${Y(N * f)}" class="g${f === 1 ? ' top' : ''}"/>${f % 0.5 === 0 ? `<text x="${L - 8}" y="${Y(N * f) + 4}" text-anchor="end">${Math.round(N * f)}</text>` : ''}`).join('');
   const mLines = months.map(m => `<text x="${X(m)}" y="${H - 9}" text-anchor="middle">${fmt(m, { month: 'short' })}</text><line x1="${X(m)}" x2="${X(m)}" y1="${H - B}" y2="${H - B + 4}" class="g"/>`).join('');
-  const showPace = Math.abs(paceGoal - planGoal) >= 3 && hist.length > 3;
-  const data = { t0, exam, N, L, R, W, H, T, B, hist: histPts.map(p => [p.t, Math.round(p.v)]), plan: plan.map(p => [p.t, Math.round(p.v), Math.round(p.rev)]), pace: showPace ? pace.map(p => [p.t, Math.round(p.v)]) : [] };
-  // Wiederholungen pro Tag (Plan)
-  const revMax = Math.max(10, ...plan.map(p => p.rev));
+  const data = { t0, exam, N, L, R, W, H, T, B, hist: histPts.map(p => [p.t, Math.round(p.v)]), proj: proj.map(p => [p.t, Math.round(p.v), Math.round(p.rev)]), soll: soll.map(p => [p.t, Math.round(p.v)]) };
+  // Wiederholungen pro Tag (Prognose)
+  const revMax = Math.max(10, ...proj.map(p => p.rev));
   const bw = (W - L - R) / Math.max(1, (exam - t0) / DAY);
-  const bars = plan.map(p => { const h = p.rev / revMax * 54; return `<rect x="${(X(p.t) - bw * 0.35).toFixed(1)}" y="${(60 - h).toFixed(1)}" width="${Math.max(1.2, bw * 0.7).toFixed(1)}" height="${h.toFixed(1)}" rx="${Math.min(2, bw * 0.3).toFixed(1)}"/>`; }).join('');
-  const peak = plan.reduce((a, p) => p.rev > a.rev ? p : a, plan[0]);
-  const ok = planGoal >= (Forecast._best || N) - Math.max(3, N * 0.02) && planGoal >= N * 0.85;
+  const bars = proj.map(p => { const h = p.rev / revMax * 54; return `<rect x="${(X(p.t) - bw * 0.35).toFixed(1)}" y="${(60 - h).toFixed(1)}" width="${Math.max(1.2, bw * 0.7).toFixed(1)}" height="${h.toFixed(1)}" rx="${Math.min(2, bw * 0.3).toFixed(1)}"/>`; }).join('');
+  const peak = proj.reduce((a, p) => p.rev > a.rev ? p : a, proj[0]);
+  const tol = Math.max(3, N * 0.05);   // Simulation streut etwa so stark
+  const ok = projGoal >= sollGoal - tol;
+  const status = ok ? `Auf Kurs · Soll ${sollGoal}`
+    : `Unter dem Soll (${sollGoal})${usePace && planGoal > projGoal + tol ? ` · mit dem Tagesplan ${planGoal}` : ''}`;
   return `<h2>Prognose</h2>
   <div class="card fcard">
     <div class="fhead">
-      <div><div class="fk">Am ${fmt(goal, { day: 'numeric', month: 'long' })} sicher beherrscht</div>
-        <div class="fv">${planGoal}<span> von ${N}</span></div>
-        <div class="fs" style="color:${ok ? 'var(--good)' : 'var(--hard)'}">${ok ? 'Mit dem Tagesplan erreichst du das Ziel' : 'Mehr Tempo nötig'}${showPace ? ` · im bisherigen Tempo ${paceGoal}` : ''}</div></div>
+      <div><div class="fk">Am ${fmt(goal, { day: 'numeric', month: 'long' })} voraussichtlich sicher beherrscht</div>
+        <div class="fv">${projGoal}<span> von ${N}</span></div>
+        <div class="fs" style="color:${ok ? 'var(--good)' : 'var(--hard)'}">${status}</div></div>
     </div>
     <div class="fwrap" data-fc='${JSON.stringify(data)}'>
-      <svg class="fchart" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Prognose der sicher beherrschten Karten">
+      <svg class="fchart" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Soll und Prognose der sicher beherrschten Karten">
         <defs><linearGradient id="fgA" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".28"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
         <rect x="${X(goal)}" y="${T}" width="${Math.max(0, X(exam) - X(goal))}" height="${H - T - B}" class="gz"/>
         <text x="${(X(goal) + X(exam)) / 2}" y="${H - B - 9}" text-anchor="middle" class="gzl">Festigen</text>
         ${grid}${mLines}
         <path d="${area}" fill="url(#fgA)"/>
-        ${showPace ? `<path d="${path(pacePts)}" class="lpace"/>` : ''}
-        <path d="${path(planPts)}" class="lplan"/>
+        <path d="${path(soll)}" class="lsoll"/>
+        <path d="${path(projPts)}" class="lplan"/>
         <path d="${path(histPts)}" class="lhist"/>
         <circle cx="${X(today.t)}" cy="${Y(today.v)}" r="5" class="dot"/>
         <g class="scrub" style="display:none"><line class="sl" y1="${T}" y2="${H - B}"/><circle class="sc" r="4.5"/></g>
       </svg>
       <div class="ftip" style="display:none"></div>
     </div>
-    <div class="flegend"><span><i class="lh"></i>Bisher</span><span><i class="lp"></i>Plan</span>${showPace ? '<span><i class="lc"></i>Bisheriges Tempo</span>' : ''}</div>
-    <div class="muted small fnote">Simuliert mit deinem Algorithmus und deinem Lernverlauf. Jede Karte kommt kurz vor dem Stichtag nochmals zur Kontrolle. Was du dort vergisst, holst du in der Festigungsphase nach – bis zur Prüfung voraussichtlich ${atExam} von ${N}. Ganz 100&nbsp;% kann kein Gedächtnis garantieren.</div>
+    <div class="flegend"><span><i class="lh"></i>Bisher</span><span><i class="lp"></i>Prognose${usePace ? ' (bisheriges Tempo)' : ' (Tagesplan)'}</span><span><i class="ls"></i>Soll</span></div>
+    <div class="muted small fnote">Soll: so viele Karten sässen sicher, wenn du ab dem ersten Lerntag den Tagesplan befolgt hättest. Prognose: simuliert mit deinem Algorithmus und Lernverlauf${usePace ? ', neue Karten in deinem bisherigen Tempo' : ''}. Jede Karte kommt kurz vor dem Stichtag nochmals zur Kontrolle; was du dort vergisst, holst du in der Festigungsphase nach – bis zur Prüfung voraussichtlich ${atExam} von ${N}. Ganz 100&nbsp;% kann kein Gedächtnis garantieren.</div>
     <div class="fsub"><div class="fk2">Wiederholungen pro Tag</div><div class="fk3">Spitze ${Math.round(peak.rev)} am ${fmt(peak.t)}</div></div>
     <svg class="frev" viewBox="0 0 ${W} 64" width="100%" aria-hidden="true"><g transform="translate(0,0)">${bars}</g></svg>
   </div>`;
@@ -2212,14 +2225,14 @@ function fcScrub(e) {
   const t = d.t0 + clamp((sx - d.L) / (d.W - d.L - d.R), 0, 1) * (d.exam - d.t0);
   const near = arr => { let b = null; for (const p of arr) if (!b || Math.abs(p[0] - t) < Math.abs(b[0] - t)) b = p; return b; };
   const h = d.hist.length && t <= d.hist[d.hist.length - 1][0] + DAY / 2 ? near(d.hist) : null;
-  const p = near(d.plan), c = d.pace.length ? near(d.pace) : null;
+  const p = near(d.proj), so = d.soll && d.soll.length ? near(d.soll) : null;
   const pt = h || p;
   const X = tt => d.L + (tt - d.t0) / (d.exam - d.t0) * (d.W - d.L - d.R), Y = v => d.T + (1 - Math.min(v, d.N) / d.N) * (d.H - d.T - d.B);
   const g = w.querySelector('.scrub'); g.style.display = '';
   g.querySelector('.sl').setAttribute('x1', X(pt[0])); g.querySelector('.sl').setAttribute('x2', X(pt[0]));
   g.querySelector('.sc').setAttribute('cx', X(pt[0])); g.querySelector('.sc').setAttribute('cy', Y(pt[1]));
   const tip = w.querySelector('.ftip'); tip.style.display = '';
-  tip.innerHTML = `<b>${new Date(pt[0]).toLocaleDateString('de-CH', { weekday: 'short', day: 'numeric', month: 'short' })}</b><br>${h ? `Sicher: ${h[1]}` : `Plan: ${p[1]}`}${!h && c ? ` · Tempo: ${c[1]}` : ''}${!h && p[2] != null ? `<br>${p[2]} Wiederholungen` : ''}`;
+  tip.innerHTML = `<b>${new Date(pt[0]).toLocaleDateString('de-CH', { weekday: 'short', day: 'numeric', month: 'short' })}</b><br>${h ? `Bisher: ${h[1]}` : `Prognose: ${p[1]}`}${so ? ` · Soll: ${so[1]}` : ''}${!h && p[2] != null ? `<br>${p[2]} Wiederholungen` : ''}`;
   const px = X(pt[0]) / d.W * r.width;
   tip.style.left = clamp(px - tip.offsetWidth / 2, 0, r.width - tip.offsetWidth) + 'px';
 }
