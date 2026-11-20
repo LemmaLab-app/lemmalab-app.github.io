@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-20.12';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-20.13';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -143,6 +143,7 @@ function prioOf(c) { const x = S.cards[c.id]; return (x && x.prio) || c.prio; }
 /* ============================================================
  * Prüfungsdatum & Planung
  * ============================================================ */
+const TRACK_BUFFER = 21;   // Tage vor der Prüfung, ab denen nur noch gefestigt wird
 function examTime() { return parseDate(S.settings.examDate || DEFAULT_SETTINGS.examDate); }
 function daysToExam() { return Math.ceil((dayStart(examTime()) - dayStart()) / DAY); }
 
@@ -187,12 +188,13 @@ function personalTimes() {
 
 function plannedNewPerDay() {
   if (S.settings.newMode === 'manual') return S.settings.newPerDay;
-  // Ziel: alles spätestens 3 Wochen vor der Prüfung eingeführt, damit genug Zeit zum Festigen bleibt.
-  // Mindestens 12 pro Tag, damit der Kernstoff schnell sitzt.
-  const remaining = eligibleNew().length;
+  // Ziel wie in der Prognose: alles spätestens TRACK_BUFFER Tage vor der Prüfung eingeführt.
+  // Gerechnet mit dem Stand zu Tagesbeginn (heute Eingeführte zählen mit), damit die Zahl über den Tag gleich bleibt.
+  // 15 % Reserve für Tage, an denen du nicht lernst. Wer zurückfällt, bekommt automatisch mehr pro Tag.
+  const remaining = eligibleNew().length + newIntroducedToday();
   if (!remaining) return 0;
-  const days = Math.max(1, daysToExam() - 21);
-  let n = Math.max(12, Math.ceil(remaining / days));
+  const days = Math.max(1, daysToExam() - TRACK_BUFFER);
+  let n = Math.max(3, Math.ceil(remaining / (days * 0.85)));
   if (dueReviews().length > 150) n = Math.ceil(n * 0.6);   // Überlastung vermeiden
   n = clamp(n, 1, 40);
   // Zeitbudget: neue Karten nur so viele, wie neben den Wiederholungen ins Budget passen
@@ -1515,7 +1517,6 @@ function openCard(id) {
  * Ziel (wie der Lernplan): alle Karten spätestens 3 Wochen vor der Prüfung
  * eingeführt, damit genug Zeit zum Festigen bleibt. Verglichen wird das nötige
  * Tempo mit deinem Tempo der letzten 7 Tage. */
-const TRACK_BUFFER = 21;
 function trackStatus() {
   const dte = daysToExam(), remaining = eligibleNew().length;
   const overdue = CARDS.filter(c => { const x = S.cards[c.id]; return x && x.st === 2 && !x.susp && x.due < dayStart(); }).length;
@@ -1524,7 +1525,7 @@ function trackStatus() {
   const recent = CARDS.filter(c => { const x = S.cards[c.id]; return x && x.intro && x.intro > now() - span * DAY; }).length;
   const pace = recent / span;
   const daysLeft = Math.max(1, dte - TRACK_BUFFER);
-  const need = remaining / daysLeft;
+  const need = (remaining + newIntroducedToday()) / daysLeft;
   const finish = pace > 0 ? now() + remaining / pace * DAY : null;
   let level, title, sub;
   if (dte < 0) { level = 'done'; title = 'Prüfung vorbei'; sub = ''; }
@@ -1558,6 +1559,7 @@ function trackHTML() {
   if (tr.remaining && tr.dte >= 0) {
     rows.push(UI.row('Noch neu', `<span class="v">${tr.remaining} Karten</span>`));
     rows.push(UI.row('Nötiges Tempo', `<span class="v">${Math.ceil(tr.need)} pro Tag</span>`));
+    rows.push(UI.row('Tagesplan', `<span class="v">${plannedNewPerDay()} neue pro Tag${S.settings.newMode === 'manual' ? ' (manuell)' : ''}</span>`));
     if (S.log.length) rows.push(UI.row('Dein Tempo', `<span class="v">${tr.pace.toFixed(1)} pro Tag</span>`));
   }
   // alle Fächer
