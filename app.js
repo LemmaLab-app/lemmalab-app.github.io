@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-20.31';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-20.32';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -2082,11 +2082,14 @@ const Forecast = {
    * Bewertung), wird das letzte Ergebnis sofort angezeigt (auch über Neuladen hinweg gespeichert) und die
    * Neuberechnung im Leerlauf nachgeholt – nie während einer Lernsitzung. */
   LS: 'lemmalab-fc-' + FACH, _loaded: false, _pend: {},
+  /* Kennung des Kartensatzes: ändert sich die Anzahl oder der Inhalt eines Fachs (z. B. neue Karten),
+   * wird das gespeicherte Ergebnis verworfen statt mit der alten Kartenzahl angezeigt. */
+  sig() { return this._sig || (this._sig = CARDS.length + '-' + hash(CARDS.map(c => c.id).join('|'))); },
   load() {
     if (this._loaded) return; this._loaded = true;
-    try { const o = JSON.parse(localStorage.getItem(this.LS) || 'null'); if (o) { this._need = o.need; this._best = o.best; this._staleNeed = o.nk; this._res = o.res; this._staleKey = o.key; } } catch (e) { }
+    try { const o = JSON.parse(localStorage.getItem(this.LS) || 'null'); if (o && o.sig === this.sig()) { this._need = o.need; this._best = o.best; this._staleNeed = o.nk; this._res = o.res; this._staleKey = o.key; } } catch (e) { }
   },
-  persist() { try { localStorage.setItem(this.LS, JSON.stringify({ need: this._need, best: this._best, nk: this._nk || this._staleNeed, res: this._res, key: this._key || this._staleKey })); } catch (e) { } },
+  persist() { try { localStorage.setItem(this.LS, JSON.stringify({ sig: this.sig(), need: this._need, best: this._best, nk: this._nk || this._staleNeed, res: this._res, key: this._key || this._staleKey })); } catch (e) { } },
   later(what, fn) {
     if (this._pend[what]) return; this._pend[what] = true;
     const idle = window.requestIdleCallback || (f => setTimeout(f, 200));
@@ -2099,7 +2102,7 @@ const Forecast = {
     };
     idle(go, { timeout: 2000 });
   },
-  needKey() { return [dayKey(now()), S.settings.examDate, S.settings.includeRand, Model.ver, Math.floor(eligibleNew().length / 20)].join('|'); },
+  needKey() { return [this.sig(), dayKey(now()), S.settings.examDate, S.settings.includeRand, Model.ver, Math.floor(eligibleNew().length / 20)].join('|'); },
   needMin() {
     this.load();
     const key = this.needKey();
@@ -2121,7 +2124,7 @@ const Forecast = {
     this._best = best;
     return this._need;
   },
-  runKey() { return [S.log.length, Model.ver, S.settings.examDate, S.settings.newMode, S.settings.newPerDay, S.settings.includeRand, dayKey(now()), Object.keys(S.cards).length].join('|'); },
+  runKey() { return [this.sig(), S.log.length, Model.ver, S.settings.examDate, S.settings.newMode, S.settings.newPerDay, S.settings.includeRand, dayKey(now()), Object.keys(S.cards).length].join('|'); },
   run() {
     this.load();
     const key = this.runKey();
@@ -2178,7 +2181,7 @@ function masteryChart() {
       <svg class="fchart" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Prognose der sicher beherrschten Karten">
         <defs><linearGradient id="fgA" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".28"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
         <rect x="${X(goal)}" y="${T}" width="${Math.max(0, X(exam) - X(goal))}" height="${H - T - B}" class="gz"/>
-        <text x="${(X(goal) + X(exam)) / 2}" y="${T + 13}" text-anchor="middle" class="gzl">Festigen</text>
+        <text x="${(X(goal) + X(exam)) / 2}" y="${H - B - 9}" text-anchor="middle" class="gzl">Festigen</text>
         ${grid}${mLines}
         <path d="${area}" fill="url(#fgA)"/>
         ${showPace ? `<path d="${path(pacePts)}" class="lpace"/>` : ''}
