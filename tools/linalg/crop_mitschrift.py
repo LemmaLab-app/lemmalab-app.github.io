@@ -9,7 +9,7 @@ B = json.load(open('ann/bands.json'))
 DPI0, DPI = 110, 300; S = DPI / DPI0
 _pages = {}
 def page(f, p):
-    """Seite in voller Scan-Auflösung (300 dpi), Karopapier weg, Schrift tiefschwarz und etwas kräftiger, Rot bleibt rot."""
+    """Seite in voller Scan-Auflösung (300 dpi), Karopapier weg, Schrift dunkel, Strichbreite wie im Original, Rot bleibt rot."""
     if (f, p) not in _pages:
         import cv2
         pix = fitz.open(f'{SRC}/{f}.pdf')[p].get_pixmap(dpi=DPI)
@@ -19,9 +19,7 @@ def page(f, p):
         dark = np.clip(1 - mn / np.maximum(bg, 1), 0, 1)                      # 0 = Papier, 1 = Tinte
         sat = rgb.max(2) - mn
         dark[((sat < 70) & (dark < 0.30)) | (dark < 0.15)] = 0               # Karolinien und Rauschen weg
-        d = np.clip((dark - 0.15) / 0.25, 0, 1)                               # starker Kontrast
-        d = cv2.dilate(d, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)))   # Striche leicht verdicken
-        d = cv2.GaussianBlur(d, (3, 3), 0)                                     # weiche Kanten
+        d = np.clip((dark - 0.15) / 0.30, 0, 1) ** 0.8                        # kräftiger Kontrast, Strichbreite wie im Original
         red = ((rgb[..., 0] - rgb[..., 2] > 40) & (rgb[..., 0] - rgb[..., 1] > 40)).astype(np.uint8)
         red = cv2.dilate(red, np.ones((7, 7), np.uint8)) > 0
         ink = np.zeros_like(rgb); ink[red] = (205, 20, 45)
