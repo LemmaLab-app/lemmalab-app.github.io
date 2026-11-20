@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-20.16';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-20.17';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -1670,6 +1670,7 @@ function viewStats() {
     <table class="t">${arr.map(g => `<tr><td style="width:40%">${lbl(g.k)}</td><td>${stackBar(g)}</td><td class="num muted" style="width:52px">${g.r == null ? '–' : Math.round(g.r * 100) + '%'}</td></tr>`).join('')}</table></div>`;
   return `
   ${trackHTML()}
+  ${masteryChart()}
   <div class="grid g2">
     <div class="card kpi"><div class="l">Prüfungsbereit</div><div class="v">${Math.round(rd.exam * 100)}%</div></div>
     <div class="card kpi"><div class="l">Sitzt sicher</div><div class="v">${sitzt}<span class="of"> / ${CARDS.length}</span></div></div>
@@ -1816,6 +1817,57 @@ function barChart(vals, lbl, hi = 0) {
       ${(vals.length <= 7 || i % 2 === 0) ? `<text x="${x + (bw - gap) / 2}" y="${H - 6}" text-anchor="middle">${lbl(i)}</text>` : ''}`;
   }).join('')}</svg>`;
 }
+/* ---------- Prognose-Graph: Soll vs. Ist «sicher beherrscht» ----------
+ * Soll: Einführung gleichmässig vom Start bis zum Einführungs-Stichtag (Prüfung − 44 T);
+ *       jede Karte sitzt CONSOLIDATE Tage nach der Einführung → alles bis Prüfung − 30 T.
+ * Ist:  Anzahl Karten mit Stabilität ≥ 21 Tagen, Tag für Tag aus dem Lernverlauf. */
+const MASTER_S = 21;
+function masteryChart() {
+  const exam = examTime();
+  const goal = exam - MASTER_BEFORE * DAY, introEnd = exam - TRACK_BUFFER * DAY;
+  const N = CARDS.filter(c => prioOf(c) !== 1 || S.settings.includeRand).length;
+  const first = S.log.length ? S.log[0][0] : now();
+  const t0 = dayStart(Math.min(first, now()));
+  if (exam <= t0 + 7 * DAY) return '';
+  // Soll-Kurve
+  const introAt = t => N * clamp((t - t0) / Math.max(DAY, introEnd - t0), 0, 1);
+  const soll = t => Math.round(introAt(t - CONSOLIDATE * DAY));
+  // Ist-Kurve (pro Tag)
+  const tl = Replay.run().timeline;
+  const events = [];
+  for (const arr of Object.values(tl)) { let was = false; for (const e of arr) { const m = e.st === 2 && e.S >= MASTER_S; if (m !== was) { events.push([e.t, m ? 1 : -1]); was = m; } } }
+  events.sort((a, b) => a[0] - b[0]);
+  const today = dayStart() + DAY - 1, ist = [];
+  let k = 0, cnt = 0;
+  for (let d = t0 + DAY - 1; d <= today + 1; d += DAY) { while (k < events.length && events[k][0] <= d) cnt += events[k++][1]; ist.push([Math.min(d, now()), cnt]); }
+  // Zeichnen
+  const W = 420, H = 210, L = 34, R = 10, T = 14, B = 30;
+  const x = t => L + (t - t0) / (exam - t0) * (W - L - R), y = v => T + (1 - v / N) * (H - T - B);
+  const sollPts = []; for (let i = 0; i <= 80; i++) { const t = t0 + (exam - t0) * i / 80; sollPts.push(`${x(t).toFixed(1)},${y(soll(t)).toFixed(1)}`); }
+  const istPts = ist.map(([t, v]) => `${x(t).toFixed(1)},${y(v).toFixed(1)}`);
+  const lastIst = ist.length ? ist[ist.length - 1][1] : 0, sollNow = soll(now());
+  const fmt = t => new Date(t).toLocaleDateString('de-CH', { day: 'numeric', month: 'short' });
+  const xt = now();
+  const grid = [0, 0.5, 1].map(f => `<line x1="${L}" x2="${W - R}" y1="${y(N * f)}" y2="${y(N * f)}" stroke="var(--line)" stroke-width=".6"/><text x="${L - 6}" y="${y(N * f) + 3.5}" text-anchor="end">${Math.round(N * f)}</text>`).join('');
+  const svg = `<svg class="chart mchart" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Soll und Ist der sicher beherrschten Karten">
+    ${grid}
+    <rect x="${x(goal)}" y="${T}" width="${Math.max(0, x(exam) - x(goal))}" height="${H - T - B}" fill="color-mix(in srgb,var(--good) 8%,transparent)"/>
+    <line x1="${x(xt)}" x2="${x(xt)}" y1="${T}" y2="${H - B}" stroke="var(--muted)" stroke-width=".8" stroke-dasharray="2 3"/>
+    <polyline points="${sollPts.join(' ')}" fill="none" stroke="var(--muted)" stroke-width="2" stroke-dasharray="5 4" stroke-linecap="round" stroke-linejoin="round"/>
+    <polyline class="ist" points="${istPts.join(' ')}" fill="none" stroke="var(--accent)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="${x(xt)}" cy="${y(lastIst)}" r="4" fill="var(--accent)"/>
+    <text x="${x(t0)}" y="${H - 10}" text-anchor="start">${fmt(t0)}</text>
+    <text x="${x(xt)}" y="${H - 10}" text-anchor="middle">heute</text>
+    <text x="${x(goal)}" y="${H - 10}" text-anchor="middle">${fmt(goal)}</text>
+    <text x="${x(exam)}" y="${H - 10}" text-anchor="end">Prüfung</text>
+  </svg>`;
+  const diff = lastIst - sollNow;
+  return `<h2>Prognose</h2><div class="card">
+    <div class="legend"><span><i style="background:var(--accent)"></i>Tatsächlich: ${lastIst}</span><span><i class="dash"></i>Plan: ${sollNow}</span><span style="margin-left:auto;color:${diff >= 0 ? 'var(--good)' : 'var(--again)'}">${diff >= 0 ? '+' : ''}${diff}</span></div>
+    ${svg}
+    <div class="muted small">Sicher beherrschte Karten (mindestens 3 Wochen zuverlässig abrufbar). Grün: der letzte Monat vor der Prüfung, bis dahin soll alles sitzen.</div></div>`;
+}
+
 function lineChart(vals, o = {}) {
   const W = 420, H = 120, pad = 30, n = vals.length;
   const pts = vals.map((v, i) => v == null ? null : [pad + i * (W - pad - 6) / (n - 1), 10 + (1 - v) * (H - 30)]);
