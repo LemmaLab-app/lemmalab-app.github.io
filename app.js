@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-20.5';   // bei jeder Änderung erhöhen (Update-Erkennung)
+const APP_VERSION = '2026-11-20.6';   // bei jeder Änderung erhöhen (Update-Erkennung)
 
 /* ============================================================
  * Grundlagen
@@ -1134,7 +1134,7 @@ function viewStudy() {
     ${!s.revealed ? `
       ${S.settings.typeAnswer ? `<textarea class="note" id="answer" placeholder="Hier aufschreiben (wird nicht gespeichert) …"></textarea>` : ''}
       <div class="spacer"></div>
-      <div class="actionbar"><button class="btn primary big" data-act="reveal">Aufdecken</button></div>
+      <div class="actionbar revealbar"><button class="btn primary big" data-act="reveal">Aufdecken</button></div>
     ` : `
       ${scanHTML(c, false)}
       ${logicHTML(c)}
