@@ -1,6 +1,6 @@
 /* LemmaLab – Beweise (Analysis 1)
  * Eigener Bereich neben den Karteikarten: schlägt vor, welchen Beweis du als Nächstes lernst
- * bzw. wiederholst. Grundlage: «Prozentuale Wichtigkeit der Beweise» (Modell aus acht
+ * bzw. wiederholst. Reihenfolge strikt nach Wahrscheinlichkeit. Grundlage: «Prozentuale Wichtigkeit der Beweise» (Modell aus acht
  * Prüfungen, Stand 14.11.2026) und die Lernmethode aus dem Heft «Wichtige Beweise»:
  * verstehen → Gerüst einprägen → frei aufschreiben → wiederholen nach 1, 3, 7, 14 Tagen;
  * ein Beweis «sitzt» nach zweimal hintereinander fehlerfrei.
@@ -48,15 +48,10 @@ window.Beweise = (() => {
     const cands = open.map(b => ({ b, ...score(b) })).sort((a, c) => c.s - a.s);
     return { tgt, open, daysLeft, perDay, newToday, due, quota, cands };
   }
+  /* Reihenfolge: strikt nach Wahrscheinlichkeit – so wächst die Abdeckung am schnellsten.
+   * Bausteine (z. B. Supremum) werden nicht vorgezogen, nur beim Beweis erwähnt. */
   function score(b) {
-    const deps = (DEP[b.id] || []).map(i => BY[i]).filter(d => inZiel(d) && !started(d.id));
-    let s = b.p + 0.5 * deps.reduce((a, d) => a + d.p, 0);
-    const unmet = b.uses.map(i => BY[i]).filter(u => inZiel(u) && !started(u.id));
-    if (unmet.length) s *= 0.3;
-    let why;
-    if (deps.length && deps.reduce((a, d) => a + d.p, 0) > b.p) why = `Baustein für ${deps.sort((a, c) => c.p - a.p).slice(0, 2).map(d => d.name).join(' und ')}`;
-    else why = b.hist ? 'Bisher ' + b.hist : `Stufe ${b.stufe} – zentraler Satz`;
-    return { s, why };
+    return { s: b.p, why: b.hist ? 'Bisher ' + b.hist : `Stufe ${b.stufe} – zentraler Satz` };
   }
   function next(P = plan()) {
     const d = P.due.find(b => !skip.has(b.id));
@@ -113,6 +108,7 @@ window.Beweise = (() => {
       <h2>${esc(b.name)}</h2>
       <div class="bmeta">${esc(b.nr)} · Kapitel ${b.kap} ${chip('Stufe ' + b.stufe, STUFE_COL[b.stufe])} ${chip(pct(b.p))}</div>
       <p class="bwhy">${esc(n.why)}</p>
+      ${isNew && b.uses.length ? `<p class="small muted" style="margin:0 0 6px">Benutzt: ${b.uses.map(u => esc(BY[u].name)).join(', ')}</p>` : ''}
       <div class="bref">${refHTML(b)}</div>
       ${stmtHTML(b)}
       ${isNew ? `<ol class="bsteps"><li><b>Verstehen:</b> Intuition und Beweis lesen, jeden Schritt nachrechnen.</li><li><b>Gerüst einprägen:</b> die violette Box abdecken und aus dem Kopf aufschreiben.</li><li><b>Frei aufschreiben:</b> Satz und Beweis auf ein leeres Blatt, dann vergleichen.</li></ol>`
