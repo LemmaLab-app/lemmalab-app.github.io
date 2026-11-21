@@ -140,7 +140,7 @@ window.Beweise = (() => {
     ${UI.group([
       UI.row('Sitzen', `<span class="v">${C.nS} von ${C.tgt.length}</span>`),
       UI.row('Angefangen', `<span class="v">${C.nA} von ${C.tgt.length}</span>`),
-      UI.row('Abgedeckt', `<span class="v">${Math.round(C.cov * 100)} % von ${Math.round(C.covT * 100)} %</span>`, { sub: 'Anteil der Prüfungswahrscheinlichkeit' }),
+      UI.row('Abgedeckt', `<span class="v">${Math.round(C.cov * 100)} % von 100 %</span>`, { sub: `der Prüfungswahrscheinlichkeit · dein Ziel deckt ${Math.round(C.covT * 100)} % ab` }),
     ], { header: 'Stand' })}
     ${after.length ? UI.group(after.map(([b, w]) => rowHTML(b, esc(w))), { header: 'Danach' }) : ''}
     </div>`;
@@ -166,7 +166,7 @@ window.Beweise = (() => {
     const mx = Math.max(1, ...cnt);
     const spark = `<div class="bspark">${cnt.map((c, i) => `<i style="height:${Math.round(c / mx * 100)}%" title="${c}"></i>`).join('')}</div>`;
     return `<div class="bwrap">
-      <div class="bhero bcov"><div class="bk">Abgedeckt</div><h2>${Math.round(C.cov * 100)} %</h2><p class="muted">der Prüfungswahrscheinlichkeit sitzt sicher (${C.nS} von ${C.tgt.length} Beweisen deines Ziels). Dein Ziel deckt ${Math.round(C.covT * 100)} % ab.</p>${bar(C.covT ? C.cov / C.covT : 0, 'var(--good)')}</div>
+      <div class="bhero bcov"><div class="bk">Abgedeckt</div><h2>${Math.round(C.cov * 100)} %</h2><p class="muted">der Prüfungswahrscheinlichkeit sitzt sicher (${C.nS} von ${C.tgt.length} Beweisen deines Ziels). Dein Ziel deckt ${Math.round(C.covT * 100)} % ab.</p>${bar(C.cov, 'var(--good)')}</div>
       ${UI.group(st, { header: 'Nach Stufe (sitzt)' })}
       ${UI.group(kaps, { header: 'Nach Kapitel', footer: 'Abgedeckt / möglich, in Prozent der erwarteten Beweise.' })}
       ${UI.group([`<div class="ir"><span class="ir-l">${spark}<small>Bewertungen der letzten 14 Tage</small></span></div>`, UI.row('Ziel-Stichtag', `<span class="v">${fmtD(goalT())} · in ${P.daysLeft} Tagen</span>`)], { header: 'Verlauf' })}
