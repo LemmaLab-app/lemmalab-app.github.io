@@ -12,6 +12,12 @@ window.FAECHER = {
     scripts: ['data.js', 'logic.js'],
     gist: 'lemmalab-fortschritt.json', syncPrefix: '', examDate: '2027-01-25', accent: null,
   },
+  ana1b: {
+    name: 'Analysis 1', short: 'Beweise', sub: 'Welchen Beweis als Nächstes', kind: 'beweise', base: 'ana1',
+    ls: 'lemmalab-ana1b-v1',
+    scripts: ['data.js', 'beweise.js'],
+    gist: 'lemmalab-ana1-beweise.json', syncPrefix: 'ana1b-', examDate: '2027-01-25', accent: null,
+  },
   phy1: {
     name: 'Physik 1', short: 'Physik 1', sub: 'Gesetze, Formeln & Konzeptfragen',
     ls: 'lemmalab-phy1-v1',
@@ -43,6 +49,7 @@ window.FACH = (() => {
   return window.FAECHER[f] ? f : 'ana1';
 })();
 try { localStorage.setItem(window.FACH_KEY, window.FACH); } catch (e) { }
+window.MODUS = window.FAECHER[window.FACH].kind || 'karten';   // 'karten' oder 'beweise'
 if (window.FAECHER[window.FACH].accent) document.documentElement.setAttribute('data-fach', window.FAECHER[window.FACH].accent);
 
 /* Lernstand eines (auch nicht aktiven) Fachs lesen/schreiben – für Konto-Abgleich und Fachwahl */

@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-20.2124';   // bei jeder Änderung neu setzen: sh tools/bump.sh (UTC-Zeit, nie von Hand runterzählen)
+const APP_VERSION = '2026-11-21.0844';   // bei jeder Änderung neu setzen: sh tools/bump.sh (UTC-Zeit, nie von Hand runterzählen)
 
 /* ============================================================
  * Grundlagen
@@ -419,7 +419,7 @@ const Tune = {
     return parts.join(' · ') || 'Keine Änderungen';
   },
   html() {
-    const rows = Object.entries(window.FAECHER || { [FACH]: { name: FACH } }).map(([k, f]) => {
+    const rows = Object.entries(window.FAECHER || { [FACH]: { name: FACH } }).filter(([k, f]) => !f.kind).map(([k, f]) => {
       const t = this.get(k === FACH ? S : FachStore.read(k));
       return `<div class="ir"><span class="ir-l"><b>${esc(f.name || k)}</b><small>${esc(this.summary(t))}${t ? ` · ${new Date(t.at).toLocaleDateString('de-CH')}` : ''}</small></span></div>`;
     }).join('');
@@ -873,7 +873,8 @@ const ICONS = {
   statistik: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
   mehr: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
 };
-const TABS = [['heute', 'Lernen'], ['quiz', 'Quiz'], ['katalog', 'Karten'], ['statistik', 'Fortschritt'], ['mehr', 'Einstellungen']];
+const TABS = window.MODUS === 'beweise' ? [['heute', 'Nächster'], ['katalog', 'Alle'], ['statistik', 'Fortschritt'], ['mehr', 'Einstellungen']]
+  : [['heute', 'Lernen'], ['quiz', 'Quiz'], ['katalog', 'Karten'], ['statistik', 'Fortschritt'], ['mehr', 'Einstellungen']];
 let tab = (location.hash || '#heute').slice(1);
 if (!TABS.some(t => t[0] === tab)) tab = 'heute';
 
@@ -913,6 +914,7 @@ function go(t) {
 window.addEventListener('hashchange', () => { const t = location.hash.slice(1); if (TABS.some(x => x[0] === t) && t !== tab) { tab = t; render(); } });
 
 function render() {
+  if (window.MODUS === 'beweise' && window.Beweise) return Beweise.render();
   applyTheme();
   Model.sync();
   { const h = $('#hdrTitle'); if (h) h.textContent = ({ heute: 'Lernen', quiz: 'Quiz', katalog: 'Karten', statistik: 'Fortschritt', mehr: 'Einstellungen', admin: 'Admin' })[tab] || 'LemmaLab'; }
@@ -1779,7 +1781,7 @@ function trackHTML() {
   try {
     const all = JSON.parse(localStorage.getItem('lemmalab-track') || '{}');
     const F = window.FAECHER || {};
-    const list = Object.keys(F).filter(k => k !== FACH).map(k => {
+    const list = Object.keys(F).filter(k => k !== FACH && !F[k].kind).map(k => {
       const t = all[k], ex = new Date(parseDate(F[k].examDate) || 0);
       const exam = t && t.exam ? new Date(t.exam) : ex;
       const right = t ? `<span class="v" style="color:${TRACK_COL[t.level]}">${esc(t.title)}</span>` : '<span class="v">noch nicht geöffnet</span>';
@@ -2331,7 +2333,7 @@ function viewSettings() {
   ${UI.group([UI.item('cards', 'var(--accent)', esc(FACH_CFG.name), `${CARDS.length} Karten · ${esc(FACH_CFG.sub || '')}`, 'Wechseln', { act: 'fachpick' })],
     { header: 'Fach', footer: 'Jedes Fach hat eigene Karten, einen eigenen Lernplan und ein eigenes Prüfungsdatum. Der Fortschritt bleibt beim Wechseln erhalten.' })}
 
-  ${UI.group(Object.keys(window.FAECHER || { [FACH]: FACH_CFG }).map(k => {
+  ${UI.group(Object.keys(window.FAECHER || { [FACH]: FACH_CFG }).filter(k => !((window.FAECHER || {})[k] || {}).kind).map(k => {
     const F = (window.FAECHER || {})[k] || FACH_CFG;
     const o = k === FACH ? S : (window.FachStore && FachStore.read(k));
     const d = (o && o.settings && o.settings.examDate) || F.examDate;
@@ -2402,6 +2404,11 @@ function viewSettings() {
  * ============================================================ */
 /* ---------- Fachwahl ---------- */
 function fachSummary(id) {
+  if (((window.FAECHER || {})[id] || {}).kind === 'beweise') {
+    if (id === FACH && window.Beweise) return Beweise.summary();
+    const st = window.FachStore ? FachStore.read(id) : null; const n = st && st.cards ? Object.values(st.cards).filter(x => x && x.st).length : 0;
+    return n ? `${n} Beweis${n === 1 ? '' : 'e'} angefangen` : 'noch nicht begonnen';
+  }
   const st = id === FACH ? S : (window.FachStore ? FachStore.read(id) : null);
   if (!st || !st.cards) return 'noch nicht begonnen';
   const n = Object.values(st.cards).filter(x => x && x.st).length;
@@ -2409,13 +2416,13 @@ function fachSummary(id) {
   const due = Object.values(st.cards).filter(x => x && x.st && !x.susp && x.due < ds + DAY).length;
   return n ? `${n} Karte${n === 1 ? "" : "n"} begonnen${due ? ` · ${due} heute fällig` : ''}` : 'noch nicht begonnen';
 }
-const FACH_COL = { ana1: '#3a2bb5', phy1: '#b4531f', inf1: '#1f7a5a', la: '#9b2c6e' };
+const FACH_COL = { ana1b: '#3a2bb5', ana1: '#3a2bb5', phy1: '#b4531f', inf1: '#1f7a5a', la: '#9b2c6e' };
 // Eigene Symbole (einheitlicher Strich statt Schriftzeichen): Integral, Atom, Code, Matrix
-const FACH_ICON = {"ana1": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path stroke-width=\"2.4\" d=\"M15.5 4.2c-.6-.8-1.5-1.2-2.4-1-1.3.3-1.8 1.6-2 3l-1.8 11.6c-.2 1.4-.8 2.7-2 3-.9.2-1.8-.2-2.4-1\"/></svg>", "phy1": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"1.6\" fill=\"currentColor\" stroke=\"none\"/><ellipse cx=\"12\" cy=\"12\" rx=\"9.5\" ry=\"3.8\"/><ellipse cx=\"12\" cy=\"12\" rx=\"9.5\" ry=\"3.8\" transform=\"rotate(60 12 12)\"/><ellipse cx=\"12\" cy=\"12\" rx=\"9.5\" ry=\"3.8\" transform=\"rotate(-60 12 12)\"/></svg>", "inf1": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M8 7l-5 5 5 5M16 7l5 5-5 5M13.5 4.5l-3 15\"/></svg>", "la": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M7 3.5H4.5v17H7M17 3.5h2.5v17H17\"/><circle cx=\"9.5\" cy=\"8.5\" r=\"1.3\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"14.5\" cy=\"8.5\" r=\"1.3\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"9.5\" cy=\"15.5\" r=\"1.3\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"14.5\" cy=\"15.5\" r=\"1.3\" fill=\"currentColor\" stroke=\"none\"/></svg>"};
+const FACH_ICON = {"ana1b": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M6 3.5h9l3.5 3.5v13.5H6z\"/><path d=\"M9 10h6M9 13.5h4\"/><rect x=\"13.2\" y=\"16\" width=\"3\" height=\"3\" fill=\"currentColor\" stroke=\"none\"/></svg>", "ana1": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path stroke-width=\"2.4\" d=\"M15.5 4.2c-.6-.8-1.5-1.2-2.4-1-1.3.3-1.8 1.6-2 3l-1.8 11.6c-.2 1.4-.8 2.7-2 3-.9.2-1.8-.2-2.4-1\"/></svg>", "phy1": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"1.6\" fill=\"currentColor\" stroke=\"none\"/><ellipse cx=\"12\" cy=\"12\" rx=\"9.5\" ry=\"3.8\"/><ellipse cx=\"12\" cy=\"12\" rx=\"9.5\" ry=\"3.8\" transform=\"rotate(60 12 12)\"/><ellipse cx=\"12\" cy=\"12\" rx=\"9.5\" ry=\"3.8\" transform=\"rotate(-60 12 12)\"/></svg>", "inf1": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M8 7l-5 5 5 5M16 7l5 5-5 5M13.5 4.5l-3 15\"/></svg>", "la": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M7 3.5H4.5v17H7M17 3.5h2.5v17H17\"/><circle cx=\"9.5\" cy=\"8.5\" r=\"1.3\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"14.5\" cy=\"8.5\" r=\"1.3\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"9.5\" cy=\"15.5\" r=\"1.3\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"14.5\" cy=\"15.5\" r=\"1.3\" fill=\"currentColor\" stroke=\"none\"/></svg>"};
 function fachPillHTML(extra) {
   // Fach-Umschalter im Stil von iOS (Liquid Glass): Kapsel mit Fach-Symbol, Name und Auf/Ab-Pfeil
   return `<button class="fachpill glass${extra ? ' ' + extra : ''}" data-act="fachpick" title="Fach wechseln" aria-haspopup="menu">
-    <span class="fic" style="--c:${FACH_COL[FACH] || 'var(--accent)'}">${FACH_ICON[FACH] || '•'}</span><span class="fnm">${esc(FACH_CFG.name)}</span><svg class="chev" viewBox="0 0 12 16" aria-hidden="true"><path d="M3 6l3-3 3 3M3 10l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`;
+    <span class="fic" style="--c:${FACH_COL[FACH] || 'var(--accent)'}">${FACH_ICON[FACH] || '•'}</span><span class="fnm">${esc(FACH_CFG.kind === 'beweise' ? FACH_CFG.name + ' · Beweise' : FACH_CFG.name)}</span><svg class="chev" viewBox="0 0 12 16" aria-hidden="true"><path d="M3 6l3-3 3 3M3 10l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`;
 }
 function closeFachMenu() {
   const m = document.querySelector('.fachmenu-wrap'); if (!m) return;
@@ -2426,10 +2433,12 @@ function fachPicker(anchor) {
   if (document.querySelector('.fachmenu-wrap')) { closeFachMenu(); return; }
   const F = window.FAECHER || {};
   const wrap = document.createElement('div'); wrap.className = 'fachmenu-wrap';
-  wrap.innerHTML = `<div class="fachmenu glass" role="menu"><div class="fmh">Fach wechseln</div>${Object.entries(F).map(([id, f]) => `<button class="fachopt fmi${id === FACH ? ' on' : ''}" data-fach="${id}" role="menuitemradio" aria-checked="${id === FACH}">
+  const opt = ([id, f]) => `<button class="fachopt fmi${id === FACH ? ' on' : ''}" data-fach="${id}" role="menuitemradio" aria-checked="${id === FACH}">
       <span class="fic" style="--c:${FACH_COL[id] || 'var(--accent)'}">${FACH_ICON[id] || '•'}</span>
       <span class="ftx"><b>${esc(f.name)}</b><small>${esc(f.sub || '')}</small><small class="fst">${esc(fachSummary(id))}</small></span>
-      <svg class="fck" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`).join('')}</div>`;
+      <svg class="fck" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`;
+  const E = Object.entries(F), kk = E.filter(([, f]) => !f.kind), bb = E.filter(([, f]) => f.kind === 'beweise');
+  wrap.innerHTML = `<div class="fachmenu glass" role="menu"><div class="fmh">Karteikarten</div>${kk.map(opt).join('')}${bb.length ? `<div class="fmh">Beweise</div>${bb.map(opt).join('')}` : ''}</div>`;
   document.body.appendChild(wrap);
   const menu = wrap.firstChild;
   const r = (anchor || document.querySelector('.fachpill')).getBoundingClientRect();
@@ -2678,7 +2687,7 @@ function importJSON(txt) {
 function mergeInto(o, anyId) {     // anyId: Lernstand eines anderen (nicht geladenen) Fachs zusammenführen
   const ra = Math.max(S.settings.resetAt || 0, (o.settings && o.settings.resetAt) || 0);
   for (const [id, y] of Object.entries(o.cards || {})) {
-    if ((!anyId && !BY_ID[id]) || !y || (y.u || 0) < ra) continue;
+    if ((!anyId && !BY_ID[id] && !(window.BEWEISE_IDS && BEWEISE_IDS.has(id))) || !y || (y.u || 0) < ra) continue;
     const x = S.cards[id];
     if (!x || (y.u || 0) > (x.u || 0)) S.cards[id] = y;
   }
@@ -2898,7 +2907,7 @@ window.addEventListener('visibilitychange', () => { if (document.visibilityState
 Motion.set('tab'); render();
 requestAnimationFrame(() => document.documentElement.classList.add('ready'));
 /* Hintergrund: Wissen aller Nutzer holen, persönliches Modell trainieren */
-const bgTasks = () => { Community.refresh().catch(() => { }); if (Trainer.due()) Trainer.run(); };
+const bgTasks = () => { if (window.MODUS === 'beweise') return; Community.refresh().catch(() => { }); if (Trainer.due()) Trainer.run(); };
 setTimeout(bgTasks, 5000);
 setInterval(bgTasks, HOUR);
 window.addEventListener('online', () => setTimeout(bgTasks, 2000));

@@ -1246,6 +1246,52 @@ body.focus .app:has(.swipeact){padding-bottom:calc(max(var(--safe-b),12px) + 10p
 .solo{margin-bottom:12px}
 /* Lange Formeln nie über den Rand: notfalls seitlich wischen */
 .katex-display{max-width:100%;overflow-x:auto;overflow-y:hidden;padding:2px 0}
+
+/* ---------- Beweise ---------- */
+.fachmenu{max-height:calc(100dvh - 24px);overflow:auto}
+.fachmenu .fmh+.fachopt{margin-top:0}
+.fachmenu .fachopt+.fmh{margin-top:6px;border-top:.5px solid var(--line);padding-top:12px}
+.bwrap{max-width:720px;margin:0 auto}
+.bhero{background:var(--panel);border-radius:22px;padding:22px 20px 16px;margin:4px 0 26px;box-shadow:0 1px 2px rgba(0,0,0,.04),0 8px 28px rgba(0,0,0,.05)}
+.bhero .bk{font-size:13px;font-weight:600;color:var(--accent)}
+.bhero h2{font-size:26px;line-height:1.15;letter-spacing:-.02em;margin:6px 0 8px}
+.bhero.done{text-align:center;padding:30px 20px 24px}
+.bhero.done .bk{color:var(--good)}
+.bhero.done .btn{margin-top:8px}
+.bhero.bcov h2{font-size:44px;margin:2px 0 4px}
+.bmeta{font-size:14px;color:var(--muted);display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.bchip{display:inline-block;font-size:12.5px;font-weight:600;padding:2px 9px;border-radius:99px;color:var(--c,var(--ink));background:color-mix(in srgb,var(--c,var(--ink)) 12%,transparent)}
+.bwhy{margin:12px 0 4px;font-size:15px}
+.bref{font-size:13.5px;color:var(--muted);margin:2px 0 10px}
+.bstmt{margin:8px 0 12px}
+.bstmt summary{cursor:pointer;color:var(--accent);font-size:14.5px;font-weight:500;list-style:none}
+.bstmt summary::-webkit-details-marker{display:none}
+.bstmt summary::before{content:'›';display:inline-block;margin-right:6px;transition:transform .2s}
+.bstmt[open] summary::before{transform:rotate(90deg)}
+.bstmt .scanwrap{margin-top:10px}
+.bsteps{margin:10px 0 14px 18px;padding:0;font-size:14.5px;line-height:1.45}
+.bsteps li{margin:4px 0}
+.bsteps1{font-size:14.5px;margin:10px 0 14px}
+.brate{display:flex;gap:8px;margin-top:6px}
+.bbtn{flex:1;border:0;border-radius:99px;padding:12px 4px;font-size:14px;white-space:nowrap;min-width:0;font-weight:600;cursor:pointer;-webkit-user-select:none;user-select:none;touch-action:manipulation;transition:transform .12s}
+.bbtn:active{transform:scale(.96)}
+.bbtn.no{color:var(--again);background:color-mix(in srgb,var(--again) 12%,transparent)}
+.bbtn.gap{color:var(--hard);background:color-mix(in srgb,var(--hard) 13%,transparent)}
+.bbtn.ok{color:var(--good);background:color-mix(in srgb,var(--good) 13%,transparent)}
+.blink{display:block;margin:12px auto 0;border:0;background:none;color:var(--accent);font-size:14px;cursor:pointer;padding:4px 8px}
+.bhero .blink+.blink{margin-top:2px;color:var(--muted)}
+.bdot{width:10px;height:10px;border-radius:50%;flex:none;margin-right:12px;border:1.5px solid color-mix(in srgb,var(--ink) 25%,transparent)}
+.bdot.run{border-color:var(--hard);background:color-mix(in srgb,var(--hard) 35%,transparent)}
+.bdot.ok{border-color:var(--good);background:var(--good)}
+.bseg{margin:0 0 18px}
+.bnote{text-align:center;margin:8px 12px 30px}
+.bbar{display:inline-block;width:90px;height:6px;border-radius:3px;background:color-mix(in srgb,var(--ink) 9%,transparent);overflow:hidden;margin-right:10px;vertical-align:middle}
+.bbar i{display:block;height:100%;border-radius:3px}
+.bhero .bbar{width:100%;height:8px;margin:10px 0 2px}
+.bspark{display:flex;align-items:flex-end;gap:4px;height:56px;margin:4px 0 6px}
+.bspark i{flex:1;background:var(--accent);border-radius:3px 3px 0 0;min-height:2px;opacity:.85}
+.bdet h2{font-size:22px;margin:8px 0 6px;letter-spacing:-.01em}
+.bdet .brate{margin-top:14px}
 </style>
 </head>
 <body>
@@ -1265,9 +1311,9 @@ body.focus .app:has(.swipeact){padding-bottom:calc(max(var(--safe-b),12px) + 10p
 <div id="navbar" aria-hidden="true"><span id="navTitle"></span></div>
 <div class="toast" id="toast"></div>
 <script src="vendor/katex/katex.min.js"></script>
-<script src="fach.js?v=2026-11-20.2124"></script>
-<script src="app.js?v=2026-11-20.2124"></script>
+<script src="fach.js?v=2026-11-21.0844"></script>
+<script src="app.js?v=2026-11-21.0844"></script>
 <script src="vendor/supabase/supabase.js"></script>
-<script src="account.js?v=2026-11-20.2124"></script>
+<script src="account.js?v=2026-11-21.0844"></script>
 </body>
 </html>
