@@ -1292,6 +1292,16 @@ body.focus .app:has(.swipeact){padding-bottom:calc(max(var(--safe-b),12px) + 10p
 .bspark i{flex:1;background:var(--accent);border-radius:3px 3px 0 0;min-height:2px;opacity:.85}
 .bdet h2{font-size:22px;margin:8px 0 6px;letter-spacing:-.01em}
 .bdet .brate{margin-top:14px}
+
+.bhint{margin:0 0 12px}
+.bhint summary{cursor:pointer;color:var(--accent);font-size:14.5px;font-weight:500;list-style:none}
+.bhint summary::-webkit-details-marker{display:none}
+.bhint summary::before{content:'›';display:inline-block;margin-right:6px;transition:transform .2s}
+.bhint[open] summary::before{transform:rotate(90deg)}
+.bhint .bidee{margin:10px 0 6px;font-size:14.5px;font-weight:500}
+.bhint ol{margin:0 0 6px 18px;padding:0;font-size:14px;line-height:1.5}
+.bhint li{margin:3px 0}
+.bhint .katex{font-size:1.02em}
 </style>
 </head>
 <body>
@@ -1311,9 +1321,9 @@ body.focus .app:has(.swipeact){padding-bottom:calc(max(var(--safe-b),12px) + 10p
 <div id="navbar" aria-hidden="true"><span id="navTitle"></span></div>
 <div class="toast" id="toast"></div>
 <script src="vendor/katex/katex.min.js"></script>
-<script src="fach.js?v=2026-11-21.1412"></script>
-<script src="app.js?v=2026-11-21.1412"></script>
+<script src="fach.js?v=2026-11-21.1430"></script>
+<script src="app.js?v=2026-11-21.1430"></script>
 <script src="vendor/supabase/supabase.js"></script>
-<script src="account.js?v=2026-11-21.1412"></script>
+<script src="account.js?v=2026-11-21.1430"></script>
 </body>
 </html>
