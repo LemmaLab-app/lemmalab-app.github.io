@@ -21,13 +21,13 @@ window.Beweise = (() => {
   BW.forEach((b, i) => { b.rank = i + 1; b.stufe = i < 9 ? 'A' : i < 20 ? 'B' : i < 34 ? 'C' : 'D'; });
   const DEP = {}; for (const b of BW) for (const u of b.uses) (DEP[u] = DEP[u] || []).push(b.id);
   const IVL = [1, 3, 7, 14, 30, 60];                                  // Tage
-  const ZIELE = [['A', 'Stufe A – 9 Pflicht-Beweise'], ['AB', 'Stufe A + B – 20 Beweise'], ['heft', 'Heft «Wichtige Beweise» – 35'], ['C', 'Stufe A bis C – 34 Beweise'], ['alle', 'Alle 106 Beweise']];
+  const ZIELE = [['alle', 'Alle 106 Beweise'], ['heft', 'Heft «Wichtige Beweise» – 35'], ['C', 'Stufe A bis C – 34 Beweise'], ['AB', 'Stufe A + B – 20 Beweise'], ['A', 'Stufe A – 9 Pflicht-Beweise']];
   const STUFE_TXT = { A: 'Sicher können: Satz und Beweis frei aufschreiben', B: 'Beweis können, zumindest das Gerüst sicher', C: 'Satz exakt formulieren, Beweisidee in 2–3 Sätzen', D: 'Aussage kennen und anwenden; Beweis nur bei Zeitüberschuss' };
   const STUFE_COL = { A: 'var(--again)', B: 'var(--hard)', C: 'var(--easy)', D: 'var(--muted)' };
   let filt = 'ziel', skip = new Set(), extra = 0;
 
   const pct = p => p >= 0.01 ? Math.round(p * 100) + ' %' : '< 1 %';
-  const ziel = () => (S.settings.bZiel || 'heft');
+  const ziel = () => (S.settings.bZiel || 'alle');
   const inZiel = b => { const z = ziel(); return z === 'alle' || (z === 'heft' ? !!b.heft : z === 'A' ? b.stufe === 'A' : z === 'AB' ? 'AB'.includes(b.stufe) : 'ABC'.includes(b.stufe)); };
   const xs = id => S.cards[id];
   const started = id => !!(xs(id) && xs(id).st);
@@ -42,7 +42,7 @@ window.Beweise = (() => {
     const daysLeft = Math.max(1, Math.round((goalT() - today()) / DAY));
     const t0 = today();
     const newToday = new Set(S.log.filter(l => l[0] >= t0 && l[3] === 0 && BY[l[1]]).map(l => l[1])).size;
-    const perDay = open.length ? clamp(Math.ceil((open.length + newToday) / (daysLeft * 0.8)), 1, 3) : 0;
+    const perDay = open.length ? clamp(Math.ceil((open.length + newToday) / (daysLeft * 0.8)), 1, 4) : 0;
     const due = BW.filter(b => { const x = xs(b.id); return x && x.st && x.due < t0 + DAY && !(x.last >= t0 && x.due > now()); }).sort((a, b) => b.p - a.p);
     const quota = Math.max(0, perDay - newToday) + extra;
     const cands = open.map(b => ({ b, ...score(b) })).sort((a, c) => c.s - a.s);
@@ -176,7 +176,7 @@ window.Beweise = (() => {
     const st = S.settings;
     return `<div class="settings">
       ${typeof accountSettingsHTML === 'function' ? accountSettingsHTML() : ''}
-      ${UI.group([UI.row('Ziel', UI.select('bZiel', ZIELE, ziel()))], { header: 'Beweise', footer: 'Welche Beweise dir vorgeschlagen werden. Das Heft deckt rund 82 % der Wahrscheinlichkeit ab, Stufe A + B rund 63 %.' })}
+      ${UI.group([UI.row('Ziel', UI.select('bZiel', ZIELE, ziel()))], { header: 'Beweise', footer: 'Welche Beweise dir vorgeschlagen werden – immer die wahrscheinlichsten zuerst. Das Heft deckt rund 81 % der Wahrscheinlichkeit ab, Stufe A + B rund 63 %.' })}
       ${UI.group([UI.row('Erscheinungsbild', UI.select('sTheme', [['auto', 'Automatisch'], ['light', 'Hell'], ['dark', 'Dunkel']], st.theme))])}
       ${UI.group([UI.action('Beweis-Fortschritt zurücksetzen', 'breset', { danger: true })], { footer: 'Prüfungsdatum wie bei den Karteikarten Analysis 1.' })}
       ${UI.group([UI.action('Nach Update suchen', 'update'), `<a class="ir ia" href="datenschutz.html"><span class="ir-l">Datenschutz</span><span class="ir-r"><svg class="chev" viewBox="0 0 8 14" aria-hidden="true"><path d="M1.5 1.5L6.5 7l-5 5.5"/></svg></span></a>`])}
