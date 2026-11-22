@@ -108,7 +108,10 @@ for pno in range(FIRST - 1, LAST):
             for x in lines_of(cur_p):
                 if x['y0'] >= start_y and ymax - 2 < x['y1'] and x['y0'] <= ymax + 6 and not re.fullmatch(r'\d+', x['text']):
                     ymax = max(ymax, x['y1'])
-            regions.append((cur_p, max(start_y, 66), min(ymax + 3, 768)))
+            # bis zur Seitenzahl (statt fest 768 – sonst wurden Formeln ganz unten abgeschnitten)
+            foot = min([x['y0'] for x in lines_of(cur_p) if re.fullmatch(r'\d+', x['text']) and x['y0'] > 700] + [800])
+            foot = min([foot] + [d['rect'].y0 - 0.4 for d in doc[cur_p].get_drawings() if d['rect'].height < 1.5 and d['rect'].width > 300 and d['rect'].y0 > 700])   # Fusszeilen-Linie
+            regions.append((cur_p, max(start_y, 66), min(ymax + 3, foot - 2)))
             cur_p += 1
             if cur_p > LAST or len(regions) > 2:
                 break
@@ -135,6 +138,30 @@ for it in items:
     if k in OVR:
         p, y0, _ = it['regions'][0]
         it['regions'] = [(p, y0, OVR[k])]
+
+# Unteren Rand korrigieren: Zeichen, die über die Schnittkante hinausragen (z. B. Nenner einer
+# abgesetzten Formel, Indizes unter Σ), vollständig mitnehmen – aber nie bis in die nächste Zeile hinein.
+_chars = {}
+def chars_of(p):
+    if p not in _chars:
+        out = []
+        for b in doc[p].get_text('rawdict')['blocks']:
+            for l in b.get('lines', []):
+                for sp in l['spans']:
+                    for ch in sp['chars']:
+                        if ch['c'].strip(): out.append(ch['bbox'])
+        _chars[p] = out
+    return _chars[p]
+def fix_bottom(p, y0, y1):
+    for _ in range(4):
+        cut = [b for b in chars_of(p) if b[1] < y1 - 0.5 and b[3] > y1 + 0.3 and b[1] > y0]
+        if not cut: break
+        y1 = max(b[3] for b in cut) + 1.5
+    return y1
+for it in items:
+    if it['regions']:
+        p, y0, y1 = it['regions'][-1]
+        it['regions'][-1] = (p, y0, fix_bottom(p, y0, y1))
 
 from PIL import Image
 ZOOM = 2.2
