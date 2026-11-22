@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-22.1437';   // bei jeder Änderung neu setzen: sh tools/bump.sh (UTC-Zeit, nie von Hand runterzählen)
+const APP_VERSION = '2026-11-22.1445';   // bei jeder Änderung neu setzen: sh tools/bump.sh (UTC-Zeit, nie von Hand runterzählen)
 
 /* ============================================================
  * Grundlagen
@@ -1180,6 +1180,23 @@ let _shownDay = '';
 function checkDayChange() { if (dayKey(now()) !== _shownDay && !session && (typeof quiz === 'undefined' || !quiz) && !document.querySelector('.modal')) render(); }
 setInterval(checkDayChange, 60000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkDayChange(); });
+/* Tagesziel in drei Stufen: Minimum (im Zeitplan bleiben), Empfohlen (Tagesplan), Maximal sinnvoll */
+function tiersHTML(q) {
+  if (S.settings.newMode === 'manual') return '';
+  const pt = personalTimes(), intro = newIntroducedToday(), avail = eligibleNew(true).length;
+  if (!avail && !intro) return '';
+  const mn = Math.min(minNewToday(), avail + intro), rec = Math.max(mn, plannedNewPerDay()), mx = Math.min(avail + intro, Math.max(rec, PACE.max));
+  const revLeft = Math.max(0, q.queue.length - q.nNew);
+  const tier = (label, n, cls) => {
+    const newLeft = Math.max(0, n - intro), done = !newLeft && !revLeft;
+    const min = Math.max(1, Math.round((newLeft * pt.newCost + revLeft * pt.review) / 60));
+    return `<div class="tier ${cls}${done ? ' ok' : ''}"><div class="tl">${label}</div><div class="tn">${n}</div><div class="ts">neue Karten</div><div class="tm">${done ? '✓ erreicht' : `noch ~${min} Min`}</div></div>`;
+  };
+  const more = intro >= rec && !revLeft && intro < mx;
+  return `<div class="tiers">${tier('Minimum', mn, 'tmin')}${tier('Empfohlen', rec, 'trec')}${tier('Maximal sinnvoll', mx, 'tmax')}</div>
+  <p class="tiernote">Dazu jeweils alle fälligen Wiederholungen${revLeft ? ` (noch ${revLeft})` : ''}. <b>Minimum</b> hält dich im Zeitplan, <b>Empfohlen</b> ist der Tagesplan. Mehr als das <b>Maximum</b> bringt kaum etwas – die zusätzlichen Wiederholungen der nächsten Tage fressen den Vorsprung wieder auf.</p>
+  ${more ? `<button class="btn big solo-btn tierbtn" data-act="extramax">Weitere ${mx - intro} neue lernen</button>` : ''}`;
+}
 function viewHome() {
   try { saveTrackSummary(trackStatus()); } catch (e) { }
   const q = buildQueue();
@@ -1207,6 +1224,7 @@ function viewHome() {
   return `<div class="home"><div class="col">${todayHTML()}
   ${hero}
   ${ts.allDone ? '' : goalNoteHTML(false)}
+  ${tiersHTML(q)}
   ${UI.group([
     UI.row('Wiederholungen', `<span class="v">${q.nRev}</span>`),
     UI.row('Neue Karten', `<span class="v">${q.nNew}</span>`),
@@ -2646,6 +2664,12 @@ document.addEventListener('click', e => {
   switch (act) {
     case 'start': startSession(); break;
     case 'train': if (!Trainer.running) { Trainer.run(); render(); } break;
+    case 'extramax': {
+      const intro = newIntroducedToday(), mx = Math.min(eligibleNew(true).length + intro, Math.max(plannedNewPerDay(), PACE.max));
+      const ids = eligibleNew().slice(0, Math.max(0, mx - intro)).map(c => c.id);
+      if (!ids.length) { toast('Keine neuen Karten mehr'); break; }
+      startSession(ids); break;
+    }
     case 'extra': {
       const ids = eligibleNew().slice(0, 10).map(c => c.id);
       if (!ids.length) { toast('Keine neuen Karten mehr'); break; }
