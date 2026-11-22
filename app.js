@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-22.1256';   // bei jeder Änderung neu setzen: sh tools/bump.sh (UTC-Zeit, nie von Hand runterzählen)
+const APP_VERSION = '2026-11-22.1318';   // bei jeder Änderung neu setzen: sh tools/bump.sh (UTC-Zeit, nie von Hand runterzählen)
 
 /* ============================================================
  * Grundlagen
@@ -800,8 +800,17 @@ function nextCard(force) {
       const alt = session.later.filter(id => id !== last && S.cards[id].due - t <= LEARN_AHEAD)
         .sort((a, b) => S.cards[a].due - S.cards[b].due)[0];
       if (alt) { session.later = session.later.filter(id => id !== alt); session.queue.unshift(alt); }
+      else if (!force && !(session.holdUntil && t >= session.holdUntil - 1000)) {
+        // Nur noch dieselbe Karte übrig: nicht direkt nochmals zeigen, sondern kurz Pause (mind. 1 Minute)
+        const id = session.queue.shift(); session.later.unshift(id);
+        session.holdUntil = Math.max(t + 60e3, S.cards[id].due - WAIT_SOON);
+        session.cur = null; session.revealed = false; session.waiting = true;
+        session.waitTimer = setTimeout(() => { if (session && session.waiting) nextCard(); }, session.holdUntil - t + 300);
+        Motion.set('tab'); render(); return;
+      }
     }
   }
+  session.holdUntil = 0;
   session.cur = session.queue.shift() || null;
   if (session.cur) lastShownId = session.cur;
   if (session.cur) session.shown = (session.shown || 0) + 1;
@@ -1344,7 +1353,7 @@ function historyLine(c) {
 function viewStudy() {
   const s = session;
   if (!s.cur && s.waiting && s.later.length) {
-    const until = Math.min(...s.later.map(id => S.cards[id].due)) - WAIT_SOON;
+    const until = s.holdUntil || (Math.min(...s.later.map(id => S.cards[id].due)) - WAIT_SOON);
     return pauseHTML(until, s.later.length, 'forcelater', `<button class="btn primary big solo-btn" data-act="home">Fertig für jetzt</button>`);
   }
   if (!s.cur) {
