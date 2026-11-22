@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-22.1448';   // bei jeder Änderung neu setzen: sh tools/bump.sh (UTC-Zeit, nie von Hand runterzählen)
+const APP_VERSION = '2026-11-22.1450';   // bei jeder Änderung neu setzen: sh tools/bump.sh (UTC-Zeit, nie von Hand runterzählen)
 // Seite (index.html, inkl. CSS) aus einer älteren Version, Skript schon neu? → einmal neu laden, sonst fehlen Styles
 (() => {
   const m = document.querySelector('meta[name="lemmalab-v"]'), v = m && m.content;
@@ -1144,7 +1144,8 @@ function goalNote() {
     const minToday = Math.min(minNewToday(), plannedNewPerDay());
     const bq = buildQueue();
     const newLeft = Math.min(bq.nNew, Math.max(0, minToday - newIntroducedToday()));
-    const revLeft = bq.nRev;
+    // alles, was heute noch offen ist und schon bekannt ist: Wiederholungen + Lernschritte von heute
+    const revLeft = Math.max(0, bq.queue.length - bq.nNew) + bq.later.filter(id => S.cards[id].due < dayStart() + DAY).length;
     const hint = newLeft || revLeft
       ? `Heute noch mindestens ${newLeft ? `${newLeft} neue Karte${newLeft === 1 ? '' : 'n'}` : ''}${newLeft && revLeft ? ' und ' : ''}${revLeft ? `${revLeft} Wiederholung${revLeft === 1 ? '' : 'en'}` : ''}`
       : 'Heute ist alles Nötige geschafft';
