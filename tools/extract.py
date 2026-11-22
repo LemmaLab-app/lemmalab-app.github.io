@@ -103,6 +103,11 @@ for pno in range(FIRST - 1, LAST):
                 break
             # bis Seitenende
             ymax = max([x['y1'] for x in lines if x['y0'] >= start_y] + [start_y + 10])
+            # Indizes/Grenzen grosser Operatoren (kleine Schrift, z. B. «n=0» unter Σ) direkt darunter mitnehmen –
+            # page_bounds() filtert kleine Schrift (Fussnoten) weg, das schnitt solche Formeln am Seitenende ab
+            for x in lines_of(cur_p):
+                if x['y0'] >= start_y and ymax - 2 < x['y1'] and x['y0'] <= ymax + 6 and not re.fullmatch(r'\d+', x['text']):
+                    ymax = max(ymax, x['y1'])
             regions.append((cur_p, max(start_y, 66), min(ymax + 3, 768)))
             cur_p += 1
             if cur_p > LAST or len(regions) > 2:
