@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-22.1334';   // bei jeder Änderung neu setzen: sh tools/bump.sh (UTC-Zeit, nie von Hand runterzählen)
+const APP_VERSION = '2026-11-22.1343';   // bei jeder Änderung neu setzen: sh tools/bump.sh (UTC-Zeit, nie von Hand runterzählen)
 
 /* ============================================================
  * Grundlagen
@@ -719,9 +719,34 @@ function buildQueue() {
   return { queue: [...learnDue, ...mixed], later: learnLater, nNew: news.length, nRev: reviews.length };
 }
 
+/* Sitzung merken: Schliessen und später «Weiterlernen» startet bei derselben Karte, in derselben Reihenfolge
+ * (gilt bis zum Ende des Lerntags; Karten, die inzwischen erledigt sind, fallen weg, neu fällige kommen hinten dazu). */
+const SessStore = {
+  key: () => 'lemmalab-sess-' + FACH,
+  save() {
+    if (!session || session.custom) return;
+    try { localStorage.setItem(this.key(), JSON.stringify({ day: dayKey(now()), cur: session.cur, queue: session.queue, later: session.later, total: session.total, done: session.done, again: session.again, start: session.start, logFrom: session.logFrom, shown: session.shown, gap: session.gap, nNew: session.nNew, nRev: session.nRev })); } catch (e) { }
+  },
+  load() { try { const o = JSON.parse(localStorage.getItem(this.key()) || 'null'); return o && o.day === dayKey(now()) ? o : null; } catch (e) { return null; } },
+  clear() { try { localStorage.removeItem(this.key()); } catch (e) { } },
+};
 function startSession(customIds) {
   const q = customIds ? { queue: customIds.slice(), later: [], nNew: 0, nRev: customIds.length } : buildQueue();
   session = { ...q, total: q.queue.length, done: 0, cur: null, revealed: false, undo: [], again: 0, custom: !!customIds, start: now(), logFrom: S.log.length, shown: 0, gap: {} };
+  const snap = customIds ? null : SessStore.load();
+  if (snap) {
+    const open = new Set([...q.queue, ...q.later]), seen = new Set();
+    const take = l => l.filter(id => id && open.has(id) && !seen.has(id) && seen.add(id));
+    const queue = take([snap.cur, ...(snap.queue || [])]);
+    const later = take(snap.later || []);
+    const added = take(q.queue), addedL = take(q.later);
+    queue.push(...added); later.push(...addedL);
+    if (queue.length || later.length) {
+      Object.assign(session, { queue, later, done: snap.done || 0, again: snap.again || 0, start: snap.start || now(), logFrom: Math.min(snap.logFrom || S.log.length, S.log.length), shown: snap.shown || 0, gap: snap.gap || {} });
+      session.total = Math.max(session.done + queue.length, (snap.total || 0) + added.length + addedL.length);
+      lastShownId = null;     // die gemerkte Karte darf gleich als erste kommen
+    }
+  }
   nextCard();
 }
 
@@ -788,7 +813,7 @@ function nextCard(force) {
     if (force || i === 1 || wait <= WAIT_SOON) session.queue.push(session.later.splice(i, 1)[0]);
     else {
       // sonst kurz warten statt dieselbe Karte gleich nochmals zu zeigen
-      session.cur = null; session.revealed = false; session.waiting = true;
+      session.cur = null; session.revealed = false; session.waiting = true; SessStore.save();
       session.waitTimer = setTimeout(() => { if (session && session.waiting) nextCard(); }, Math.max(1000, wait - WAIT_SOON + 500));
       Motion.set('tab'); render(); return;
     }
@@ -804,7 +829,7 @@ function nextCard(force) {
         // Nur noch dieselbe Karte übrig: nicht direkt nochmals zeigen, sondern kurz Pause (mind. 1 Minute)
         const id = session.queue.shift(); session.later.unshift(id);
         session.holdUntil = Math.max(t + 60e3, S.cards[id].due - WAIT_SOON);
-        session.cur = null; session.revealed = false; session.waiting = true;
+        session.cur = null; session.revealed = false; session.waiting = true; SessStore.save();
         session.waitTimer = setTimeout(() => { if (session && session.waiting) nextCard(); }, session.holdUntil - t + 300);
         Motion.set('tab'); render(); return;
       }
@@ -813,6 +838,7 @@ function nextCard(force) {
   session.holdUntil = 0;
   session.cur = session.queue.shift() || null;
   if (session.cur) lastShownId = session.cur;
+  if (session.cur || session.later.length) SessStore.save(); else if (!session.custom) SessStore.clear();
   if (session.cur) session.shown = (session.shown || 0) + 1;
   session.revealed = false;
   Timer.start();
