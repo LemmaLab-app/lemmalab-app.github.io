@@ -1233,7 +1233,7 @@ body.focus #view.a-tab .study-head,body.focus #view.a-tab .fc>:not(.actionbar){a
 /* iOS: fest positionierte Leisten werden nach dem Scrollen teils versetzt getroffen (Tippen geht ins Leere
    bzw. markiert Text). Bewertungsknöpfe darum im Fluss, unten angeheftet (sticky) statt fixed. */
 body.focus #view:has(> .swipeact){display:flex;flex-direction:column;min-height:calc(100dvh - 8px - var(--safe-t) - max(var(--safe-b),12px) - 10px)}
-body.focus .actionbar.swipeact{position:sticky!important;bottom:calc(max(var(--safe-b),12px) + 6px)!important;left:auto!important;right:auto!important;transform:none!important;width:auto!important;margin:auto 0 0!important;padding:16px 0 0!important;z-index:30}
+body.focus .actionbar.swipeact{position:sticky!important;bottom:calc(max(var(--safe-b),12px) + 6px)!important;left:auto!important;right:auto!important;transform:none!important;width:100%!important;margin:auto auto 0!important;padding:16px 0 0!important;z-index:30}
 body.focus .app:has(.swipeact){padding-bottom:calc(max(var(--safe-b),12px) + 10px)!important}
 .swipeact,.swipeact *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .rb{touch-action:manipulation}
@@ -1323,9 +1323,9 @@ body.focus .app:has(.swipeact){padding-bottom:calc(max(var(--safe-b),12px) + 10p
 <div id="navbar" aria-hidden="true"><span id="navTitle"></span></div>
 <div class="toast" id="toast"></div>
 <script src="vendor/katex/katex.min.js"></script>
-<script src="fach.js?v=2026-11-22.0906"></script>
-<script src="app.js?v=2026-11-22.0906"></script>
+<script src="fach.js?v=2026-11-22.1256"></script>
+<script src="app.js?v=2026-11-22.1256"></script>
 <script src="vendor/supabase/supabase.js"></script>
-<script src="account.js?v=2026-11-22.0906"></script>
+<script src="account.js?v=2026-11-22.1256"></script>
 </body>
 </html>
