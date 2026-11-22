@@ -5,6 +5,6 @@
 cd "$(dirname "$0")/.." || exit 1
 V=$(date -u +%Y-%m-%d.%H%M)
 sed -i -E "s/const APP_VERSION = '[^']+'/const APP_VERSION = '$V'/" app.js
-sed -i -E "s/\?v=[0-9]{4}-[0-9]{2}-[0-9]{2}\.[0-9]+/?v=$V/g" index.html
+sed -i -E "s/\?v=[0-9]{4}-[0-9]{2}-[0-9]{2}\.[0-9]+/?v=$V/g; s/(name=\"lemmalab-v\" content=\")[^\"]+/\1$V/" index.html
 python3 tools/build_sw.py >/dev/null
 echo "$V"

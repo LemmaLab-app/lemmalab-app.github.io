@@ -3,7 +3,15 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-22.1445';   // bei jeder Änderung neu setzen: sh tools/bump.sh (UTC-Zeit, nie von Hand runterzählen)
+const APP_VERSION = '2026-11-22.1448';   // bei jeder Änderung neu setzen: sh tools/bump.sh (UTC-Zeit, nie von Hand runterzählen)
+// Seite (index.html, inkl. CSS) aus einer älteren Version, Skript schon neu? → einmal neu laden, sonst fehlen Styles
+(() => {
+  const m = document.querySelector('meta[name="lemmalab-v"]'), v = m && m.content;
+  if (v && v !== APP_VERSION) {
+    try { if (sessionStorage.getItem('lemmalab-vfix') === APP_VERSION) return; sessionStorage.setItem('lemmalab-vfix', APP_VERSION); } catch (e) { return; }
+    const u = new URL(location.href); u.searchParams.set('v', APP_VERSION); location.replace(u.toString());
+  }
+})();
 
 /* ============================================================
  * Grundlagen
@@ -1180,22 +1188,33 @@ let _shownDay = '';
 function checkDayChange() { if (dayKey(now()) !== _shownDay && !session && (typeof quiz === 'undefined' || !quiz) && !document.querySelector('.modal')) render(); }
 setInterval(checkDayChange, 60000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkDayChange(); });
-/* Tagesziel in drei Stufen: Minimum (im Zeitplan bleiben), Empfohlen (Tagesplan), Maximal sinnvoll */
+/* Tagesziel in drei Stufen (alle Karten des Tages: Wiederholungen + neue):
+ * Minimum (im Zeitplan bleiben) · Empfohlen (Tagesplan) · Maximal sinnvoll */
 function tiersHTML(q) {
   if (S.settings.newMode === 'manual') return '';
   const pt = personalTimes(), intro = newIntroducedToday(), avail = eligibleNew(true).length;
-  if (!avail && !intro) return '';
-  const mn = Math.min(minNewToday(), avail + intro), rec = Math.max(mn, plannedNewPerDay()), mx = Math.min(avail + intro, Math.max(rec, PACE.max));
-  const revLeft = Math.max(0, q.queue.length - q.nNew);
-  const tier = (label, n, cls) => {
-    const newLeft = Math.max(0, n - intro), done = !newLeft && !revLeft;
-    const min = Math.max(1, Math.round((newLeft * pt.newCost + revLeft * pt.review) / 60));
-    return `<div class="tier ${cls}${done ? ' ok' : ''}"><div class="tl">${label}</div><div class="tn">${n}</div><div class="ts">neue Karten</div><div class="tm">${done ? '✓ erreicht' : `noch ~${min} Min`}</div></div>`;
-  };
-  const more = intro >= rec && !revLeft && intro < mx;
-  return `<div class="tiers">${tier('Minimum', mn, 'tmin')}${tier('Empfohlen', rec, 'trec')}${tier('Maximal sinnvoll', mx, 'tmax')}</div>
-  <p class="tiernote">Dazu jeweils alle fälligen Wiederholungen${revLeft ? ` (noch ${revLeft})` : ''}. <b>Minimum</b> hält dich im Zeitplan, <b>Empfohlen</b> ist der Tagesplan. Mehr als das <b>Maximum</b> bringt kaum etwas – die zusätzlichen Wiederholungen der nächsten Tage fressen den Vorsprung wieder auf.</p>
-  ${more ? `<button class="btn big solo-btn tierbtn" data-act="extramax">Weitere ${mx - intro} neue lernen</button>` : ''}`;
+  const t0 = dayStart(), end = t0 + DAY;
+  const done = new Set(S.log.filter(l => l[0] >= t0 && modeOf(l) !== 'q').map(l => l[1]));
+  const open = [...q.queue, ...q.later.filter(id => S.cards[id].due < end)].filter(id => S.cards[id] && S.cards[id].st && !done.has(id));
+  const revLeft = open.length;
+  const mnN = Math.min(minNewToday(), avail + intro), recN = Math.max(mnN, plannedNewPerDay()), mxN = Math.min(avail + intro, Math.max(recN, PACE.max));
+  const tot = n => done.size + revLeft + Math.max(0, n - intro);
+  const mn = tot(mnN), rec = tot(recN), mx = tot(mxN), d = done.size;
+  if (!mx) return '';
+  const left = n => Math.max(0, n - intro), mins = n => Math.max(1, Math.round((left(n) * pt.newCost + revLeft * pt.review) / 60));
+  const pc = v => Math.min(100, v / mx * 100).toFixed(1);
+  const goal = d < mn ? ['Minimum', mn, mnN] : d < rec ? ['Empfohlen', rec, recN] : d < mx ? ['Maximal sinnvoll', mx, mxN] : null;
+  const sub = !goal ? 'Alles Sinnvolle für heute geschafft' : mn === rec && goal[0] === 'Minimum' ? `bis Empfohlen noch ~${mins(goal[2])} Min` : d >= mn && goal[0] === 'Empfohlen' ? `Minimum geschafft · bis Empfohlen noch ~${mins(goal[2])} Min` : d >= rec ? `Empfohlen geschafft · bis Maximum noch ~${mins(goal[2])} Min` : `bis ${goal[0]} noch ~${mins(goal[2])} Min`;
+  const mk = (v, cls) => `<i class="tk ${cls}${d >= v ? ' ok' : ''}" style="left:${pc(v)}%"></i>`;
+  const more = d >= rec && !revLeft && intro < mxN;
+  return `<div class="tcard">
+    <div class="th"><span class="tbig">${d}</span><span class="tof">von ${rec} Karten</span></div>
+    <div class="tsub">${sub}</div>
+    <div class="tbar"><span class="tfill" style="width:${pc(d)}%"></span>${mk(mn, 'tmn')}${mk(rec, 'trc')}</div>
+    <div class="tleg">${mn === rec ? `<span class="rec"><b>${rec}</b> Minimum = Empfohlen</span>` : `<span><b>${mn}</b> Minimum</span><span class="rec"><b>${rec}</b> Empfohlen</span>`}<span><b>${mx}</b> Maximal sinnvoll</span></div>
+    ${more ? `<button class="btn tierbtn" data-act="extramax">Weitere ${mxN - intro} neue lernen</button>` : ''}
+  </div>
+  <p class="tiernote">Alle Karten von heute – fällige Wiederholungen plus neue. <b>Minimum</b> hält dich im Zeitplan, <b>Empfohlen</b> ist der Tagesplan. Mehr als das Maximum bringt kaum etwas, weil die zusätzlichen Wiederholungen der nächsten Tage den Vorsprung wieder auffressen.</p>`;
 }
 function viewHome() {
   try { saveTrackSummary(trackStatus()); } catch (e) { }

@@ -15,6 +15,7 @@
 <title>LemmaLab</title>
 <meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<meta name="lemmalab-v" content="2026-11-22.1448">
 <script>/* Fachwechsel: Browser mit Seitenübergängen (Safari 18.2+, Chrome 126+) blenden weich über.
    Ältere zeigen die Seite erst, wenn die App gezeichnet ist (kein leeres Zwischenbild). */
 if(!('onpagereveal' in window))document.documentElement.classList.add('hold');
@@ -1305,17 +1306,21 @@ body.focus .app:has(.swipeact){padding-bottom:calc(max(var(--safe-b),12px) + 10p
 
 .today{font-size:15px;font-weight:500;color:var(--muted);margin:-4px 0 14px;padding-left:4px}
 
-.tiers{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:4px 0 8px}
-.tier{background:var(--panel);border-radius:16px;padding:12px 8px 10px;text-align:center;border:1.5px solid transparent}
-.tier .tl{font-size:12.5px;font-weight:600;color:var(--muted)}
-.tier .tn{font-size:28px;font-weight:700;letter-spacing:-.02em;line-height:1.15;margin-top:2px}
-.tier .ts{font-size:12px;color:var(--muted)}
-.tier .tm{font-size:12.5px;margin-top:6px;color:var(--muted)}
-.tier.trec{border-color:color-mix(in srgb,var(--accent) 45%,transparent)}
-.tier.trec .tl{color:var(--accent)}
-.tier.ok .tm{color:var(--good);font-weight:600}
+.tcard{background:var(--panel);border-radius:18px;padding:16px 18px 14px;margin:4px 0 8px}
+.tcard .th{display:flex;align-items:baseline;gap:8px}
+.tcard .tbig{font-size:34px;font-weight:700;letter-spacing:-.03em;line-height:1}
+.tcard .tof{font-size:16px;color:var(--muted);font-weight:500}
+.tcard .tsub{font-size:13.5px;color:var(--muted);margin:4px 0 14px}
+.tbar{position:relative;height:8px;border-radius:4px;background:color-mix(in srgb,var(--ink) 9%,transparent);margin:0 0 10px}
+.tbar .tfill{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:var(--accent);transition:width .5s}
+.tbar .tk{position:absolute;top:-4px;width:2px;height:16px;margin-left:-1px;border-radius:1px;background:color-mix(in srgb,var(--ink) 35%,transparent)}
+.tbar .tk.trc{background:var(--accent);width:3px;margin-left:-1.5px}
+.tbar .tk.ok{background:var(--good)}
+.tleg{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;color:var(--muted)}
+.tleg b{color:var(--ink);font-weight:600;margin-right:3px}
+.tleg .rec b,.tleg .rec{color:var(--accent)}
 .tiernote{font-size:12.5px;color:var(--muted);margin:2px 6px 22px;line-height:1.45}
-.tierbtn{margin:-10px auto 22px;display:block}
+.tcard .tierbtn{display:block;width:100%;margin-top:14px}
 </style>
 </head>
 <body>
@@ -1335,9 +1340,9 @@ body.focus .app:has(.swipeact){padding-bottom:calc(max(var(--safe-b),12px) + 10p
 <div id="navbar" aria-hidden="true"><span id="navTitle"></span></div>
 <div class="toast" id="toast"></div>
 <script src="vendor/katex/katex.min.js"></script>
-<script src="fach.js?v=2026-11-22.1445"></script>
-<script src="app.js?v=2026-11-22.1445"></script>
+<script src="fach.js?v=2026-11-22.1448"></script>
+<script src="app.js?v=2026-11-22.1448"></script>
 <script src="vendor/supabase/supabase.js"></script>
-<script src="account.js?v=2026-11-22.1445"></script>
+<script src="account.js?v=2026-11-22.1448"></script>
 </body>
 </html>
