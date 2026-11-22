@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-22.1428';   // bei jeder Änderung neu setzen: sh tools/bump.sh (UTC-Zeit, nie von Hand runterzählen)
+const APP_VERSION = '2026-11-22.1432';   // bei jeder Änderung neu setzen: sh tools/bump.sh (UTC-Zeit, nie von Hand runterzählen)
 
 /* ============================================================
  * Grundlagen
@@ -742,13 +742,14 @@ function buildQueue() {
 /* Sitzung merken: Schliessen und später «Weiterlernen» startet bei derselben Karte, in derselben Reihenfolge
  * (gilt bis zum Ende des Lerntags; Karten, die inzwischen erledigt sind, fallen weg, neu fällige kommen hinten dazu). */
 const SessStore = {
-  key: () => 'lemmalab-sess-' + FACH,
+  // liegt im Lernstand (S.sess) und wird so mit dem Konto auf alle Geräte abgeglichen – neueste gewinnt
   save() {
     if (!session || session.custom) return;
-    try { localStorage.setItem(this.key(), JSON.stringify({ day: dayKey(now()), cur: session.cur, queue: session.queue, later: session.later, total: session.total, done: session.done, again: session.again, start: session.start, logFrom: session.logFrom, shown: session.shown, gap: session.gap, nNew: session.nNew, nRev: session.nRev })); } catch (e) { }
+    S.sess = { day: dayKey(now()), at: now(), cur: session.cur, queue: session.queue, later: session.later, total: session.total, done: session.done, again: session.again, start: session.start, logFrom: session.logFrom, shown: session.shown, gap: session.gap };
+    save();
   },
-  load() { try { const o = JSON.parse(localStorage.getItem(this.key()) || 'null'); return o && o.day === dayKey(now()) ? o : null; } catch (e) { return null; } },
-  clear() { try { localStorage.removeItem(this.key()); } catch (e) { } },
+  load() { const o = S.sess; return o && o.day === dayKey(now()) ? o : null; },
+  clear() { if (S.sess) { delete S.sess; save(); } },
 };
 function startSession(customIds) {
   const q = customIds ? { queue: customIds.slice(), later: [], nNew: 0, nRev: customIds.length } : buildQueue();
@@ -2761,6 +2762,7 @@ function mergeInto(o, anyId) {     // anyId: Lernstand eines anderen (nicht gela
   const seen = new Set(S.log.map(l => l[0] + '|' + l[1]));
   for (const l of o.log || []) if (Array.isArray(l) && l[0] >= ra && !seen.has(l[0] + '|' + l[1])) { S.log.push(l); seen.add(l[0] + '|' + l[1]); }
   if (o.settings && (o.settings.u || 0) > (S.settings.u || 0)) S.settings = { ...DEFAULT_SETTINGS, ...o.settings };
+  if (o.sess && (!S.sess || (o.sess.at || 0) > (S.sess.at || 0))) S.sess = o.sess;   // gemerkte Lernsitzung
   if (ra) {   // nach einem Zurücksetzen auf einem anderen Gerät
     S.settings.resetAt = ra;
     for (const [id, x] of Object.entries(S.cards)) if ((x.u || 0) < ra) delete S.cards[id];
