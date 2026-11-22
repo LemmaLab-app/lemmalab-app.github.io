@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-22.1450';   // bei jeder Änderung neu setzen: sh tools/bump.sh (UTC-Zeit, nie von Hand runterzählen)
+const APP_VERSION = '2026-11-22.1451';   // bei jeder Änderung neu setzen: sh tools/bump.sh (UTC-Zeit, nie von Hand runterzählen)
 // Seite (index.html, inkl. CSS) aus einer älteren Version, Skript schon neu? → einmal neu laden, sonst fehlen Styles
 (() => {
   const m = document.querySelector('meta[name="lemmalab-v"]'), v = m && m.content;
@@ -1199,15 +1199,18 @@ function tiersHTML(q) {
   const open = [...q.queue, ...q.later.filter(id => S.cards[id].due < end)].filter(id => S.cards[id] && S.cards[id].st && !done.has(id));
   const revLeft = open.length;
   const mnN = Math.min(minNewToday(), avail + intro), recN = Math.max(mnN, plannedNewPerDay()), mxN = Math.min(avail + intro, Math.max(recN, PACE.max));
+  // noch offen von heute: alles in der Warteschlange inkl. Lernschritte schon gelernter Karten
+  const pending = q.queue.length + q.later.filter(id => S.cards[id].due < end).length - Math.max(0, q.nNew);
   const tot = n => done.size + revLeft + Math.max(0, n - intro);
   const mn = tot(mnN), rec = tot(recN), mx = tot(mxN), d = done.size;
   if (!mx) return '';
-  const left = n => Math.max(0, n - intro), mins = n => Math.max(1, Math.round((left(n) * pt.newCost + revLeft * pt.review) / 60));
+  const left = n => Math.max(0, n - intro), mins = n => Math.max(1, Math.round((left(n) * pt.newCost + Math.max(revLeft, pending) * pt.review) / 60));
+  const reached = v => d >= v && pending <= 0;
   const pc = v => Math.min(100, v / mx * 100).toFixed(1);
-  const goal = d < mn ? ['Minimum', mn, mnN] : d < rec ? ['Empfohlen', rec, recN] : d < mx ? ['Maximal sinnvoll', mx, mxN] : null;
-  const sub = !goal ? 'Alles Sinnvolle für heute geschafft' : mn === rec && goal[0] === 'Minimum' ? `bis Empfohlen noch ~${mins(goal[2])} Min` : d >= mn && goal[0] === 'Empfohlen' ? `Minimum geschafft · bis Empfohlen noch ~${mins(goal[2])} Min` : d >= rec ? `Empfohlen geschafft · bis Maximum noch ~${mins(goal[2])} Min` : `bis ${goal[0]} noch ~${mins(goal[2])} Min`;
-  const mk = (v, cls) => `<i class="tk ${cls}${d >= v ? ' ok' : ''}" style="left:${pc(v)}%"></i>`;
-  const more = d >= rec && !revLeft && intro < mxN;
+  const goal = !reached(mn) ? ['Minimum', mn, mnN] : !reached(rec) ? ['Empfohlen', rec, recN] : d < mx ? ['Maximal sinnvoll', mx, mxN] : null;
+  const sub = pending > 0 && d >= (goal ? goal[1] : mx) ? `Noch ${pending} offene Karte${pending === 1 ? '' : 'n'} von heute fertig lernen (~${Math.max(1, Math.round(pending * pt.review / 60))} Min)` : !goal ? 'Alles Sinnvolle für heute geschafft' : mn === rec && goal[0] === 'Minimum' ? `bis Empfohlen noch ~${mins(goal[2])} Min` : d >= mn && goal[0] === 'Empfohlen' ? `Minimum geschafft · bis Empfohlen noch ~${mins(goal[2])} Min` : d >= rec ? `Empfohlen geschafft · bis Maximum noch ~${mins(goal[2])} Min` : `bis ${goal[0]} noch ~${mins(goal[2])} Min`;
+  const mk = (v, cls) => `<i class="tk ${cls}${reached(v) ? ' ok' : ''}" style="left:${pc(v)}%"></i>`;
+  const more = reached(rec) && intro < mxN;
   return `<div class="tcard">
     <div class="th"><span class="tbig">${d}</span><span class="tof">von ${rec} Karten</span></div>
     <div class="tsub">${sub}</div>
