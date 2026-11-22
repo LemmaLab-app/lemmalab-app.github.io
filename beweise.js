@@ -139,7 +139,7 @@ window.Beweise = (() => {
     const P = plan(), n = next(P), C = cover();
     const after = []; { const seen = new Set(n ? [n.b.id] : []); for (const b of P.due) if (!seen.has(b.id) && after.length < 3) { after.push([b, 'Wiederholung fällig']); seen.add(b.id); } for (const c of P.cands) if (!seen.has(c.b.id) && after.length < 3) { after.push([c.b, c.why]); seen.add(c.b.id); } }
     const dueLeft = P.due.length;
-    return `<div class="bwrap">${heroHTML(n, P)}
+    return `<div class="bwrap">${todayHTML()}${heroHTML(n, P)}
     ${UI.group([
       UI.row('Wiederholungen fällig', `<span class="v">${dueLeft}</span>`),
       UI.row('Neue Beweise heute', `<span class="v">${P.newToday} von ${P.perDay}</span>`),

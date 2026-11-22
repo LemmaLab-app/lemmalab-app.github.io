@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-21.1430';   // bei jeder Änderung neu setzen: sh tools/bump.sh (UTC-Zeit, nie von Hand runterzählen)
+const APP_VERSION = '2026-11-22.0906';   // bei jeder Änderung neu setzen: sh tools/bump.sh (UTC-Zeit, nie von Hand runterzählen)
 
 /* ============================================================
  * Grundlagen
@@ -914,6 +914,7 @@ function go(t) {
 window.addEventListener('hashchange', () => { const t = location.hash.slice(1); if (TABS.some(x => x[0] === t) && t !== tab) { tab = t; render(); } });
 
 function render() {
+  _shownDay = dayKey(now());
   if (window.MODUS === 'beweise' && window.Beweise) return Beweise.render();
   applyTheme();
   Model.sync();
@@ -1101,6 +1102,15 @@ function weakIds() {
   return CARDS.filter(c => { const x = S.cards[c.id]; return x && x.st && !x.susp && ((x.lapses || 0) >= 2 || retrievability(x) < 0.85); })
     .sort((a, b) => retrievability(S.cards[a.id]) - retrievability(S.cards[b.id])).map(c => c.id);
 }
+/* Heutiger Lerntag (beginnt um 04:00) – zeigt, dass der Plan für heute gilt */
+function todayHTML() {
+  const d = new Date(dayStart() + 12 * HOUR).toLocaleDateString('de-CH', { weekday: 'long', day: 'numeric', month: 'long' });
+  return `<div class="today">${d}</div>`;
+}
+let _shownDay = '';
+function checkDayChange() { if (dayKey(now()) !== _shownDay && !session && (typeof quiz === 'undefined' || !quiz) && !document.querySelector('.modal')) render(); }
+setInterval(checkDayChange, 60000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkDayChange(); });
 function viewHome() {
   try { saveTrackSummary(trackStatus()); } catch (e) { }
   const q = buildQueue();
@@ -1125,7 +1135,7 @@ function viewHome() {
     <div class="solo-s">etwa ${estMin} Minute${estMin === 1 ? '' : 'n'}</div>
     <button class="btn primary big solo-btn" data-act="start">${ts.startedToday ? 'Weiterlernen' : 'Lernen'}</button>
   </div>`;
-  return `<div class="home"><div class="col">
+  return `<div class="home"><div class="col">${todayHTML()}
   ${hero}
   ${ts.allDone ? '' : goalNoteHTML(false)}
   ${UI.group([
