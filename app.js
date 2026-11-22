@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-22.1432';   // bei jeder Änderung neu setzen: sh tools/bump.sh (UTC-Zeit, nie von Hand runterzählen)
+const APP_VERSION = '2026-11-22.1437';   // bei jeder Änderung neu setzen: sh tools/bump.sh (UTC-Zeit, nie von Hand runterzählen)
 
 /* ============================================================
  * Grundlagen
@@ -178,7 +178,20 @@ function eligibleNew(all) {   // all = auch noch gesperrte Skript-Karten (für P
     const fs = focusState();
     if (!fs.open && !all) list = list.filter(c => c.src === F);
   }
-  return list.sort((a, b) => (F ? (b.src === F) - (a.src === F) : 0) || (prioOf(b) - prioOf(a)) || (a.ord - b.ord));
+  return list.sort((a, b) => (F ? (b.src === F) - (a.src === F) : 0) || (prioOf(b) - prioOf(a)) || (importance(b) - importance(a)) || (a.ord - b.ord));
+}
+/* Feinere Wichtigkeit innerhalb einer Prioritätsstufe: Prüfungswahrscheinlichkeit (Modell aus alten Prüfungen).
+ * Definitionen erben den höchsten Wert ihres Abschnitts (mind. 6 %, Grundbegriffe werden auch direkt gefragt) – so kommt
+ * z. B. «Gleichmässige Konvergenz» zusammen mit den Sätzen dazu vor weniger gefragtem Stoff; bei gleichem Wert bleibt die Skript-Reihenfolge (Definition vor Satz). */
+let _imp = null;
+function importance(c) {
+  if (!_imp) {
+    _imp = {}; const sec = {};
+    const k = x => x.chap + '|' + x.sec;
+    for (const x of CARDS) sec[k(x)] = Math.max(sec[k(x)] || 0, x.proofP || 0);
+    for (const x of CARDS) _imp[x.id] = Math.round(100 * (x.kind === 'Definition' ? Math.max(sec[k(x)] || 0, x.proofP == null && !CARDS.some(y => y.proofP) ? 0 : 0.06) : Math.max(x.proofP || 0, 0.5 * (sec[k(x)] || 0))));
+  }
+  return _imp[c.id] || 0;
 }
 const FOCUS_SHARE = 0.8, FOCUS_STAB = 7;   // 80 % der Mitschrift-Karten gefestigt (Stabilität ≥ 7 Tage)
 function focusState() {
