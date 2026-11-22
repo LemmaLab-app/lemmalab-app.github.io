@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-22.1343';   // bei jeder Änderung neu setzen: sh tools/bump.sh (UTC-Zeit, nie von Hand runterzählen)
+const APP_VERSION = '2026-11-22.1347';   // bei jeder Änderung neu setzen: sh tools/bump.sh (UTC-Zeit, nie von Hand runterzählen)
 
 /* ============================================================
  * Grundlagen
@@ -217,7 +217,23 @@ function personalTimes() {
 const PACE = { minNew: 12, low: 20, mid: 16, max: 40, ...(FACH_CFG.pace || {}) };
 const MIN_NEW_BASE = PACE.minNew;
 function MIN_NEW() { const t = Tune.get(); return t && Number.isFinite(t.minNew) ? t.minNew : MIN_NEW_BASE; }   // so viele neue Karten pro Tag mindestens (Ziel: alles so schnell wie möglich beherrschen)
+/* Tagesplan: einmal pro Lerntag festgelegt (morgens neu berechnet aus Prüfungsdatum, Stand, Rückstand,
+ * Wiederholungslast und Prognose) – bleibt dann den ganzen Tag gleich. Neu bei Einstellungsänderung. */
+const DayPlan = {
+  key: () => 'lemmalab-dayplan-' + FACH,
+  sig: () => [dayKey(now()), S.settings.newMode, S.settings.newPerDay, S.settings.examDate, S.settings.includeRand, (Tune.get() || {}).at || 0].join('|'),
+  get(name, fn) {
+    let o = null; try { o = JSON.parse(localStorage.getItem(this.key()) || 'null'); } catch (e) { }
+    const sg = this.sig(); if (!o || o.sig !== sg) o = { sig: sg };
+    if (o[name] == null) { o[name] = fn(); try { localStorage.setItem(this.key(), JSON.stringify(o)); } catch (e) { } }
+    return o[name];
+  },
+};
 function plannedNewPerDay() {
+  const remaining = eligibleNew(true).length + newIntroducedToday();
+  return Math.min(DayPlan.get('plan', plannedNewPerDay0), remaining);
+}
+function plannedNewPerDay0() {
   if (S.settings.newMode === 'manual') return S.settings.newPerDay;
   // Gerechnet mit dem Stand zu Tagesbeginn (heute Eingeführtes/Wiederholtes zählt mit), damit die Zahl über den Tag gleich bleibt.
   const remaining = eligibleNew(true).length + newIntroducedToday();
@@ -242,6 +258,10 @@ function plannedNewPerDay() {
 }
 /* Was heute mindestens nötig ist, damit die Prognose hält (ohne Zuschlag «mehr, wenn Platz ist») */
 function minNewToday() {
+  const remaining = eligibleNew(true).length + newIntroducedToday();
+  return Math.min(DayPlan.get('min', minNewToday0), remaining);
+}
+function minNewToday0() {
   const remaining = eligibleNew(true).length + newIntroducedToday();
   if (!remaining) return 0;
   if (S.settings.newMode === 'manual') return Math.min(S.settings.newPerDay, remaining);
@@ -1177,7 +1197,7 @@ function viewHome() {
     UI.row('Wiederholungen', `<span class="v">${q.nRev}</span>`),
     UI.row('Neue Karten', `<span class="v">${q.nNew}</span>`),
     UI.row('Heute gelernt', `<span class="v">${todayLog.length} Karte${todayLog.length === 1 ? '' : 'n'} · ${minToday} Min</span>`),
-  ], { header: 'Heute' })}
+  ], { header: 'Heute', footer: S.settings.newMode === 'manual' ? `Plan: ${plannedNewPerDay()} neue Karten pro Tag (manuell).` : `Plan für heute: ${plannedNewPerDay()} neue Karten. Wird jeden Morgen automatisch neu berechnet – aus Prüfungsdatum, deinem Stand, Rückstand und den anstehenden Wiederholungen.` })}
   </div><div class="col">
   ${UI.group([
     UI.row('Prüfung', `<span class="v">${dte > 0 ? `in ${dte} Tagen` : dte === 0 ? 'heute' : 'vorbei'}</span>`),
