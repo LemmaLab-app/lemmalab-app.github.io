@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-22.1355';   // bei jeder Änderung neu setzen: sh tools/bump.sh (UTC-Zeit, nie von Hand runterzählen)
+const APP_VERSION = '2026-11-22.1428';   // bei jeder Änderung neu setzen: sh tools/bump.sh (UTC-Zeit, nie von Hand runterzählen)
 
 /* ============================================================
  * Grundlagen
@@ -1417,7 +1417,9 @@ function viewStudy() {
   const c = BY_ID[s.cur], x = cs(c.id);
   const isNew = !x.st;
   const left = s.queue.length + 1 + s.later.length;
-  const pct = s.total ? clamp(s.done / (s.done + left) * 100, 0, 100) : 0;
+  // Fortschritt des ganzen Lerntags (alle Sitzungen und Geräte), nicht nur dieser Sitzung
+  const doneN = s.custom ? s.done : S.log.filter(l => l[0] >= dayStart() && modeOf(l) !== 'q').length;
+  const pct = (doneN + left) ? clamp(doneN / (doneN + left) * 100, 0, 100) : 0;
   const ivls = s.revealed ? previewIvls(c) : null;
   return `
   <div class="study-head">
