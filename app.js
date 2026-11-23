@@ -3,7 +3,7 @@
  * Fortschritt: localStorage (immer) + optional Cloud-Sync (claude.ai Artifact-DB).
  */
 'use strict';
-const APP_VERSION = '2026-11-22.1451';   // bei jeder Änderung neu setzen: sh tools/bump.sh (UTC-Zeit, nie von Hand runterzählen)
+const APP_VERSION = '2026-11-23.0929';   // bei jeder Änderung neu setzen: sh tools/bump.sh (UTC-Zeit, nie von Hand runterzählen)
 // Seite (index.html, inkl. CSS) aus einer älteren Version, Skript schon neu? → einmal neu laden, sonst fehlen Styles
 (() => {
   const m = document.querySelector('meta[name="lemmalab-v"]'), v = m && m.content;
