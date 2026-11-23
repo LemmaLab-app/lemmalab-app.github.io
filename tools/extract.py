@@ -69,6 +69,17 @@ def is_stop(l, kind, M=72):
         return True
     return False
 
+# Definitionen, deren Text im Skript über einen weiteren Absatz geht (in aufrechter Schrift nicht erkennbar):
+# Anzahl zusätzlicher Absätze, die noch dazugehören
+CONT = {'Definition 8.1': 1,    # rechts-/linksseitige Ableitung
+        'Definition 1.14': 1,   # Obermenge, «enthalten»
+        'Definition 1.31': 1,   # Gleichheit von Funktionen, Bild
+        'Definition 1.74': 2,   # endliche/unendliche Menge
+        'Definition 2.41': 2,   # endliche/beschränkte Intervalle
+        'Definition 4.11': 1,   # Integrationsgrenzen, Integrand
+        'Definition 5.48': 1,   # folgenstetig
+        'Definition 8.16': 1}   # lokales Extremum
+
 items = []
 for pno in range(FIRST - 1, LAST):
     L = page_bounds(lines_of(pno))
@@ -85,10 +96,13 @@ for pno in range(FIRST - 1, LAST):
         j = i + 1
         lines = L
         end_y = None
+        skip_left = CONT.get(f'{kind} {nr}', 0)
         while True:
             stop = None
             for k in range(j, len(lines)):
                 if is_stop(lines[k], kind, margin_of_page(cur_p)):
+                    if skip_left > 0 and not lines[k]['bold']:
+                        skip_left -= 1; continue
                     stop = lines[k]
                     break
             figs = fig_tops(cur_p, start_y + 12)
