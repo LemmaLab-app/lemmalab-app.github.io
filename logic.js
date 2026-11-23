@@ -120,8 +120,16 @@ window.LOGIC = {
 ],
 "Definition-1.74": [
 [
-"",
+"Kardinalität n",
 "|X|=n:\\Longleftrightarrow \\exists f:\\{1,\\dots,n\\}\\to X \\text{ bijektiv}"
+],
+[
+"endlich",
+"|X|<\\infty:\\Longleftrightarrow \\exists n\\in\\mathbb N_0:\\ |X|=n"
+],
+[
+"unendlich",
+"|X|=\\infty:\\Longleftrightarrow \\neg\\,\\exists n\\in\\mathbb N_0:\\ |X|=n"
 ]
 ],
 "Proposition-1.75": [
@@ -796,8 +804,12 @@ window.LOGIC = {
 ],
 "Definition-5.48": [
 [
-"",
+"ε-δ-stetig bei x₀",
 "\\forall\\varepsilon>0\\ \\exists\\delta>0\\ \\forall x\\in X:\\ d_X(x,x_0)<\\delta\\Rightarrow d_Y(f(x),f(x_0))<\\varepsilon"
+],
+[
+"folgenstetig bei x₀",
+"\\forall (x_n)_n\\subseteq X:\\ \\lim_{n\\to\\infty}x_n=x_0\\implies \\lim_{n\\to\\infty}f(x_n)=f(x_0)"
 ]
 ],
 "Lemma-5.49": [
@@ -1178,8 +1190,16 @@ window.LOGIC = {
 ],
 "Definition-8.1": [
 [
-"",
+"beidseitig",
 "f\\text{ diff'bar bei }a:\\Longleftrightarrow \\exists L\\in\\mathbb R\\ \\forall\\varepsilon>0\\ \\exists\\delta>0\\ \\forall x\\in D:\\ 0<|x-a|<\\delta\\Rightarrow\\Big|\\frac{f(x)-f(a)}{x-a}-L\\Big|<\\varepsilon\\quad(L=f'(a))"
+],
+[
+"rechtsseitig",
+"f\\text{ rechtsseitig diff'bar bei }a:\\Longleftrightarrow \\exists L\\in\\mathbb R\\ \\forall\\varepsilon>0\\ \\exists\\delta>0\\ \\forall x\\in D:\\ a<x<a+\\delta\\Rightarrow\\Big|\\frac{f(x)-f(a)}{x-a}-L\\Big|<\\varepsilon\\quad(L=f'_+(a))"
+],
+[
+"linksseitig",
+"f\\text{ linksseitig diff'bar bei }a:\\Longleftrightarrow \\exists L\\in\\mathbb R\\ \\forall\\varepsilon>0\\ \\exists\\delta>0\\ \\forall x\\in D:\\ a-\\delta<x<a\\Rightarrow\\Big|\\frac{f(x)-f(a)}{x-a}-L\\Big|<\\varepsilon\\quad(L=f'_-(a))"
 ]
 ],
 "Proposition-8.5": [

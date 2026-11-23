@@ -3,7 +3,8 @@
 # Jeder Eintrag: Liste von (Beschriftung, LaTeX).
 L = {}
 def add(key, *rows):
-    L[key.replace(' ', '-')] = [r if isinstance(r, tuple) else ('', r) for r in rows]
+    rows = [r if isinstance(r, tuple) else ('', r) for r in rows]
+    L[key.replace(' ', '-')] = [(a, b.replace("\\'", "'")) for a, b in rows]   # \' in r'…' → '
 
 # ---------------- Kapitel 1 ----------------
 add('Lemma 1.3', r'\forall n\in\mathbb N:\ \sum_{k=1}^{n} k^2=\frac{n^3}{3}+\frac{n^2}{2}+\frac{n}{6}')
@@ -34,7 +35,10 @@ add('Proposition 1.67',
     ('', r'\sim \text{ Äquivalenzrelation}\implies \mathcal P_\sim=\{[x]_\sim\mid x\in X\}\text{ ist Partition von }X'),
     ('', r'\mathcal P \text{ Partition}\implies \big(x\sim_{\mathcal P}y:\Longleftrightarrow \exists P\in\mathcal P:\ x\in P\wedge y\in P\big)\text{ ist Äquivalenzrelation}'),
     ('', r'\mathcal P_{\sim_{\mathcal P}}=\mathcal P\quad\wedge\quad \sim_{\mathcal P_\sim}\;=\;\sim'))
-add('Definition 1.74', r'|X|=n:\Longleftrightarrow \exists f:\{1,\dots,n\}\to X \text{ bijektiv}')
+add('Definition 1.74',
+    ('Kardinalität n', r'|X|=n:\Longleftrightarrow \exists f:\{1,\dots,n\}\to X \text{ bijektiv}'),
+    ('endlich', r'|X|<\infty:\Longleftrightarrow \exists n\in\mathbb N_0:\ |X|=n'),
+    ('unendlich', r'|X|=\infty:\Longleftrightarrow \neg\,\exists n\in\mathbb N_0:\ |X|=n'))
 add('Proposition 1.75',
     ('', r'|X|=m>n=|Y|\implies \neg\,\exists f:X\to Y \text{ injektiv}'),
     ('', r'\exists f:X\to Y \text{ bijektiv}\iff |X|=|Y|'))
@@ -183,7 +187,9 @@ add('Lemma 5.39', r'a_n\to A\implies \forall(n_k)_k\text{ streng monoton wachsen
 add('Proposition 5.42', r'\exists(a_{n_k})_k:\ a_{n_k}\to A\iff \forall\varepsilon>0\ \forall N\in\mathbb N\ \exists n\ge N:\ d(a_n,A)<\varepsilon')
 add('Proposition 5.44', r'v_n\xrightarrow{\|\cdot\|_\infty}v\iff v_n\xrightarrow{\|\cdot\|_1}v\iff v_n\xrightarrow{\|\cdot\|_2}v\iff \forall j\in\{1,\dots,d\}:\ \pi_j(v_n)\to\pi_j(v)')
 add('Korollar 5.45', r'a_n\to a\iff \operatorname{Re}(a_n)\to\operatorname{Re}(a)\ \wedge\ \operatorname{Im}(a_n)\to\operatorname{Im}(a)')
-add('Definition 5.48', r'\forall\varepsilon>0\ \exists\delta>0\ \forall x\in X:\ d_X(x,x_0)<\delta\Rightarrow d_Y(f(x),f(x_0))<\varepsilon')
+add('Definition 5.48',
+    ('ε-δ-stetig bei x₀', r'\forall\varepsilon>0\ \exists\delta>0\ \forall x\in X:\ d_X(x,x_0)<\delta\Rightarrow d_Y(f(x),f(x_0))<\varepsilon'),
+    ('folgenstetig bei x₀', r'\forall (x_n)_n\subseteq X:\ \lim_{n\to\infty}x_n=x_0\implies \lim_{n\to\infty}f(x_n)=f(x_0)'))
 add('Lemma 5.49',
     ('folgenstetig', r'\forall(x_n)_n\in X^{\mathbb N}:\ x_n\to x_0\implies f(x_n)\to f(x_0)'),
     ('Aussage', r'f\ \varepsilon\text{-}\delta\text{-stetig bei }x_0\iff f\text{ folgenstetig bei }x_0'))
@@ -268,7 +274,10 @@ add('Korollar 7.86', r'\forall a,b\in\mathbb R:\ \int_a^b\exp=\exp b-\exp a,\qua
 add('Proposition 7.97', r'f_P:[0,1]\to[0,1]^2\text{ stetig}\ \wedge\ \forall y\in[0,1]^2\ \exists t\in[0,1]:\ f_P(t)=y')
 
 # ---------------- Kapitel 8 ----------------
-add('Definition 8.1', r"f\text{ diff'bar bei }a:\Longleftrightarrow \exists L\in\mathbb R\ \forall\varepsilon>0\ \exists\delta>0\ \forall x\in D:\ 0<|x-a|<\delta\Rightarrow\Big|\frac{f(x)-f(a)}{x-a}-L\Big|<\varepsilon\quad(L=f'(a))")
+add('Definition 8.1',
+    ('beidseitig', r"f\text{ diff'bar bei }a:\Longleftrightarrow \exists L\in\mathbb R\ \forall\varepsilon>0\ \exists\delta>0\ \forall x\in D:\ 0<|x-a|<\delta\Rightarrow\Big|\frac{f(x)-f(a)}{x-a}-L\Big|<\varepsilon\quad(L=f'(a))"),
+    ('rechtsseitig', r"f\text{ rechtsseitig diff'bar bei }a:\Longleftrightarrow \exists L\in\mathbb R\ \forall\varepsilon>0\ \exists\delta>0\ \forall x\in D:\ a<x<a+\delta\Rightarrow\Big|\frac{f(x)-f(a)}{x-a}-L\Big|<\varepsilon\quad(L=f'_+(a))"),
+    ('linksseitig', r"f\text{ linksseitig diff'bar bei }a:\Longleftrightarrow \exists L\in\mathbb R\ \forall\varepsilon>0\ \exists\delta>0\ \forall x\in D:\ a-\delta<x<a\Rightarrow\Big|\frac{f(x)-f(a)}{x-a}-L\Big|<\varepsilon\quad(L=f'_-(a))"))
 add('Proposition 8.5', r"f,g\text{ diff'bar bei }a\implies (f+g)'(a)=f'(a)+g'(a)\ \wedge\ (fg)'(a)=f'(a)g(a)+f(a)g'(a)")
 add('Korollar 8.6', r"\forall x\in\mathbb R:\ (1)'=0,\qquad \forall n\in\mathbb N\ \forall x\in\mathbb R:\ (x^n)'=nx^{n-1}")
 add('Satz 8.8', r"f\text{ diff'bar bei }x_0\ \wedge\ g\text{ diff'bar bei }f(x_0)\implies (g\circ f)'(x_0)=g'(f(x_0))\,f'(x_0)")
@@ -316,3 +325,11 @@ add('Satz 9.35', r'f:[1,\infty)\to\mathbb R_{\ge0}\text{ mon. fallend}\implies \
 add('Theorem 9.46', r'f\in C^{n+1}((a,b))\implies \forall x\in(a,b):\ f(x)=\sum_{k=0}^n\frac{f^{(k)}(x_0)}{k!}(x-x_0)^k+\int_{x_0}^xf^{(n+1)}(t)\frac{(x-t)^n}{n!}\,dt')
 add('Korollar 9.47', r'\big|f(x)-P^f_{x_0,n}(x)\big|\le M_{n+1}\frac{|x-x_0|^{n+1}}{(n+1)!},\qquad M_{n+1}=\max_{t\text{ zw. }x_0,x}|f^{(n+1)}(t)|')
 add('Lemma 9.67', r'\varphi\text{ Reparametrisierung}\implies L(\gamma\circ\varphi)=L(\gamma);\qquad \gamma\text{ regulär}\implies \exists\varphi:\ \forall s:\ \|(\gamma\circ\varphi)\'(s)\|=1')
+
+
+if __name__ == '__main__':
+    import json, os
+    out = os.path.join(os.path.dirname(__file__), '..', 'logic.js')
+    with open(out, 'w') as f:
+        f.write('// Prädikatenlogische Formulierungen (aus tools/logic.py erzeugt). Format: id -> [[Beschriftung, LaTeX], …]\n')
+        f.write('window.LOGIC = ' + json.dumps({k: [list(r) for r in v] for k, v in L.items()}, ensure_ascii=False, indent=0) + ';\n')
